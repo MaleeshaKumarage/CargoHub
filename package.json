@@ -1,0 +1,10 @@
+{
+  "name": "portal-backend",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix portal",
+    "dev": "npm run dev --prefix portal",
+    "start": "npm run start --prefix portal",
+    "lint": "npm run lint --prefix portal"
+  }
+}

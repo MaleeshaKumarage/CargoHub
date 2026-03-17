@@ -1,0 +1,22 @@
+# PostgreSQL for local development. Start with: docker compose up -d
+# Or use run.ps1 to start DB and API in one go.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: portal-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: portal
+    ports:
+      - "5433:5432"   # Use 5433 on host to avoid conflict with local PostgreSQL on 5432
+    volumes:
+      - portal_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d portal"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  portal_pgdata:

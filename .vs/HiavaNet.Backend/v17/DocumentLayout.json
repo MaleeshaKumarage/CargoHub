@@ -1,0 +1,201 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\malee\\source\\HiavaNet.Backend\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|solutionrelative:hiavanet.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\smtpemailsender.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\smtpemailsender.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\servicecollectionextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\servicecollectionextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\matkahuoltocourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\matkahuoltocourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\hameentavarataxicourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\hameentavarataxicourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\dhlexpresscourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\dhlexpresscourierclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.infrastructure\\couriers\\courierbookingclientfactory.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E1862A89-C25B-4040-A71C-78EC43E52135}|HiavaNet.Infrastructure\\HiavaNet.Infrastructure.csproj|solutionrelative:hiavanet.infrastructure\\couriers\\courierbookingclientfactory.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5B5C600-76ED-466C-8334-B159C2A211DC}|HiavaNet.Application\\HiavaNet.Application.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.application\\auth\\handlers\\loginusercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5B5C600-76ED-466C-8334-B159C2A211DC}|HiavaNet.Application\\HiavaNet.Application.csproj|solutionrelative:hiavanet.application\\auth\\handlers\\loginusercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5B5C600-76ED-466C-8334-B159C2A211DC}|HiavaNet.Application\\HiavaNet.Application.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.application\\auth\\dtos\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5B5C600-76ED-466C-8334-B159C2A211DC}|HiavaNet.Application\\HiavaNet.Application.csproj|solutionrelative:hiavanet.application\\auth\\dtos\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.api\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|solutionrelative:hiavanet.api\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|c:\\users\\malee\\source\\hiavanet.backend\\hiavanet.api\\hiavanet.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{F0E2629D-03C5-4BCD-9DC9-C7B4E34BEBA3}|HiavaNet.Api\\HiavaNet.Api.csproj|solutionrelative:hiavanet.api\\hiavanet.api.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\Program.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Api\\Program.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\Program.cs",
+              "RelativeToolTip": "HiavaNet.Api\\Program.cs",
+              "ViewState": "AgIAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:13:14.949Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "SmtpEmailSender.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\SmtpEmailSender.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\SmtpEmailSender.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\SmtpEmailSender.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\SmtpEmailSender.cs",
+              "ViewState": "AgIAABsAAAAAAAAAAAAIwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:13:01.782Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ServiceCollectionExtensions.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\ServiceCollectionExtensions.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\ServiceCollectionExtensions.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\ServiceCollectionExtensions.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\ServiceCollectionExtensions.cs",
+              "ViewState": "AgIAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:12:58.918Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "MatkahuoltoCourierClient.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\MatkahuoltoCourierClient.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\MatkahuoltoCourierClient.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\MatkahuoltoCourierClient.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\MatkahuoltoCourierClient.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:12:57.019Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "HameenTavarataxiCourierClient.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\HameenTavarataxiCourierClient.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\HameenTavarataxiCourierClient.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\HameenTavarataxiCourierClient.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\HameenTavarataxiCourierClient.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:12:55.038Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "DhlExpressCourierClient.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\DhlExpressCourierClient.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\DhlExpressCourierClient.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\DhlExpressCourierClient.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\DhlExpressCourierClient.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:12:48.371Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "CourierBookingClientFactory.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\CourierBookingClientFactory.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Infrastructure\\Couriers\\CourierBookingClientFactory.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Infrastructure\\Couriers\\CourierBookingClientFactory.cs",
+              "RelativeToolTip": "HiavaNet.Infrastructure\\Couriers\\CourierBookingClientFactory.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-04T18:12:44.725Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "LoginUserCommandHandler.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Application\\Auth\\Handlers\\LoginUserCommandHandler.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Application\\Auth\\Handlers\\LoginUserCommandHandler.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Application\\Auth\\Handlers\\LoginUserCommandHandler.cs",
+              "RelativeToolTip": "HiavaNet.Application\\Auth\\Handlers\\LoginUserCommandHandler.cs",
+              "ViewState": "AgIAADoAAAAAAAAAAAAAADwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-03T07:55:46.251Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "AuthDtos.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Application\\Auth\\Dtos\\AuthDtos.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Application\\Auth\\Dtos\\AuthDtos.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Application\\Auth\\Dtos\\AuthDtos.cs",
+              "RelativeToolTip": "HiavaNet.Application\\Auth\\Dtos\\AuthDtos.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-03T07:33:56.837Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "HiavaNet.Api\\Controllers\\AuthController.cs",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "HiavaNet.Api\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAABQAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-03T07:33:26.318Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "HiavaNet.Api.csproj",
+              "DocumentMoniker": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\HiavaNet.Api.csproj",
+              "RelativeDocumentMoniker": "HiavaNet.Api\\HiavaNet.Api.csproj",
+              "ToolTip": "C:\\Users\\malee\\source\\HiavaNet.Backend\\HiavaNet.Api\\HiavaNet.Api.csproj",
+              "RelativeToolTip": "HiavaNet.Api\\HiavaNet.Api.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-03-03T07:33:20.595Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

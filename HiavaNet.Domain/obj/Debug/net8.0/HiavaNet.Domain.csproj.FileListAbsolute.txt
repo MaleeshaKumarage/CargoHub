@@ -1,0 +1,11 @@
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\bin\Debug\net8.0\HiavaNet.Domain.deps.json
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\bin\Debug\net8.0\HiavaNet.Domain.dll
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\bin\Debug\net8.0\HiavaNet.Domain.pdb
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.AssemblyInfoInputs.cache
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.AssemblyInfo.cs
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.csproj.CoreCompileInputs.cache
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.dll
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\refint\HiavaNet.Domain.dll
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\HiavaNet.Domain.pdb
+C:\Users\malee\source\HiavaNet.Backend\HiavaNet.Domain\obj\Debug\net8.0\ref\HiavaNet.Domain.dll

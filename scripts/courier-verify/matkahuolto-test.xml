@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MHShipmentRequest>
+  <UserId>9430023</UserId>
+  <Password>456</Password>
+  <Version>2.0</Version>
+  <Shipment>
+    <ShipmentType>N</ShipmentType>
+    <MessageType>N</MessageType>
+    <ShipmentNumber>null</ShipmentNumber>
+    <ShipmentDate>10.03.2025</ShipmentDate>
+    <Weight>5.00</Weight>
+    <Volume>0.01</Volume>
+    <Packages>1</Packages>
+    <SenderId>9430023</SenderId>
+    <SenderName1>Hiava Test Shipper</SenderName1>
+    <SenderAddress>Testikatu 1</SenderAddress>
+    <SenderAddress2></SenderAddress2>
+    <SenderPostal>00100</SenderPostal>
+    <SenderCity>Helsinki</SenderCity>
+    <SenderCountry>FI</SenderCountry>
+    <SenderContactName>Test Contact</SenderContactName>
+    <SenderContactNumber>+358401234567</SenderContactNumber>
+    <SenderEmail>test@example.com</SenderEmail>
+    <ReceiverName1>Test Receiver</ReceiverName1>
+    <ReceiverAddress>Vastaanottajantie 2</ReceiverAddress>
+    <ReceiverAddress2></ReceiverAddress2>
+    <ReceiverPostal>00100</ReceiverPostal>
+    <ReceiverCity>Helsinki</ReceiverCity>
+    <ReceiverCountry>FI</ReceiverCountry>
+    <ReceiverContactName>Receiver Contact</ReceiverContactName>
+    <ReceiverContactNumber>+358409876543</ReceiverContactNumber>
+    <ReceiverEmail>receiver@example.com</ReceiverEmail>
+    <ReceiverLanguage>EN</ReceiverLanguage>
+    <PayerCode>S</PayerCode>
+    <PayerId>9430023</PayerId>
+    <PayerName1>Hiava Test</PayerName1>
+    <PayerAddress>Testikatu 1</PayerAddress>
+    <PayerPostal>00100</PayerPostal>
+    <PayerCity>Helsinki</PayerCity>
+    <PayerCountry>FI</PayerCountry>
+    <ProductCode>N</ProductCode>
+    <Pickup>Y</Pickup>
+    <PickupPayer>S</PickupPayer>
+    <Delivery>Y</Delivery>
+    <DeliveryPayer>S</DeliveryPayer>
+    <Goods>Verify test</Goods>
+    <DeliveryPinCode>00100</DeliveryPinCode>
+  </Shipment>
+</MHShipmentRequest>
