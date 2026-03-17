@@ -55,15 +55,17 @@ jobs:
 
       - name: Coverage summary
         run: |
-          COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" | head -1)
-          if [ -n "$COV_FILE" ]; then
-            RATE=$(grep -o 'line-rate="[^"]*"' "$COV_FILE" | head -1 | cut -d'"' -f2)
-            COVERAGE=$(awk "BEGIN {printf \"%.1f\", $RATE*100}")
-            echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-            echo "**Line coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-            echo "Coverage data not found." >> $GITHUB_STEP_SUMMARY
+          COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
+          COVERAGE="N/A"
+          if [ -n "$COV_FILE" ] && [ -f "$COV_FILE" ]; then
+            RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
+            if [ -n "$RATE" ]; then
+              COVERAGE=$(awk "BEGIN {printf \"%.1f\", $RATE*100}" 2>/dev/null || echo "N/A")
+            fi
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download the **coverage-report** artifact to view the full HTML report." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Coverage Report"
+            echo "**Line coverage: ${COVERAGE}%**"
+            echo ""
+            echo "Download the **coverage-report** artifact to view the full HTML report."
+          } >> $GITHUB_STEP_SUMMARY
