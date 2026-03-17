@@ -478,6 +478,11 @@ describe("api", () => {
       const s = await addSender("token", { name: "Sender" });
       expect(s.id).toBe("s1");
     });
+    it("includes companyId in URL when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({ id: "s1" }) });
+      await addSender("token", { name: "S" }, "c1");
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("companyId=c1"), expect.any(Object));
+    });
     it("throws when API returns non-ok", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
@@ -495,6 +500,18 @@ describe("api", () => {
       });
       const r = await addReceiver("token", { name: "Receiver" });
       expect(r.id).toBe("r1");
+    });
+    it("includes companyId in URL when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({ id: "r1" }) });
+      await addReceiver("token", { name: "R" }, "c1");
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("companyId=c1"), expect.any(Object));
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Failed" }),
+      });
+      await expect(addReceiver("token", {})).rejects.toThrow("Failed");
     });
   });
 
@@ -546,6 +563,22 @@ describe("api", () => {
       });
       await expect(bookingCreate("token", {})).rejects.toThrow(/migration|IsDraft/);
     });
+    it("throws with migration hint when message includes column", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: "column X does not exist" }),
+      });
+      await expect(bookingCreate("token", {})).rejects.toThrow(/migration|column/);
+    });
+    it("throws generic message when API returns non-ok without IsDraft", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: "Invalid receiver" }),
+      });
+      await expect(bookingCreate("token", {})).rejects.toThrow("Invalid receiver");
+    });
   });
 
   describe("draftList", () => {
@@ -595,6 +628,17 @@ describe("api", () => {
       const d = await draftUpdate("token", "d1", { receiverName: "R2" });
       expect(d.id).toBe("d1");
     });
+    it("throws Draft not found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+      await expect(draftUpdate("token", "x", {})).rejects.toThrow("Draft not found");
+    });
+    it("throws when API returns non-ok with message", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Validation failed" }),
+      });
+      await expect(draftUpdate("token", "d1", {})).rejects.toThrow("Validation failed");
+    });
   });
 
   describe("draftConfirm", () => {
@@ -605,6 +649,17 @@ describe("api", () => {
       });
       const b = await draftConfirm("token", "d1");
       expect(b.id).toBe("b1");
+    });
+    it("throws Draft not found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+      await expect(draftConfirm("token", "x")).rejects.toThrow("Draft not found");
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Draft already confirmed" }),
+      });
+      await expect(draftConfirm("token", "d1")).rejects.toThrow("Draft already confirmed");
     });
   });
 

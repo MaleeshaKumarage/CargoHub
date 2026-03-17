@@ -23,4 +23,11 @@ describe("Button", () => {
     expect(btn).toHaveAttribute("data-variant", "destructive");
     expect(btn).toHaveAttribute("data-size", "lg");
   });
+
+  it("applies outline and ghost variants", () => {
+    const { rerender } = render(<Button variant="outline">Outline</Button>);
+    expect(screen.getByRole("button")).toHaveAttribute("data-variant", "outline");
+    rerender(<Button variant="ghost">Ghost</Button>);
+    expect(screen.getByRole("button")).toHaveAttribute("data-variant", "ghost");
+  });
 });
