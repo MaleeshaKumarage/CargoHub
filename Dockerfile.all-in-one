@@ -1,0 +1,59 @@
+# All-in-one: PostgreSQL + API + Portal in a single image
+# Run: docker run -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
+
+# ---- Build API ----
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS api-build
+WORKDIR /src
+COPY CargoHub.Backend.sln ./
+COPY CargoHub.Api/CargoHub.Api.csproj CargoHub.Api/
+COPY CargoHub.Application/ CargoHub.Application/
+COPY CargoHub.Domain/ CargoHub.Domain/
+COPY CargoHub.Infrastructure/ CargoHub.Infrastructure/
+RUN dotnet restore CargoHub.Api/CargoHub.Api.csproj
+COPY . .
+RUN dotnet publish CargoHub.Api/CargoHub.Api.csproj -c Release -o /app/publish --no-restore
+
+# ---- Build Portal ----
+FROM node:20-alpine AS portal-build
+WORKDIR /app
+ENV NEXT_PUBLIC_API_URL=http://localhost:8080
+COPY portal/package.json portal/package-lock.json* ./
+RUN npm ci
+COPY portal/ .
+RUN npm run build
+
+# ---- Final: Postgres + .NET + Node ----
+FROM postgres:16-alpine
+
+ENV POSTGRES_DB=portal POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+
+# Install .NET 8 runtime (Alpine)
+RUN apk add --no-cache icu-libs
+COPY --from=mcr.microsoft.com/dotnet/aspnet:8.0-alpine /usr/share/dotnet /usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}" \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+# Install Node.js
+RUN apk add --no-cache nodejs
+
+# Copy API
+COPY --from=api-build /app/publish /app/api
+
+# Copy Portal (standalone)
+COPY --from=portal-build /app/.next/standalone /app/portal
+COPY --from=portal-build /app/.next/static /app/portal/.next/static
+COPY --from=portal-build /app/public /app/portal/public
+
+# Startup script (fix CRLF if from Windows)
+COPY docker/start-all-in-one.sh /start.sh
+RUN sed -i 's/\r$//' /start.sh 2>/dev/null || true && chmod +x /start.sh
+
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    PORT=8080 \
+    ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=portal;Username=postgres;Password=postgres" \
+    Cors__PortalOrigin="http://localhost:3000" \
+    Bootstrap__Secret="SuperAdminBootstrapSecret" \
+    Jwt__SigningKey="DemoJwtKey-ChangeMe-AtLeast32Chars"
+
+EXPOSE 3000 8080
+ENTRYPOINT ["/start.sh"]

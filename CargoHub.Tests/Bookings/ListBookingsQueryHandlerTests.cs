@@ -34,7 +34,7 @@ public class ListBookingsQueryHandlerTests
     {
         var b1 = CreateBooking(Guid.NewGuid());
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<BookingListFilter?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Booking> { b1 });
         repo.Setup(r => r.GetStatusHistoryForBookingIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<BookingStatusEventDto>> { { b1.Id, new List<BookingStatusEventDto>() } });
@@ -52,7 +52,7 @@ public class ListBookingsQueryHandlerTests
     {
         var b1 = CreateBooking(Guid.NewGuid());
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.ListAllAsync(0, 100, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.ListAllAsync(0, 100, It.IsAny<BookingListFilter?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Booking> { b1 });
         repo.Setup(r => r.GetStatusHistoryForBookingIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<BookingStatusEventDto>> { { b1.Id, new List<BookingStatusEventDto>() } });
@@ -67,7 +67,7 @@ public class ListBookingsQueryHandlerTests
     public async Task Handle_WhenListEmpty_ReturnsEmptyWithEmptyStatusHistory()
     {
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.ListByCustomerIdAsync("cust-empty", 0, 100, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.ListByCustomerIdAsync("cust-empty", 0, 100, It.IsAny<BookingListFilter?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Booking>());
         repo.Setup(r => r.GetStatusHistoryForBookingIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<BookingStatusEventDto>>());
@@ -84,7 +84,7 @@ public class ListBookingsQueryHandlerTests
         var b1 = CreateBooking(Guid.NewGuid());
         var statusEvent = new BookingStatusEventDto { Status = "Completed", OccurredAtUtc = DateTime.UtcNow };
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<BookingListFilter?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Booking> { b1 });
         repo.Setup(r => r.GetStatusHistoryForBookingIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<BookingStatusEventDto>> { { b1.Id, new List<BookingStatusEventDto> { statusEvent } } });
@@ -101,7 +101,7 @@ public class ListBookingsQueryHandlerTests
     {
         var b1 = CreateBooking(Guid.NewGuid());
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.ListByCustomerIdAsync("cust-1", 0, 100, It.IsAny<BookingListFilter?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Booking> { b1 });
         repo.Setup(r => r.GetStatusHistoryForBookingIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<BookingStatusEventDto>>());

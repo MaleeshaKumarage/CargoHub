@@ -8,10 +8,10 @@ namespace CargoHub.Application.Bookings;
 /// </summary>
 public interface IBookingRepository
 {
-    /// <summary>List completed bookings only (IsDraft == false).</summary>
-    Task<List<BookingEntity>> ListByCustomerIdAsync(string customerId, int skip = 0, int take = 100, CancellationToken cancellationToken = default);
-    /// <summary>List all completed bookings (all customers). Used by SuperAdmin.</summary>
-    Task<List<BookingEntity>> ListAllAsync(int skip = 0, int take = 100, CancellationToken cancellationToken = default);
+    /// <summary>List completed bookings only (IsDraft == false). Optional filter for search, date range, enabled.</summary>
+    Task<List<BookingEntity>> ListByCustomerIdAsync(string customerId, int skip = 0, int take = 100, BookingListFilter? filter = null, CancellationToken cancellationToken = default);
+    /// <summary>List all completed bookings (all customers). Used by SuperAdmin. Optional filter for search, date range, enabled.</summary>
+    Task<List<BookingEntity>> ListAllAsync(int skip = 0, int take = 100, BookingListFilter? filter = null, CancellationToken cancellationToken = default);
     /// <summary>List draft bookings (IsDraft == true).</summary>
     Task<List<BookingEntity>> ListDraftsByCustomerIdAsync(string customerId, int skip = 0, int take = 100, CancellationToken cancellationToken = default);
     /// <summary>List all draft bookings (all customers). Used by SuperAdmin.</summary>

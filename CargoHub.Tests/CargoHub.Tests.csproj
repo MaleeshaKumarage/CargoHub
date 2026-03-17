@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CargoHub.Api\CargoHub.Api.csproj" />
     <ProjectReference Include="..\CargoHub.Application\CargoHub.Application.csproj" />
     <ProjectReference Include="..\CargoHub.Domain\CargoHub.Domain.csproj" />
     <ProjectReference Include="..\CargoHub.Infrastructure\CargoHub.Infrastructure.csproj" />

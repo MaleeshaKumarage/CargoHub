@@ -1,0 +1,18 @@
+# Single image: db + api + portal. One command: docker compose -f docker-compose.one.yml up -d
+# Portal: http://localhost:3000  |  API: http://localhost:8080
+
+services:
+  cargohub:
+    image: maleesha404/cargohub:latest
+    container_name: cargohub
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    volumes:
+      - cargohub_data:/var/lib/postgresql/data
+    environment:
+      Bootstrap__Secret: ${Bootstrap__Secret:-SuperAdminBootstrapSecret}
+      Jwt__SigningKey: ${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}
+
+volumes:
+  cargohub_data:

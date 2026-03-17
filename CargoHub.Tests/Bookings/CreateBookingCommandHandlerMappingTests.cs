@@ -126,4 +126,39 @@ public class CreateBookingCommandHandlerMappingTests
         Assert.NotNull(captured);
         Assert.Equal("0", captured.ShippingInfo.GrossWeight);
     }
+
+    [Fact]
+    public void MapParty_WhenDtoIsNull_ReturnsNull()
+    {
+        var result = CreateBookingCommandHandler.MapParty(null);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_WithOptionalReceiverFields_MapsCorrectly()
+    {
+        var repo = new Mock<IBookingRepository>();
+        Booking? captured = null;
+        repo.Setup(r => r.AddAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>()))
+            .Callback<Booking, CancellationToken>((b, _) => captured = b)
+            .Returns<Booking, CancellationToken>((b, _) => Task.FromResult(b));
+        repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var request = MinimalRequest();
+        request.ReceiverAddress2 = "Apt 5";
+        request.ReceiverEmail = "r@test.com";
+        request.ReceiverPhone = "+358401234567";
+        request.ReceiverContactPersonName = "Contact";
+        request.ReceiverCountry = null;
+        var handler = new CreateBookingCommandHandler(repo.Object);
+        await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
+
+        Assert.NotNull(captured);
+        Assert.Equal("Apt 5", captured.Receiver.Address2);
+        Assert.Equal("r@test.com", captured.Receiver.Email);
+        Assert.Equal("+358401234567", captured.Receiver.PhoneNumber);
+        Assert.Equal("Contact", captured.Receiver.ContactPersonName);
+        Assert.Equal("FI", captured.Receiver.Country);
+    }
 }

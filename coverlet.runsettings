@@ -6,7 +6,7 @@
         <Configuration>
           <Format>cobertura</Format>
           <!-- Exclude test project, migrations, and external-facing Infrastructure (couriers, SMTP) -->
-          <Exclude>[*.Tests]*,[*]*.Migrations*,[CargoHub.Infrastructure]*.Couriers*,[CargoHub.Infrastructure]*.Smtp*,[CargoHub.Infrastructure]*.Schema*,[CargoHub.Infrastructure]*.Auth*,[CargoHub.Infrastructure]*.Identity*,[CargoHub.Application]*.Couriers*</Exclude>
+          <Exclude>[*.Tests]*,[*]*.Migrations*,[CargoHub.Infrastructure]*.Couriers*,[CargoHub.Infrastructure]*.Smtp*,[CargoHub.Infrastructure]*.Schema*,[CargoHub.Infrastructure]*.Auth*,[CargoHub.Infrastructure]*.Identity*,[CargoHub.Application]*.Couriers*,[CargoHub.Api]*</Exclude>
         </Configuration>
       </DataCollector>
     </DataCollectors>
