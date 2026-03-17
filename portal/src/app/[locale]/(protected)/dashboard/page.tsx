@@ -28,8 +28,8 @@ const PIE_COLORS = [
   "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
-  "#94a3b8",
-  "#64748b",
+  "var(--chart-3)",
+  "var(--chart-4)",
 ];
 
 export default function DashboardPage() {

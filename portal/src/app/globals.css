@@ -26,6 +26,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -64,6 +65,7 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -98,6 +100,7 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -120,14 +123,90 @@
    Each theme has distinctive widgets, button styles, and visual identity.
    Light-mode palettes use :where(html:not(.dark)) to avoid breaking dark mode. */
 
-/* ========== MINIMALISM: clean, subtle, generous whitespace ========== */
+/* ========== MINIMALISM: clean, subtle, neutral grays, generous whitespace ========== */
 [data-theme="minimalism"] {
   --radius: 0.5rem;
 }
+:where(html:not(.dark))[data-theme="minimalism"] {
+  --background: oklch(0.985 0.002 264);
+  --foreground: oklch(0.18 0.01 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 264);
+  --primary: oklch(0.28 0.02 264);
+  --primary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.96 0.005 264);
+  --muted-foreground: oklch(0.48 0.02 264);
+  --accent: oklch(0.94 0.01 264);
+  --accent-foreground: oklch(0.22 0.02 264);
+  --chart-1: oklch(0.5 0.15 264);
+  --chart-2: oklch(0.55 0.12 200);
+  --chart-3: oklch(0.5 0.1 160);
+  --chart-4: oklch(0.55 0.15 300);
+  --chart-5: oklch(0.5 0.18 30);
+}
+.dark[data-theme="minimalism"] {
+  --background: oklch(0.14 0.01 264);
+  --foreground: oklch(0.95 0.005 264);
+  --card: oklch(0.2 0.015 264);
+  --card-foreground: oklch(0.95 0.005 264);
+  --primary: oklch(0.92 0.01 264);
+  --primary-foreground: oklch(0.2 0.02 264);
+  --muted: oklch(0.26 0.015 264);
+  --muted-foreground: oklch(0.65 0.02 264);
+  --accent: oklch(0.28 0.02 264);
+  --accent-foreground: oklch(0.95 0.005 264);
+  --chart-1: oklch(0.55 0.15 264);
+  --chart-2: oklch(0.6 0.12 200);
+  --chart-3: oklch(0.65 0.1 160);
+  --chart-4: oklch(0.6 0.15 300);
+  --chart-5: oklch(0.55 0.18 30);
+}
 
-/* ========== SKEUOMORPHISM: realistic textures, heavy bevels, physical-material feel ========== */
+/* ========== SKEUOMORPHISM: warm wood/leather, realistic textures, heavy bevels ========== */
 [data-theme="skeuomorphism"] {
   --radius: 0.5rem;
+}
+:where(html:not(.dark))[data-theme="skeuomorphism"] {
+  --background: oklch(0.96 0.03 75);
+  --foreground: oklch(0.28 0.06 55);
+  --card: oklch(0.98 0.04 70);
+  --card-foreground: oklch(0.28 0.06 55);
+  --primary: oklch(0.38 0.12 55);
+  --primary-foreground: oklch(0.98 0.02 75);
+  --secondary: oklch(0.92 0.05 75);
+  --secondary-foreground: oklch(0.32 0.08 55);
+  --muted: oklch(0.9 0.04 70);
+  --muted-foreground: oklch(0.45 0.06 55);
+  --accent: oklch(0.88 0.06 75);
+  --accent-foreground: oklch(0.32 0.08 55);
+  --border: oklch(0.82 0.05 70);
+  --input: oklch(0.85 0.05 70);
+  --chart-1: oklch(0.5 0.15 55);
+  --chart-2: oklch(0.55 0.12 75);
+  --chart-3: oklch(0.45 0.1 45);
+  --chart-4: oklch(0.6 0.1 85);
+  --chart-5: oklch(0.5 0.12 35);
+}
+.dark[data-theme="skeuomorphism"] {
+  --background: oklch(0.22 0.05 55);
+  --foreground: oklch(0.92 0.04 75);
+  --card: oklch(0.28 0.06 55);
+  --card-foreground: oklch(0.92 0.04 75);
+  --primary: oklch(0.75 0.12 75);
+  --primary-foreground: oklch(0.25 0.08 55);
+  --secondary: oklch(0.35 0.06 55);
+  --secondary-foreground: oklch(0.92 0.04 75);
+  --muted: oklch(0.32 0.05 55);
+  --muted-foreground: oklch(0.72 0.05 75);
+  --accent: oklch(0.4 0.08 70);
+  --accent-foreground: oklch(0.95 0.02 75);
+  --border: oklch(0.4 0.04 55);
+  --input: oklch(0.35 0.04 55);
+  --chart-1: oklch(0.65 0.15 75);
+  --chart-2: oklch(0.6 0.12 55);
+  --chart-3: oklch(0.7 0.1 85);
+  --chart-4: oklch(0.55 0.12 45);
+  --chart-5: oklch(0.65 0.1 35);
 }
 [data-theme="skeuomorphism"] [data-slot="navbar"] {
   box-shadow:
@@ -139,7 +218,8 @@
   border-bottom: 1px solid color-mix(in oklch, var(--border) 80%, black 20%);
 }
 [data-theme="skeuomorphism"] [data-slot="card"],
-[data-theme="skeuomorphism"] [data-slot="dropdown-menu-content"] {
+[data-theme="skeuomorphism"] [data-slot="dropdown-menu-content"],
+[data-theme="skeuomorphism"] [data-slot="dropdown-menu-sub-content"] {
   box-shadow:
     0 6px 12px rgb(0 0 0 / 0.18),
     0 2px 4px rgb(0 0 0 / 0.12),
@@ -175,10 +255,42 @@
   --radius: 0.25rem;
 }
 :where(html:not(.dark))[data-theme="neobrutalism"] {
+  --background: oklch(0.98 0.02 100);
+  --foreground: oklch(0.2 0.02 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 250);
   --primary: oklch(0.55 0.22 250);
   --primary-foreground: oklch(0.99 0 0);
-  --accent: oklch(0.92 0.08 85);
-  --accent-foreground: oklch(0.25 0.05 250);
+  --secondary: oklch(0.9 0.1 100);
+  --secondary-foreground: oklch(0.25 0.05 250);
+  --muted: oklch(0.94 0.04 100);
+  --muted-foreground: oklch(0.4 0.04 250);
+  --accent: oklch(0.92 0.12 85);
+  --accent-foreground: oklch(0.25 0.08 250);
+  --chart-1: oklch(0.55 0.22 250);
+  --chart-2: oklch(0.7 0.18 100);
+  --chart-3: oklch(0.6 0.2 180);
+  --chart-4: oklch(0.65 0.2 320);
+  --chart-5: oklch(0.6 0.22 30);
+}
+.dark[data-theme="neobrutalism"] {
+  --background: oklch(0.18 0.03 250);
+  --foreground: oklch(0.95 0.02 100);
+  --card: oklch(0.24 0.04 250);
+  --card-foreground: oklch(0.95 0.02 100);
+  --primary: oklch(0.65 0.2 250);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.35 0.06 250);
+  --secondary-foreground: oklch(0.95 0.02 100);
+  --muted: oklch(0.3 0.05 250);
+  --muted-foreground: oklch(0.75 0.04 250);
+  --accent: oklch(0.45 0.15 85);
+  --accent-foreground: oklch(0.2 0.05 250);
+  --chart-1: oklch(0.6 0.2 250);
+  --chart-2: oklch(0.7 0.15 100);
+  --chart-3: oklch(0.65 0.18 180);
+  --chart-4: oklch(0.6 0.2 320);
+  --chart-5: oklch(0.65 0.18 30);
 }
 [data-theme="neobrutalism"] [data-slot="navbar"] {
   border-width: 0 0 4px 0;
@@ -213,7 +325,8 @@
   color: var(--foreground);
   font-weight: 500;
 }
-[data-theme="neobrutalism"] [data-slot="dropdown-menu-content"] {
+[data-theme="neobrutalism"] [data-slot="dropdown-menu-content"],
+[data-theme="neobrutalism"] [data-slot="dropdown-menu-sub-content"] {
   border-width: 3px;
   border-color: var(--foreground);
   box-shadow: 6px 6px 0 var(--foreground);
@@ -223,17 +336,54 @@
 [data-theme="neobrutalism"] [data-slot="main"] {
   border-top: 3px solid var(--border);
 }
+[data-theme="neobrutalism"] [data-slot="data-table"] {
+  border-width: 3px;
+  border-color: var(--foreground);
+  box-shadow: 4px 4px 0 var(--foreground);
+}
+[data-theme="neobrutalism"] [data-slot="table-header"] {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
 
 /* ========== CLAYMORPHISM: colorful, soft 3D, pill-shaped, playful ========== */
 :where(html:not(.dark))[data-theme="claymorphism"] {
-  --background: oklch(0.96 0.02 250);
-  --card: oklch(0.98 0.03 280);
-  --card-foreground: oklch(0.25 0.05 280);
-  --primary: oklch(0.55 0.2 260);
+  --background: oklch(0.96 0.025 260);
+  --foreground: oklch(0.28 0.06 280);
+  --card: oklch(0.98 0.035 280);
+  --card-foreground: oklch(0.28 0.06 280);
+  --primary: oklch(0.52 0.2 260);
   --primary-foreground: oklch(0.99 0 0);
-  --muted: oklch(0.93 0.04 200);
-  --accent: oklch(0.92 0.06 160);
-  --accent-foreground: oklch(0.3 0.06 200);
+  --secondary: oklch(0.92 0.05 260);
+  --secondary-foreground: oklch(0.3 0.06 280);
+  --muted: oklch(0.92 0.05 220);
+  --muted-foreground: oklch(0.42 0.06 280);
+  --accent: oklch(0.88 0.08 180);
+  --accent-foreground: oklch(0.28 0.08 220);
+  --chart-1: oklch(0.55 0.2 260);
+  --chart-2: oklch(0.6 0.15 180);
+  --chart-3: oklch(0.55 0.18 320);
+  --chart-4: oklch(0.65 0.15 140);
+  --chart-5: oklch(0.6 0.18 30);
+}
+.dark[data-theme="claymorphism"] {
+  --background: oklch(0.2 0.04 260);
+  --foreground: oklch(0.92 0.03 280);
+  --card: oklch(0.26 0.05 270);
+  --card-foreground: oklch(0.92 0.03 280);
+  --primary: oklch(0.6 0.18 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.35 0.06 260);
+  --secondary-foreground: oklch(0.92 0.03 280);
+  --muted: oklch(0.32 0.05 220);
+  --muted-foreground: oklch(0.72 0.04 280);
+  --accent: oklch(0.42 0.1 180);
+  --accent-foreground: oklch(0.92 0.02 220);
+  --chart-1: oklch(0.6 0.18 260);
+  --chart-2: oklch(0.65 0.15 180);
+  --chart-3: oklch(0.6 0.16 320);
+  --chart-4: oklch(0.7 0.12 140);
+  --chart-5: oklch(0.65 0.15 30);
 }
 [data-theme="claymorphism"] {
   --radius: 1.25rem;
@@ -249,7 +399,8 @@
   color: var(--card-foreground);
 }
 [data-theme="claymorphism"] [data-slot="card"],
-[data-theme="claymorphism"] [data-slot="dropdown-menu-content"] {
+[data-theme="claymorphism"] [data-slot="dropdown-menu-content"],
+[data-theme="claymorphism"] [data-slot="dropdown-menu-sub-content"] {
   border-radius: 1.5rem;
   box-shadow:
     0 12px 40px -12px rgb(0 0 0 / 0.2),
