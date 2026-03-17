@@ -63,6 +63,12 @@ jobs:
               COVERAGE=$(awk "BEGIN {printf \"%.1f\", $RATE*100}" 2>/dev/null || echo "N/A")
             fi
           fi
+          # Show in step log (visible when you expand "Coverage summary")
+          echo "## Coverage Report"
+          echo "**Line coverage: ${COVERAGE}%**"
+          echo ""
+          echo "Download the **coverage-report** artifact to view the full HTML report."
+          # Also append to Job Summary (visible at top of job page)
           {
             echo "## Coverage Report"
             echo "**Line coverage: ${COVERAGE}%**"
