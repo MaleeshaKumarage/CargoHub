@@ -1,6 +1,42 @@
+# Aider
 .aider*
+
+# Build
 bin/
 obj/
+[Dd]ebug/
+[Rr]elease/
+[Bb]uild/
+[Oo]ut/
+
+# Visual Studio
 .vs/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+[Tt]estResults/
+[Cc]overage/
+[Cc]overageReport/
+*.coverage
+*.coveragexml
+
+# Misc
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

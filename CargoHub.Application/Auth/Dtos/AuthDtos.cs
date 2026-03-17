@@ -63,6 +63,15 @@ public sealed class PortalMeResponse
     public string? BusinessId { get; set; }
     /// <summary>User's company display name. Empty if user has no company.</summary>
     public string? CompanyName { get; set; }
+
+    /// <summary>UI design theme preference (skeuomorphism, neobrutalism, claymorphism, minimalism).</summary>
+    public string? Theme { get; set; }
+}
+
+/// <summary>Request for PATCH /api/v1/portal/me/preferences. Body: { theme }.</summary>
+public sealed class UpdatePreferencesRequest
+{
+    public string Theme { get; set; } = string.Empty;
 }
 
 /// <summary>Request for portal requestPasswordReset. Body: { email }.</summary>
