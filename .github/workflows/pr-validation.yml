@@ -56,22 +56,22 @@ jobs:
       - name: Coverage summary
         run: |
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
-          COVERAGE="N/A"
+          LINE_COV="N/A"
+          BRANCH_COV="N/A"
           if [ -n "$COV_FILE" ] && [ -f "$COV_FILE" ]; then
-            RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
-            if [ -n "$RATE" ]; then
-              COVERAGE=$(awk "BEGIN {printf \"%.1f\", $RATE*100}" 2>/dev/null || echo "N/A")
-            fi
+            LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
+            [ -n "$LINE_RATE" ] && LINE_COV=$(awk "BEGIN {printf \"%.1f\", $LINE_RATE*100}" 2>/dev/null)
+            BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
+            [ -n "$BRANCH_RATE" ] && BRANCH_COV=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE*100}" 2>/dev/null)
           fi
-          # Show in step log (visible when you expand "Coverage summary")
-          echo "## Coverage Report"
-          echo "**Line coverage: ${COVERAGE}%**"
-          echo ""
-          echo "Download the **coverage-report** artifact to view the full HTML report."
-          # Also append to Job Summary (visible at top of job page)
+          # Build Markdown report (displayed on the job page and in step log)
           {
             echo "## Coverage Report"
-            echo "**Line coverage: ${COVERAGE}%**"
             echo ""
-            echo "Download the **coverage-report** artifact to view the full HTML report."
-          } >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Coverage |"
+            echo "|--------|----------|"
+            echo "| **Line** | ${LINE_COV}% |"
+            echo "| **Branch** | ${BRANCH_COV}% |"
+            echo ""
+            echo "Full HTML report: download the **coverage-report** artifact (zip) and open \`index.html\` in a browser."
+          } | tee -a $GITHUB_STEP_SUMMARY
