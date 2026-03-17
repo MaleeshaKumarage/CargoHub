@@ -1,0 +1,77 @@
+# PR validation: build, test, and coverage on every pull request
+# Runs on GitHub-hosted runners — no server needed
+#
+# To block direct commits: Settings → Branches → Add rule for main & development
+#   - Require a pull request before merging
+#   - Require status checks (this workflow) to pass
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, master, development]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore CargoHub.Backend.sln
+
+      - name: Build
+        run: dotnet build CargoHub.Backend.sln --no-restore --configuration Release
+
+      - name: Test with coverage
+        run: |
+          dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"./TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"./CoverageReport" \
+            -reporttypes:"Html;HtmlSummary;Badges"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport/
+
+      - name: Coverage summary
+        run: |
+          COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
+          LINE_COV="N/A"
+          BRANCH_COV="N/A"
+          if [ -n "$COV_FILE" ] && [ -f "$COV_FILE" ]; then
+            LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
+            [ -n "$LINE_RATE" ] && LINE_COV=$(awk "BEGIN {printf \"%.1f\", $LINE_RATE*100}" 2>/dev/null)
+            BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
+            [ -n "$BRANCH_RATE" ] && BRANCH_COV=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE*100}" 2>/dev/null)
+          fi
+          # Build Markdown report (displayed on the job page and in step log)
+          {
+            echo "## Coverage Report"
+            echo ""
+            echo "| Metric | Coverage |"
+            echo "|--------|----------|"
+            echo "| **Line** | ${LINE_COV}% |"
+            echo "| **Branch** | ${BRANCH_COV}% |"
+            echo ""
+            echo "Full HTML report: download the **coverage-report** artifact (zip) and open \`index.html\` in a browser."
+          } | tee -a $GITHUB_STEP_SUMMARY
