@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DotNetEnv;
 using CargoHub.Api.Options;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Handlers;
@@ -15,6 +16,23 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+
+// Load .env from repo root before configuration (secrets stay out of appsettings)
+var possibleEnvPaths = new[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env"),
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env")
+};
+foreach (var p in possibleEnvPaths)
+{
+    var resolved = Path.GetFullPath(p);
+    if (File.Exists(resolved))
+    {
+        Env.Load(resolved);
+        break;
+    }
+}
 
 // When running from Visual Studio (Development), ensure PostgreSQL in Docker is up so DB is ready.
 if (string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase))
@@ -55,8 +73,14 @@ if (string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), 
 var builder = WebApplication.CreateBuilder(args);
 
 // In Development, always listen on 5299 so the portal (NEXT_PUBLIC_API_URL=http://localhost:5299) can reach the API.
+// In Production (e.g. Render), use PORT from environment (default 8080 for local Docker).
 if (builder.Environment.IsDevelopment())
     builder.WebHost.UseUrls("http://localhost:5299");
+else
+{
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
 
 // Configure database connection for PostgreSQL.
 // NOTE: update "DefaultConnection" in appsettings.json or user-secrets

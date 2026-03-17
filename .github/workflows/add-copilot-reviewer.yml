@@ -1,0 +1,21 @@
+# Add GitHub Copilot as reviewer on every new PR
+name: Add Copilot Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  add-reviewer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Copilot as reviewer
+        run: gh pr edit "${{ github.event.pull_request.number }}" --add-reviewer "@copilot" --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
