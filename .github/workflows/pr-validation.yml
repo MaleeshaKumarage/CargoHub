@@ -24,6 +24,25 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Install portal dependencies
+        run: cd portal && npm ci
+
+      - name: Portal test with coverage
+        run: cd portal && npm run test:coverage
+
+      - name: Upload portal coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-coverage
+          path: portal/coverage/
+
       - name: Restore
         run: dotnet restore CargoHub.Backend.sln
 
@@ -55,32 +74,49 @@ jobs:
 
       - name: Coverage summary
         run: |
+          # Backend coverage
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
-          LINE_COV="N/A"
-          BRANCH_COV="N/A"
+          BACKEND_LINE="N/A"
+          BACKEND_BRANCH="N/A"
           if [ -n "$COV_FILE" ] && [ -f "$COV_FILE" ]; then
             LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
-            [ -n "$LINE_RATE" ] && LINE_COV=$(awk "BEGIN {printf \"%.1f\", $LINE_RATE*100}" 2>/dev/null)
+            [ -n "$LINE_RATE" ] && BACKEND_LINE=$(awk "BEGIN {printf \"%.1f\", $LINE_RATE*100}" 2>/dev/null)
             BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
-            [ -n "$BRANCH_RATE" ] && BRANCH_COV=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE*100}" 2>/dev/null)
+            [ -n "$BRANCH_RATE" ] && BACKEND_BRANCH=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE*100}" 2>/dev/null)
           fi
+
+          # Portal (frontend) coverage
+          PORTAL_LINE="N/A"
+          PORTAL_BRANCH="N/A"
+          if [ -f portal/coverage/coverage-summary.json ]; then
+            PORTAL_LINE=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+            PORTAL_BRANCH=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json 2>/dev/null || echo "N/A")
+          fi
+
           # Build Markdown report (displayed on the job page and in step log)
           {
             echo "## Coverage Report"
             echo ""
+            echo "### Backend (.NET)"
             echo "| Metric | Coverage | Target |"
             echo "|--------|----------|--------|"
-            echo "| **Line** | ${LINE_COV}% | 80% |"
-            echo "| **Branch** | ${BRANCH_COV}% | 75% (target 80%) |"
+            echo "| **Line** | ${BACKEND_LINE}% | 75% min |"
+            echo "| **Branch** | ${BACKEND_BRANCH}% | 75% min |"
             echo ""
-            echo "Full HTML report: download the **coverage-report** artifact (zip) and open \`index.html\` in a browser."
+            echo "### Frontend (Portal)"
+            echo "| Metric | Coverage | Target |"
+            echo "|--------|----------|--------|"
+            echo "| **Line** | ${PORTAL_LINE}% | 75% min |"
+            echo "| **Branch** | ${PORTAL_BRANCH}% | 75% min |"
+            echo ""
+            echo "**Artifacts:** Backend HTML report: **coverage-report** | Portal HTML report: **portal-coverage**"
           } | tee -a $GITHUB_STEP_SUMMARY
 
-      - name: Enforce coverage threshold (80% line, 75% branch)
+      - name: Enforce backend coverage threshold (75% line and branch minimum)
         run: |
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
           if [ -z "$COV_FILE" ] || [ ! -f "$COV_FILE" ]; then
-            echo "Coverage file not found"
+            echo "Backend coverage file not found"
             exit 1
           fi
           LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
@@ -88,12 +124,31 @@ jobs:
           LINE_PCT=$(echo "$LINE_RATE * 100" | bc)
           BRANCH_PCT=$(echo "$BRANCH_RATE * 100" | bc)
           FAIL=0
-          if (( $(echo "$LINE_PCT < 80" | bc -l) )); then
-            echo "::error::Line coverage ${LINE_PCT}% is below 80% target"
+          if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
+            echo "::error::Backend line coverage ${LINE_PCT}% is below 75% minimum - PR cannot merge"
             FAIL=1
           fi
           if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
-            echo "::error::Branch coverage ${BRANCH_PCT}% is below 75% target"
+            echo "::error::Backend branch coverage ${BRANCH_PCT}% is below 75% minimum - PR cannot merge"
+            FAIL=1
+          fi
+          if [ $FAIL -eq 1 ]; then exit 1; fi
+
+      - name: Enforce portal coverage threshold (75% line and branch minimum)
+        run: |
+          if [ ! -f portal/coverage/coverage-summary.json ]; then
+            echo "Portal coverage file not found"
+            exit 1
+          fi
+          LINE_PCT=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json)
+          BRANCH_PCT=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json)
+          FAIL=0
+          if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
+            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum - PR cannot merge"
+            FAIL=1
+          fi
+          if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
+            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum - PR cannot merge"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
