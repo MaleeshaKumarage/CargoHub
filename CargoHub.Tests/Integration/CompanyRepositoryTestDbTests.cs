@@ -1,0 +1,98 @@
+using CargoHub.Application.Company.Commands;
+using CargoHub.Application.Company.Queries;
+using CargoHub.Domain.Companies;
+using CargoHub.Infrastructure.Persistence;
+using Xunit;
+using CompanyEntity = CargoHub.Domain.Companies.Company;
+
+namespace CargoHub.Tests.Integration;
+
+public class CompanyRepositoryTestDbTests : IDisposable
+{
+    private readonly TestDbFixture _fixture;
+
+    public CompanyRepositoryTestDbTests()
+    {
+        _fixture = new TestDbFixture();
+    }
+
+    public void Dispose() => _fixture.Dispose();
+
+    [Fact]
+    public async Task Create_ThenGetById_ReturnsCompany()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var company = new CompanyEntity
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = "comp-1",
+            Name = "Acme Oy",
+            BusinessId = "1234567-8",
+            CustomerId = "cust-1"
+        };
+
+        var created = await repo.CreateAsync(company, default);
+        Assert.Equal(company.Id, created.Id);
+
+        var loaded = await repo.GetByIdAsync(company.Id, default);
+        Assert.NotNull(loaded);
+        Assert.Equal("Acme Oy", loaded.Name);
+        Assert.Equal("1234567-8", loaded.BusinessId);
+    }
+
+    [Fact]
+    public async Task GetByBusinessId_WhenExists_ReturnsCompany()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var company = new CompanyEntity
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = "comp-2",
+            Name = "Test Ltd",
+            BusinessId = "9876543-2",
+            CustomerId = "cust-2"
+        };
+        await repo.CreateAsync(company, default);
+
+        var loaded = await repo.GetByBusinessIdAsync("9876543-2", default);
+        Assert.NotNull(loaded);
+        Assert.Equal("Test Ltd", loaded.Name);
+    }
+
+    [Fact]
+    public async Task CreateCompanyCommandHandler_WithRepository_PersistsCompany()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var handler = new CreateCompanyCommandHandler(repo);
+        var company = new CompanyEntity { Name = "Handler Test", BusinessId = "1111111-1" };
+
+        var result = await handler.Handle(new CreateCompanyCommand(company, "cust-handler"), default);
+        Assert.NotNull(result);
+        Assert.Equal("cust-handler", result.CustomerId);
+
+        var loaded = await repo.GetByIdAsync(result.Id, default);
+        Assert.NotNull(loaded);
+        Assert.Equal("Handler Test", loaded.Name);
+    }
+
+    [Fact]
+    public async Task GetByBusinessId_WhenEmpty_ReturnsNull()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var result = await repo.GetByBusinessIdAsync("", default);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetByBusinessId_WhenWhitespace_ReturnsNull()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var result = await repo.GetByBusinessIdAsync("   ", default);
+        Assert.Null(result);
+    }
+}

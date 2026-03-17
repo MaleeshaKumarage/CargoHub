@@ -3,7 +3,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\CargoHub.Domain\CargoHub.Domain.csproj" />
     <ProjectReference Include="..\CargoHub.Application\CargoHub.Application.csproj" />

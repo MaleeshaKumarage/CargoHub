@@ -34,5 +34,11 @@ public class ApplicationUser : IdentityUser
     /// When false, user cannot log in (deactivated by super admin).
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// UI design theme preference (skeuomorphism, neobrutalism, claymorphism, minimalism).
+    /// Defaults to minimalism when null.
+    /// </summary>
+    public string? Theme { get; set; }
 }
 

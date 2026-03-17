@@ -16,8 +16,7 @@ try {
 
     Write-Host "`n=== Test (with coverage) ===" -ForegroundColor Cyan
     dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal `
-      --collect:"XPlat Code Coverage" --results-directory ./TestResults `
-      -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+      --collect:"XPlat Code Coverage" --results-directory ./TestResults --settings coverlet.runsettings
     if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 
     Write-Host "`n=== All checks passed ===" -ForegroundColor Green
