@@ -28,7 +28,9 @@ packages/
 
 # Test / coverage
 [Tt]est[Rr]esult*/
+[Tt]estResults/
 [Cc]overage/
+[Cc]overageReport/
 *.coverage
 *.coveragexml
 

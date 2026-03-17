@@ -1,4 +1,4 @@
-# PR validation: build and test on every pull request
+# PR validation: build, test, and coverage on every pull request
 # Runs on GitHub-hosted runners — no server needed
 #
 # To block direct commits: Settings → Branches → Add rule for main & development
@@ -30,5 +30,40 @@ jobs:
       - name: Build
         run: dotnet build CargoHub.Backend.sln --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal
+      - name: Test with coverage
+        run: |
+          dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"./TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"./CoverageReport" \
+            -reporttypes:"Html;HtmlSummary;Badges"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport/
+
+      - name: Coverage summary
+        run: |
+          COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" | head -1)
+          if [ -n "$COV_FILE" ]; then
+            RATE=$(grep -o 'line-rate="[^"]*"' "$COV_FILE" | head -1 | cut -d'"' -f2)
+            COVERAGE=$(awk "BEGIN {printf \"%.1f\", $RATE*100}")
+            echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+            echo "**Line coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage data not found." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the **coverage-report** artifact to view the full HTML report." >> $GITHUB_STEP_SUMMARY

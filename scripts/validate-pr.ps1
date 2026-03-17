@@ -14,8 +14,10 @@ try {
     dotnet build CargoHub.Backend.sln --no-restore --configuration Release
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
-    Write-Host "`n=== Test ===" -ForegroundColor Cyan
-    dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal
+    Write-Host "`n=== Test (with coverage) ===" -ForegroundColor Cyan
+    dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal `
+      --collect:"XPlat Code Coverage" --results-directory ./TestResults `
+      -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
     if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 
     Write-Host "`n=== All checks passed ===" -ForegroundColor Green
