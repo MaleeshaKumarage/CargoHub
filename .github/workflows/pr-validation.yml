@@ -35,7 +35,7 @@ jobs:
           dotnet test CargoHub.Backend.sln --no-build --configuration Release --verbosity normal \
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults \
-            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+            --settings coverlet.runsettings
 
       - name: Install ReportGenerator
         run: dotnet tool install -g dotnet-reportgenerator-globaltool
@@ -68,10 +68,32 @@ jobs:
           {
             echo "## Coverage Report"
             echo ""
-            echo "| Metric | Coverage |"
-            echo "|--------|----------|"
-            echo "| **Line** | ${LINE_COV}% |"
-            echo "| **Branch** | ${BRANCH_COV}% |"
+            echo "| Metric | Coverage | Target |"
+            echo "|--------|----------|--------|"
+            echo "| **Line** | ${LINE_COV}% | 80% |"
+            echo "| **Branch** | ${BRANCH_COV}% | 75% (target 80%) |"
             echo ""
             echo "Full HTML report: download the **coverage-report** artifact (zip) and open \`index.html\` in a browser."
           } | tee -a $GITHUB_STEP_SUMMARY
+
+      - name: Enforce coverage threshold (80% line, 75% branch)
+        run: |
+          COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
+          if [ -z "$COV_FILE" ] || [ ! -f "$COV_FILE" ]; then
+            echo "Coverage file not found"
+            exit 1
+          fi
+          LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
+          BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
+          LINE_PCT=$(echo "$LINE_RATE * 100" | bc)
+          BRANCH_PCT=$(echo "$BRANCH_RATE * 100" | bc)
+          FAIL=0
+          if (( $(echo "$LINE_PCT < 80" | bc -l) )); then
+            echo "::error::Line coverage ${LINE_PCT}% is below 80% target"
+            FAIL=1
+          fi
+          if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
+            echo "::error::Branch coverage ${BRANCH_PCT}% is below 75% target"
+            FAIL=1
+          fi
+          if [ $FAIL -eq 1 ]; then exit 1; fi
