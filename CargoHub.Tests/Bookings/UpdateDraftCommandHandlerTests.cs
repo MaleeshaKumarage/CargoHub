@@ -106,4 +106,60 @@ public class UpdateDraftCommandHandlerTests
         Assert.Equal("Payer Inc", draft.Payer?.Name);
         Assert.Equal("Delivery Co", draft.DeliveryPoint.Name);
     }
+
+    [Fact]
+    public async Task Handle_WithPickUpAddress_UpdatesPickUpAddress()
+    {
+        var id = Guid.NewGuid();
+        var draft = CreateDraft(id);
+        var repo = new Mock<IBookingRepository>();
+        repo.Setup(r => r.GetByIdWithTrackingAsync(id, "cust-1", It.IsAny<CancellationToken>())).ReturnsAsync(draft);
+        repo.Setup(r => r.UpdateAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var request = MinimalRequest();
+        request.PickUpAddress = new CreateBookingPartyDto { Name = "PickUp Co", Address1 = "PU1", City = "Vantaa", Country = "FI" };
+        var handler = new UpdateDraftCommandHandler(repo.Object);
+        var result = await handler.Handle(new UpdateDraftCommand(id, "cust-1", request), default);
+
+        Assert.NotNull(result);
+        Assert.Equal("PickUp Co", draft.PickUpAddress.Name);
+    }
+
+    [Fact]
+    public async Task Handle_WithShipment_UpdatesShipment()
+    {
+        var id = Guid.NewGuid();
+        var draft = CreateDraft(id);
+        var repo = new Mock<IBookingRepository>();
+        repo.Setup(r => r.GetByIdWithTrackingAsync(id, "cust-1", It.IsAny<CancellationToken>())).ReturnsAsync(draft);
+        repo.Setup(r => r.UpdateAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var request = MinimalRequest();
+        request.Shipment = new CreateBookingShipmentDto { Service = "express", SenderReference = "SR1", FreightPayer = "SENDER" };
+        var handler = new UpdateDraftCommandHandler(repo.Object);
+        var result = await handler.Handle(new UpdateDraftCommand(id, "cust-1", request), default);
+
+        Assert.NotNull(result);
+        Assert.Equal("express", draft.Shipment.Service);
+        Assert.Equal("SR1", draft.Shipment.SenderReference);
+    }
+
+    [Fact]
+    public async Task Handle_WithCompanyId_UpdatesCompanyId()
+    {
+        var companyId = Guid.NewGuid().ToString();
+        var id = Guid.NewGuid();
+        var draft = CreateDraft(id);
+        var repo = new Mock<IBookingRepository>();
+        repo.Setup(r => r.GetByIdWithTrackingAsync(id, "cust-1", It.IsAny<CancellationToken>())).ReturnsAsync(draft);
+        repo.Setup(r => r.UpdateAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var request = MinimalRequest();
+        request.CompanyId = companyId;
+        var handler = new UpdateDraftCommandHandler(repo.Object);
+        var result = await handler.Handle(new UpdateDraftCommand(id, "cust-1", request), default);
+
+        Assert.NotNull(result);
+        Assert.Equal(companyId, draft.Header.CompanyId);
+    }
 }

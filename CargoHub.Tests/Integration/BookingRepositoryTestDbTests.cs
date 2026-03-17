@@ -223,6 +223,71 @@ public class BookingRepositoryTestDbTests : IDisposable
     }
 
     [Fact]
+    public async Task ListByCustomerId_WithFilter_AppliesSearchAndDateRange()
+    {
+        var customerId = "cust-filter";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var r1 = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "CustomerA", request, Guid.NewGuid()), default);
+        var r2 = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "CustomerB", request, Guid.NewGuid()), default);
+        Assert.NotNull(r1);
+        Assert.NotNull(r2);
+
+        var b1 = await repo.GetByIdWithTrackingAsync(r1.Id, customerId, default);
+        var b2 = await repo.GetByIdWithTrackingAsync(r2.Id, customerId, default);
+        Assert.NotNull(b1);
+        Assert.NotNull(b2);
+        b1.ShipmentNumber = "SHIP-ALPHA";
+        b1.CustomerName = "CustomerA";
+        b2.ShipmentNumber = "SHIP-BETA";
+        b2.CustomerName = "CustomerB";
+        await repo.UpdateAsync(b1, default);
+        await repo.UpdateAsync(b2, default);
+
+        var from = DateTime.UtcNow.AddHours(-1);
+        var to = DateTime.UtcNow.AddHours(1);
+        var filter = new BookingListFilter(Search: "ALPHA", CreatedFrom: from, CreatedTo: to, Enabled: null);
+        var list = await repo.ListByCustomerIdAsync(customerId, 0, 10, filter, default);
+        Assert.Single(list);
+        Assert.Equal("SHIP-ALPHA", list[0].ShipmentNumber);
+    }
+
+    [Fact]
+    public async Task ListByCustomerId_WithEnabledFilter_ReturnsOnlyMatching()
+    {
+        var customerId = "cust-enabled";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var r1 = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(r1);
+        var b1 = await repo.GetByIdWithTrackingAsync(r1.Id, customerId, default);
+        Assert.NotNull(b1);
+        b1.Enabled = false;
+        await repo.UpdateAsync(b1, default);
+
+        var enabledOnly = await repo.ListByCustomerIdAsync(customerId, 0, 10, new BookingListFilter(Enabled: true), default);
+        var disabledOnly = await repo.ListByCustomerIdAsync(customerId, 0, 10, new BookingListFilter(Enabled: false), default);
+        Assert.Empty(enabledOnly);
+        Assert.Single(disabledOnly);
+    }
+
+    [Fact]
     public async Task UpdateDraft_WithShippingInfoAndPackages_UpdatesCorrectly()
     {
         var customerId = "cust-update";

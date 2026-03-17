@@ -95,6 +95,58 @@ public class ImportBookingsCommandHandlerTests
         Assert.Contains("REF-FULL", result.Errors[0]);
     }
 
+    [Fact]
+    public async Task Handle_WhenDraftCreateFails_ReturnsError()
+    {
+        var mediator = Substitute.For<IMediator>();
+        mediator.Send(Arg.Any<IRequest<BookingDetailDto?>>(), default)
+            .Returns((BookingDetailDto?)null);
+
+        var request = FullRequest();
+        request.ReferenceNumber = "REF-DRAFT";
+        var handler = new ImportBookingsCommandHandler(mediator);
+        var result = await handler.Handle(new ImportBookingsCommand(
+            "cust-1", "User", null,
+            new List<ImportRowDto> { new(request, IsComplete: false) }), default);
+
+        Assert.Equal(0, result.DraftCount);
+        Assert.Single(result.Errors);
+        Assert.Contains("REF-DRAFT", result.Errors[0]);
+        Assert.Contains("Draft create failed", result.Errors[0]);
+    }
+
+    [Fact]
+    public async Task Handle_WhenExceptionThrown_AddsToErrorsAndContinues()
+    {
+        var mediator = Substitute.For<IMediator>();
+        var callCount = 0;
+        mediator.Send(Arg.Any<IRequest<BookingDetailDto?>>(), default)
+            .Returns(_ =>
+            {
+                callCount++;
+                if (callCount == 1) throw new InvalidOperationException("Simulated failure");
+                return new BookingDetailDto { Id = Guid.NewGuid() };
+            });
+
+        var req1 = FullRequest();
+        req1.ReferenceNumber = "REF-FAIL";
+        var req2 = FullRequest();
+        req2.ReferenceNumber = "REF-OK";
+        var handler = new ImportBookingsCommandHandler(mediator);
+        var result = await handler.Handle(new ImportBookingsCommand(
+            "cust-1", "User", null,
+            new List<ImportRowDto>
+            {
+                new(req1, true),
+                new(req2, true),
+            }), default);
+
+        Assert.Equal(1, result.CreatedCount);
+        Assert.Single(result.Errors);
+        Assert.Contains("REF-FAIL", result.Errors[0]);
+        Assert.Contains("Simulated failure", result.Errors[0]);
+    }
+
     private static CreateBookingRequest FullRequest()
     {
         return new CreateBookingRequest
