@@ -15,8 +15,8 @@ public sealed class ExportBookingsQueryHandler : IRequestHandler<ExportBookingsQ
     public async Task<List<BookingDetailDto>> Handle(ExportBookingsQuery request, CancellationToken cancellationToken)
     {
         var list = string.IsNullOrEmpty(request.CustomerId)
-            ? await _repository.ListAllAsync(request.Skip, request.Take, cancellationToken)
-            : await _repository.ListByCustomerIdAsync(request.CustomerId, request.Skip, request.Take, cancellationToken);
+            ? await _repository.ListAllAsync(request.Skip, request.Take, request.Filter, cancellationToken)
+            : await _repository.ListByCustomerIdAsync(request.CustomerId, request.Skip, request.Take, request.Filter, cancellationToken);
         var ids = list.Select(b => b.Id).ToList();
         var statusByBooking = await _repository.GetStatusHistoryForBookingIdsAsync(ids, cancellationToken);
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DotNetEnv;
 using CargoHub.Api.Options;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Handlers;
@@ -15,6 +16,23 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+
+// Load .env from repo root before configuration (secrets stay out of appsettings)
+var possibleEnvPaths = new[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env"),
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env")
+};
+foreach (var p in possibleEnvPaths)
+{
+    var resolved = Path.GetFullPath(p);
+    if (File.Exists(resolved))
+    {
+        Env.Load(resolved);
+        break;
+    }
+}
 
 // When running from Visual Studio (Development), ensure PostgreSQL in Docker is up so DB is ready.
 if (string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase))

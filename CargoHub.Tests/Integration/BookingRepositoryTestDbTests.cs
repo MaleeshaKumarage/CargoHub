@@ -93,7 +93,7 @@ public class BookingRepositoryTestDbTests : IDisposable
         var completed = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(completed);
 
-        var list = await repo.ListByCustomerIdAsync(customerId, 0, 10, default);
+        var list = await repo.ListByCustomerIdAsync(customerId, 0, 10, null, default);
         Assert.Single(list);
         Assert.Equal(completed.Id, list[0].Id);
         Assert.False(list[0].IsDraft);
