@@ -1,4 +1,4 @@
-# Run after starting the API: dotnet run --project HiavaNet.Api --urls "http://localhost:5000"
+# Run after starting the API: dotnet run --project CargoHub.Api --urls "http://localhost:5000"
 # Requires PostgreSQL configured and running for the API to start.
 
 $base = "http://localhost:5000"

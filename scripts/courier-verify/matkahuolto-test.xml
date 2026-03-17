@@ -12,7 +12,7 @@
     <Volume>0.01</Volume>
     <Packages>1</Packages>
     <SenderId>9430023</SenderId>
-    <SenderName1>Hiava Test Shipper</SenderName1>
+    <SenderName1>CargoHub Test Shipper</SenderName1>
     <SenderAddress>Testikatu 1</SenderAddress>
     <SenderAddress2></SenderAddress2>
     <SenderPostal>00100</SenderPostal>
@@ -33,7 +33,7 @@
     <ReceiverLanguage>EN</ReceiverLanguage>
     <PayerCode>S</PayerCode>
     <PayerId>9430023</PayerId>
-    <PayerName1>Hiava Test</PayerName1>
+    <PayerName1>CargoHub Test</PayerName1>
     <PayerAddress>Testikatu 1</PayerAddress>
     <PayerPostal>00100</PayerPostal>
     <PayerCity>Helsinki</PayerCity>

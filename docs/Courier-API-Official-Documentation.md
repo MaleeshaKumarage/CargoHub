@@ -1,6 +1,6 @@
 # Courier APIs – Official documentation, endpoints & credentials
 
-This document links to **official** documentation and describes how to obtain **valid** endpoints and credentials for each courier. Use it to replace or verify the values used in booking-backend and in HiavaNet courier clients.
+This document links to **official** documentation and describes how to obtain **valid** endpoints and credentials for each courier. Use it to replace or verify the values used in booking-backend and in CargoHub courier clients.
 
 ---
 
@@ -117,7 +117,7 @@ This document links to **official** documentation and describes how to obtain **
 ## 5. SMTP / email-based couriers (e.g. Hämeen Tavarataxi)
 
 - **No “courier API” to document:** Notifications are sent by **email** (e.g. via SMTP).
-- **Configuration:** Use your own or company SMTP server (e.g. `mail.hiava.fi`, port 465, TLS) and the mailbox credentials (e.g. from booking-backend `.env`: `INFO_EMAIL_ADDRESS`, `INFO_EMAIL_PASSWORD`, `HAMEEN_TAVARA_TAXI_EMAIL`).
+- **Configuration:** Use your own or company SMTP server (e.g. `smtp.example.com`, port 465, TLS) and the mailbox credentials (e.g. from booking-backend `.env`: `INFO_EMAIL_ADDRESS`, `INFO_EMAIL_PASSWORD`, `HAMEEN_TAVARA_TAXI_EMAIL`).
 - **Valid “credentials”:** Valid SMTP host, port, user, password, and recipient addresses; no separate “API key” from the carrier.
 
 ---
@@ -132,4 +132,4 @@ This document links to **official** documentation and describes how to obtain **
 | **Kaukokiito** | No public API docs | API key from Kaukokiito or partner (Coneksion / nShift) | e.g. `api.kaukokiito.fi` / `test-api.kaukokiito.fi` + `/api/partner/createTransportOrder` |
 | **Email (e.g. Hämeen Tavarataxi)** | N/A | SMTP server + mailbox credentials | Your SMTP host:port and recipient addresses |
 
-Use this document to align HiavaNet and booking-backend with **official** endpoints and to request or rotate **valid** credentials from each provider.
+Use this document to align CargoHub and booking-backend with **official** endpoints and to request or rotate **valid** credentials from each provider.

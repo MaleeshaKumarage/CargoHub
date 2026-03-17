@@ -117,7 +117,7 @@ Complete list of routes from booking-backend that must be available in the .NET 
 
 | Method | Path | Auth |
 |--------|------|------|
-| GET | `/` | token.middleware (hiava-header) |
+| GET | `/` | token.middleware (cargohub-header) |
 
 ## Pickup point — `/api/v1/pickuppoint`
 
@@ -144,4 +144,4 @@ Complete list of routes from booking-backend that must be available in the .NET 
 
 ---
 
-Implementation must provide the same HTTP methods, path segments, request/response shapes, and auth for each entry so that hiavanet-portal, plugin clients, and integration clients work without change.
+Implementation must provide the same HTTP methods, path segments, request/response shapes, and auth for each entry so that CargoHub-portal, plugin clients, and integration clients work without change.

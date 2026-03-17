@@ -1,6 +1,6 @@
 # Booking-backend alignment
 
-Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align HiavaNet.Backend (and portal) with it.
+Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align CargoHub.Backend (and portal) with it.
 
 ---
 
@@ -10,7 +10,7 @@ Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align Hia
 
 | Area | Fields |
 |------|--------|
-| **Header** | `postalService`, `senderId`, `documentDateTime`, `hiavaId`, `carrierId`, `labelPageLayout`, `companyId`, `senderNumber`, `divisionCode`; some carriers add `serviceType`. |
+| **Header** | `postalService`, `senderId`, `documentDateTime`, `cargohubId`, `carrierId`, `labelPageLayout`, `companyId`, `senderNumber`, `divisionCode`; some carriers add `serviceType`. |
 | **Shipment** | `shipmentNumber`, `shipmentDateTime`, `service`, `dangerousGoods`, `freightPayer`, `senderReference`, `receiverReference`, `extraService`, `incoterm`, `reference`, `pickUpDates`, `deliveryDates`, `handlingInstructions`, `waybillNumber`, `notes` (+ carrier-specific). |
 | **Parties** | **Shipper**, **Receiver**, **Payer**, **PickUpAddress**, **DeliveryPoint**. Each: `name`, `address1`, `address2`, `postalCode`, `country`, `city`, `email`, `phoneNumber`, `phoneNumberMobile`, `contactPersonName`, `vatNo`, `taxBorderNumber`, `customerNumber`, `preferredLanguage`. |
 | **Package / shipping** | **ShippingInfo**: `grossWeight`, `grossVolume`, `packageQuantity`, pickup/delivery/general instructions, `noDgPackages`, `deliveryWithoutSignature`, `loadmeter`, `routeInformation`, **`packages`** (array: weight, volume, colliCode, packageType, dimensions, description, trackingId, trackingUpdates). |
@@ -30,11 +30,11 @@ Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align Hia
 - **Usage**: `header.postalService` selects carrier; `postalServiceModelMapping` maps to carrier-specific booking models.
 - **No CRUD API for couriers** in booking-backend; the “dropdown” is the fixed enum.
 
-**Your requirement:** “adding a courier can be done by admin or super admin” → in HiavaNet we should introduce an **admin-managed Courier list** (new entity + API) and use it as the dropdown source, instead of a fixed enum.
+**Your requirement:** “adding a courier can be done by admin or super admin” → in CargoHub we should introduce an **admin-managed Courier list** (new entity + API) and use it as the dropdown source, instead of a fixed enum.
 
 ---
 
-## 2. HiavaNet.Backend today
+## 2. CargoHub.Backend today
 
 ### Domain (`Booking.cs`)
 
@@ -64,7 +64,7 @@ Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align Hia
 
 ---
 
-## 3. Recommended alignment (HiavaNet)
+## 3. Recommended alignment (CargoHub)
 
 ### 3.1 Draft vs completed
 
@@ -103,11 +103,11 @@ Analysis of **C:\Users\malee\source\repos\booking-backend** and how to align Hia
 
 ## 4. Summary
 
-| Topic | booking-backend | HiavaNet alignment |
+| Topic | booking-backend | CargoHub alignment |
 |-------|-----------------|--------------------|
 | **Booking object** | Rich: header, shipment, shipper, receiver, payer, pickup, delivery, shippingInfo + packages, transportCompany, updates | Extend domain + DTOs with missing fields and **packages** array. |
 | **Courier** | Enum in code; no admin CRUD | Add **Courier** entity + admin CRUD; portal dropdown from API. |
 | **Draft vs completed** | Separate collections + `enabled` | Add drafts (table or status) + draft API + “confirm draft” flow. |
 | **Create** | Full document (or draft) | Extend CreateBookingRequest to full sender/receiver/package/courier. |
 
-This document can be used as the scope for implementing draft/completed, courier dropdown (admin-managed), and the richer booking object in HiavaNet.Backend and the portal.
+This document can be used as the scope for implementing draft/completed, courier dropdown (admin-managed), and the richer booking object in CargoHub.Backend and the portal.

@@ -8,7 +8,7 @@ The **first Super Admin** is not created via the normal portal registration. It 
 
 The API must have **`Bootstrap:Secret`** in configuration. If it is missing, the bootstrap endpoint returns 500.
 
-- **Development:** In `HiavaNet.Api/appsettings.Development.json` there is a placeholder:
+- **Development:** In `CargoHub.Api/appsettings.Development.json` there is a placeholder:
   ```json
   "Bootstrap": {
     "Secret": "change-me-in-production-use-user-secrets-or-env"
@@ -18,7 +18,7 @@ The API must have **`Bootstrap:Secret`** in configuration. If it is missing, the
 
 - **Production:** Do **not** put the real secret in appsettings. Use:
   - **User secrets:**  
-    `dotnet user-secrets set "Bootstrap:Secret" "your-strong-secret" --project HiavaNet.Api`
+    `dotnet user-secrets set "Bootstrap:Secret" "your-strong-secret" --project CargoHub.Api`
   - Or an **environment variable:**  
     `Bootstrap__Secret=your-strong-secret`
 

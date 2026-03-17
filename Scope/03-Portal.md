@@ -86,4 +86,4 @@ All portal endpoints under `/api/v1/portal`. Auth: **PortalAuthMiddleware** (coo
 
 - POST `/uploadExcel/:companyid` — upload Excel
 
-Implementation must match booking-backend request/response shapes and HTTP methods so hiavanet-portal works without change.
+Implementation must match booking-backend request/response shapes and HTTP methods so CargoHub-portal works without change.

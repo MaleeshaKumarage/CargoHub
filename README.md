@@ -1,9 +1,9 @@
-# HiavaNet Backend
+# CargoHub Backend
 
 ## Run API + UI together
 
-1. Open **HiavaNet.Backend.sln** in Visual Studio.
-2. In Solution Explorer, **right-click HiavaNet.Launcher** → **Set as Startup Project**.
+1. Open **CargoHub.Backend.sln** in Visual Studio.
+2. In Solution Explorer, **right-click CargoHub.Launcher** → **Set as Startup Project**.
 3. Press **F5** (or the Start button).
 
 This starts:
@@ -15,4 +15,4 @@ Press Enter in the Launcher console to stop both.
 
 ---
 
-To run only the API (no UI), set **HiavaNet.Api** as Startup Project instead.
+To run only the API (no UI), set **CargoHub.Api** as Startup Project instead.

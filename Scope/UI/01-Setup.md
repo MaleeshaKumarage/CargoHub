@@ -2,7 +2,7 @@
 
 ## Folder and tooling
 
-- **Location**: `portal/` at repo root (sibling to `HiavaNet.Api/`, `Scope/`).
+- **Location**: `portal/` at repo root (sibling to `CargoHub.Api/`, `Scope/`).
 - **Scaffold**: Next.js 15 with TypeScript, ESLint, Tailwind, App Router, `src/` directory.
 - **Components**: shadcn/ui (init via `npx shadcn@latest init`; use `components.json` for paths).
 - **Providers**: next-themes (`ThemeProvider`), next-intl (`NextIntlClientProvider`); both in root layout.
@@ -15,7 +15,7 @@
 
 ## CORS (backend)
 
-- In `HiavaNet.Api` `Program.cs`, allow the portal origin (e.g. `http://localhost:3000` for dev), credentials, and required headers (`Authorization`, `customer-id`, `Content-Type`).
+- In `CargoHub.Api` `Program.cs`, allow the portal origin (e.g. `http://localhost:3000` for dev), credentials, and required headers (`Authorization`, `customer-id`, `Content-Type`).
 
 ## Run
 

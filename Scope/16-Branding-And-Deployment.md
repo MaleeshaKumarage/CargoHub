@@ -10,7 +10,7 @@ The application is **de-branded** and **configurable per deployment**: each depl
 
 ## Branding configuration
 
-Configure in **`HiavaNet.Api/appsettings.json`** (or `appsettings.Development.json`, user-secrets, or environment variables) under the **`Branding`** section:
+Configure in **`CargoHub.Api/appsettings.json`** (or `appsettings.Development.json`, user-secrets, or environment variables) under the **`Branding`** section:
 
 | Key | Description | Example |
 |-----|-------------|---------|
@@ -50,4 +50,4 @@ Defaults (when omitted or empty): app name fallback `"Portal"`, no logo, no cust
 
 - **Multi-tenant branding**: Different name/logo/colors per company in a single deployment (would require tenant resolution and a Tenant/Branding table).
 - **Admin UI to edit branding**: Currently configuration is file/env only; an admin screen could be added later.
-- **Full solution/project rename**: Project/namespace names (e.g. HiavaNet.*) are unchanged; only user-facing and configurable strings were de-branded.
+- **Full solution/project rename**: Project/namespace names (e.g. CargoHub.*) are unchanged; only user-facing and configurable strings were de-branded.

@@ -1,6 +1,6 @@
-### HiavaNet.Backend — Endpoint verification (run with REST client or use curl)
+### CargoHub.Backend — Endpoint verification (run with REST client or use curl)
 ### Base URL: http://localhost:5000 (or set in env)
-### Start API first: dotnet run --project HiavaNet.Api --urls "http://localhost:5000"
+### Start API first: dotnet run --project CargoHub.Api --urls "http://localhost:5000"
 
 ### ========== Section 12: Health and Swagger ==========
 ### Health check

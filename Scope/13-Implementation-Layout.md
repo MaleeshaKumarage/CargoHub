@@ -4,13 +4,13 @@ High-level files and structure. Follow Clean Architecture + CQRS + MediatR; see 
 
 ## Application — Accounts module
 
-**Folder:** `HiavaNet.Application/Accounts/`
+**Folder:** `CargoHub.Application/Accounts/`
 
 - **Commands**: PortalLoginCommand, PortalRegisterCommand, RequestPasswordResetCommand, ResetPasswordCommand, VerifyEmailCommand, UpdateVerificationStatusCommand, PluginLoginCommand, IntegrationAuthCommand; optional LinkSocialLoginCommand.
 - **Handlers**: One per command (e.g. PortalLoginCommandHandler), each implementing IRequestHandler<TReq, TRes>.
 - **Dtos**: PortalLoginRequest, PortalLoginResponse (status, data), PortalRegisterRequest/Response, plugin/integration DTOs matching booking-backend.
 - **Abstractions**: IPortalCookieService, IWebSocketTokenService (implemented in Infrastructure).
-- Optionally merge or reference existing `HiavaNet.Application/Auth/` to avoid duplication.
+- Optionally merge or reference existing `CargoHub.Application/Auth/` to avoid duplication.
 
 ## Application — Other modules (future)
 

@@ -57,7 +57,7 @@ So today:
 
 ---
 
-## 2. Requirements for HiavaNet.Backend
+## 2. Requirements for CargoHub.Backend
 
 - **Separate API (or “client”) per courier** – one class/module per carrier.
 - **Multiple transport types:** REST APIs, XML over HTTP, email; all must be pluggable.
@@ -70,7 +70,7 @@ So today:
 
 ---
 
-## 3. Proposed design in HiavaNet.Backend
+## 3. Proposed design in CargoHub.Backend
 
 ### 3.1 Single interface (Application layer)
 
@@ -131,9 +131,9 @@ No if-chains on courier name; new couriers = new client + registration.
 
 ---
 
-## 4. Mapping from booking-backend to HiavaNet
+## 4. Mapping from booking-backend to CargoHub
 
-| booking-backend concept        | HiavaNet.Backend                          |
+| booking-backend concept        | CargoHub.Backend                          |
 |--------------------------------|-------------------------------------------|
 | `postalService` (PostalService enum) | `CourierId` / `Header.PostalService`     |
 | `handleDHLExpress` etc.        | `DhlExpressCourierClient.CreateBookingAsync` |
@@ -148,13 +148,13 @@ No if-chains on courier name; new couriers = new client + registration.
 ## 5. Summary
 
 - **Current (booking-backend):** Separate services per courier, mixed REST/XML/email, no shared interface; orchestration uses long if-chains on `postalService`.
-- **Target (HiavaNet.Backend):** One interface `ICourierBookingClient` (create + get status), one implementation per courier (API, XML, or email), resolved by courier id; configuration externalised; easy to extend with new couriers without touching orchestration.
+- **Target (CargoHub.Backend):** One interface `ICourierBookingClient` (create + get status), one implementation per courier (API, XML, or email), resolved by courier id; configuration externalised; easy to extend with new couriers without touching orchestration.
 
 The next step is to add `ICourierBookingClient`, the DTOs, and a factory in the solution, then implement at least one client of each type (REST, XML, email) as a template for the rest.
 
 ---
 
-## 6. Implementation summary (HiavaNet.Backend)
+## 6. Implementation summary (CargoHub.Backend)
 
 - **Application:** `ICourierBookingClient`, `ICourierBookingClientFactory`, `CourierCreateRequest` / `CourierCreateResult` / `CourierStatusResult`, `IEmailSender`.
 - **Infrastructure:** `CourierBookingClientFactory`, `DhlExpressCourierClient` (REST), `MatkahuoltoCourierClient` (XML), `HameenTavarataxiCourierClient` (email), `SmtpEmailSender`, `ServiceCollectionExtensions.AddCourierClients(configuration)`.
@@ -179,17 +179,17 @@ The next step is to add `ICourierBookingClient`, the DTOs, and a factory in the 
       "BookingUrl": "https://extservicestest.matkahuolto.fi/mpaketti/mhshipmentxml"
     },
     "HameenTavarataxi": {
-      "CarrierEmail": "xxxxxx@hiava.fi",
-      "TestEmail": "maleesha@hiava.fi"
+      "CarrierEmail": "carrier@example.com",
+      "TestEmail": "test@example.com"
     }
   },
   "Smtp": {
-    "Host": "mail.hiava.fi",
+    "Host": "smtp.example.com",
     "Port": 465,
     "UseSsl": true,
-    "UserName": "noreply@hiava.fi",
+    "UserName": "noreply@example.com",
     "Password": "<from env INFO_EMAIL_PASSWORD>",
-    "FromAddress": "noreply@hiava.fi"
+    "FromAddress": "noreply@example.com"
   }
 }
 ```

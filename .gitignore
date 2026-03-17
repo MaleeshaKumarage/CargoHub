@@ -1,1 +1,6 @@
 .aider*
+bin/
+obj/
+.vs/
+*.user
+*.suo

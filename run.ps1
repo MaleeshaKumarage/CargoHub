@@ -13,7 +13,7 @@ try {
     Write-Host "Database ready." -ForegroundColor Green
 
     Write-Host "Running API (migrations will apply automatically)..." -ForegroundColor Cyan
-    dotnet run --project HiavaNet.Api --urls "http://localhost:5000"
+    dotnet run --project CargoHub.Api --urls "http://localhost:5000"
 } finally {
     Pop-Location
 }

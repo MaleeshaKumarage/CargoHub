@@ -10,7 +10,7 @@ Credentials and URLs here are from booking-backend (DHL hardcoded in code, Matka
 | **DHL Express – Create** | OK | 422 until body is valid (e.g. remove `reference`, set `plannedShippingDateAndTime` within next 10 days). Credentials accepted. |
 | **DHL Express – Tracking** | OK | 404 for unknown ID = endpoint + auth valid. |
 | **Matkahuolto – Create** | Timeout | Host `extservicestest.matkahuolto.fi` responds (302 on GET). POST to `/mpaketti/mhshipmentxml` timed out (45s). May need VPN, firewall allowlist, or different network. |
-| **SMTP (Hämeen Tavarataxi)** | Not tested via curl | Use app or script with `mail.hiava.fi:465` and credentials from .env. |
+| **SMTP (Hämeen Tavarataxi)** | Not tested via curl | Use app or script with SMTP host:port and credentials from .env. |
 | **Postnord (test API)** | OK | Tracking URL + test apikey return 200 (business error for invalid id). Endpoint and key valid. |
 | **Kaukokiito (prod URL)** | 401 | Endpoint reachable; API key from booking-backend code rejected. Use test key or get valid key. |
 
@@ -20,14 +20,14 @@ Credentials and URLs here are from booking-backend (DHL hardcoded in code, Matka
 
 - **Create shipment:** `POST https://express.api.dhl.com/mydhlapi/test/shipments`
 - **Tracking:** `GET https://express.api.dhl.com/mydhlapi/test/shipments/{shipmentId}/tracking`
-- **Auth:** Basic (from booking-backend: `hiavanetoyFI:X@4xB!7hV^2dK#3l`)
+- **Auth:** Basic (use your DHL API credentials from [developer.dhl.com](https://developer.dhl.com) — format: `username:password`)
 
 ```bash
 # Base64 for Basic auth (run once to get token)
-# PowerShell: [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("hiavanetoyFI:X@4xB!7hV^2dK#3l"))
+# PowerShell: [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("YOUR_DHL_USERNAME:YOUR_DHL_PASSWORD"))
 
 curl -s -w "\nHTTP_CODE:%{http_code}\n" -X POST "https://express.api.dhl.com/mydhlapi/test/shipments?strictValidation=false&bypassPLTError=false&validateDataOnly=false" ^
-  -H "Authorization: Basic aGlhdmFuZXRveUZJOlhANHhCITdoVl4yZEsjM2w=" ^
+  -H "Authorization: Basic YOUR_BASE64_TOKEN" ^
   -H "Content-Type: application/json" ^
   -d @dhl-express-test.json
 ```
@@ -60,7 +60,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}\n" -X POST "https://api.kaukokiito.fi/api/p
 
 ## 5. SMTP (Hämeen Tavarataxi email)
 
-Not verifiable via curl in the same way. Use a small .NET or script to send one test email with `mail.hiava.fi:465` and `noreply@hiava.fi` / password from .env.
+Not verifiable via curl in the same way. Use a small .NET or script to send one test email with your SMTP host:port and credentials from .env.
 
 ## Expected outcomes
 
