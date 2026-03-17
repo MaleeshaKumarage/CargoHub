@@ -104,8 +104,8 @@ jobs:
             echo "### Frontend (Portal)"
             echo "| Metric | Coverage | Target |"
             echo "|--------|----------|--------|"
-            echo "| **Line** | ${PORTAL_LINE}% | 35% min |"
-            echo "| **Branch** | ${PORTAL_BRANCH}% | 35% min |"
+            echo "| **Line** | ${PORTAL_LINE}% | 75% min |"
+            echo "| **Branch** | ${PORTAL_BRANCH}% | 75% min |"
             echo ""
             echo "**Artifacts:** Backend HTML report: **coverage-report** | Portal HTML report: **portal-coverage**"
           } | tee -a $GITHUB_STEP_SUMMARY
@@ -132,7 +132,7 @@ jobs:
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
 
-      - name: Enforce portal coverage threshold (35% line and branch minimum)
+      - name: Enforce portal coverage threshold (75% line and branch minimum)
         run: |
           if [ ! -f portal/coverage/coverage-summary.json ]; then
             echo "Portal coverage file not found"
@@ -141,12 +141,12 @@ jobs:
           LINE_PCT=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json)
           BRANCH_PCT=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json)
           FAIL=0
-          if (( $(echo "$LINE_PCT < 35" | bc -l) )); then
-            echo "::error::Portal line coverage ${LINE_PCT}% is below 35% minimum - PR cannot merge"
+          if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
+            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum - PR cannot merge"
             FAIL=1
           fi
-          if (( $(echo "$BRANCH_PCT < 35" | bc -l) )); then
-            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 35% minimum - PR cannot merge"
+          if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
+            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum - PR cannot merge"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi

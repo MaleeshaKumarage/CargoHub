@@ -6,6 +6,26 @@ import {
   updateTheme,
   getWaybillPdfBlobUrl,
   DESIGN_THEMES,
+  requestPasswordReset,
+  resetPassword,
+  getBranding,
+  getCouriers,
+  adminGetCompanies,
+  adminGetUsers,
+  adminPatchUser,
+  createCompany,
+  getAddressBook,
+  addSender,
+  addReceiver,
+  bookingList,
+  bookingGet,
+  bookingCreate,
+  draftList,
+  draftGet,
+  draftCreate,
+  draftUpdate,
+  draftConfirm,
+  getDashboardStats,
   type RegisterBody,
 } from "./api";
 
@@ -67,6 +87,32 @@ describe("api", () => {
       expect(result.success).toBe(false);
       expect(result.message).toBeDefined();
     });
+
+    it("returns failure when API returns ok but success false", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: false, errorCode: "Locked", message: "Account locked" }),
+      });
+      const result = await login("u@example.com", "pass");
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe("Locked");
+    });
+
+    it("normalizes empty roles to empty array", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          userId: "u1",
+          email: "u@x.com",
+          displayName: "User",
+          jwtToken: "jwt",
+        }),
+      });
+      const result = await login("u@example.com", "pass");
+      expect(result.success).toBe(true);
+      expect(result.data?.roles).toEqual([]);
+    });
   });
 
   describe("register", () => {
@@ -109,6 +155,16 @@ describe("api", () => {
 
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe("CompanyIdRequired");
+    });
+
+    it("returns failure with title when API returns non-ok with title", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ title: "Validation Error" }),
+      });
+      const result = await register({ email: "x@x.com", password: "p", userName: "X" } as RegisterBody);
+      expect(result.success).toBe(false);
+      expect(result.message).toBeDefined();
     });
 
     it("returns failure with CompanyNotFound when errorCode is CompanyNotFound", async () => {
@@ -243,6 +299,374 @@ describe("api", () => {
       });
 
       await expect(getWaybillPdfBlobUrl("token", "b1")).rejects.toThrow(/Failed to load waybill|waybill/);
+    });
+  });
+
+  describe("requestPasswordReset", () => {
+    it("returns success when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      const result = await requestPasswordReset("u@example.com");
+      expect(result.success).toBe(true);
+    });
+    it("returns failure with message when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "User not found" }),
+      });
+      const result = await requestPasswordReset("x@x.com");
+      expect(result.success).toBe(false);
+      expect(result.message).toBe("User not found");
+    });
+  });
+
+  describe("resetPassword", () => {
+    it("returns success when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      const result = await resetPassword("token", "newpass");
+      expect(result.success).toBe(true);
+    });
+    it("returns failure when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Token expired" }),
+      });
+      const result = await resetPassword("t", "p");
+      expect(result.success).toBe(false);
+      expect(result.message).toBe("Token expired");
+    });
+  });
+
+  describe("getBranding", () => {
+    it("returns branding when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          appName: "CargoHub",
+          logoUrl: "/logo.png",
+          primaryColor: "#000",
+          secondaryColor: "#fff",
+        }),
+      });
+      const b = await getBranding();
+      expect(b.appName).toBe("CargoHub");
+      expect(b.logoUrl).toBe("/logo.png");
+    });
+    it("returns defaults when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      const b = await getBranding();
+      expect(b.appName).toBe("Portal");
+      expect(b.logoUrl).toBe("");
+    });
+  });
+
+  describe("getCouriers", () => {
+    it("returns courierIds when API returns array", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ courierIds: ["DHL", "PostNord"] }),
+      });
+      const ids = await getCouriers("token");
+      expect(ids).toEqual(["DHL", "PostNord"]);
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      await expect(getCouriers("token")).rejects.toThrow("Failed to load couriers");
+    });
+  });
+
+  describe("adminGetCompanies", () => {
+    it("returns companies when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: "1", name: "Co" }],
+      });
+      const list = await adminGetCompanies("token");
+      expect(list).toHaveLength(1);
+      expect(list[0].name).toBe("Co");
+    });
+    it("throws with message when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ message: "Forbidden" }),
+      });
+      await expect(adminGetCompanies("token")).rejects.toThrow(/403|Forbidden/);
+    });
+  });
+
+  describe("adminGetUsers", () => {
+    it("returns users when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ userId: "u1", email: "a@b.com", displayName: "A", isActive: true, roles: [] }],
+      });
+      const list = await adminGetUsers("token");
+      expect(list).toHaveLength(1);
+      expect(list[0].userId).toBe("u1");
+    });
+    it("includes businessId in URL when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => [] });
+      await adminGetUsers("token", "1234567-8");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("businessId=1234567-8"),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe("adminPatchUser", () => {
+    it("succeeds when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+      await expect(adminPatchUser("token", "u1", { isActive: false })).resolves.toBeUndefined();
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Update failed" }),
+      });
+      await expect(adminPatchUser("token", "u1", {})).rejects.toThrow("Update failed");
+    });
+  });
+
+  describe("createCompany", () => {
+    it("returns created company when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "c1", companyId: "1234567-8", name: "New Co" }),
+      });
+      const c = await createCompany("token", { name: "New Co", businessId: "1234567-8" });
+      expect(c.id).toBe("c1");
+      expect(c.name).toBe("New Co");
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: "Invalid" }),
+      });
+      await expect(createCompany("token", {})).rejects.toThrow(/Invalid|400/);
+    });
+  });
+
+  describe("getAddressBook", () => {
+    it("returns address book when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ addressBooks: [{ companyId: "c1", senders: [], receivers: [] }] }),
+      });
+      const r = await getAddressBook("token");
+      expect(r.addressBooks).toHaveLength(1);
+      expect(r.addressBooks[0].companyId).toBe("c1");
+    });
+    it("includes companyId in URL when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({ addressBooks: [] }) });
+      await getAddressBook("token", { companyId: "c1" });
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("companyId=c1"), expect.any(Object));
+    });
+    it("throws Company not found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+      await expect(getAddressBook("token")).rejects.toThrow("Company not found");
+    });
+  });
+
+  describe("addSender", () => {
+    it("returns created entry when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "s1", name: "Sender" }),
+      });
+      const s = await addSender("token", { name: "Sender" });
+      expect(s.id).toBe("s1");
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Failed" }),
+      });
+      await expect(addSender("token", {})).rejects.toThrow("Failed");
+    });
+  });
+
+  describe("addReceiver", () => {
+    it("returns created entry when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "r1", name: "Receiver" }),
+      });
+      const r = await addReceiver("token", { name: "Receiver" });
+      expect(r.id).toBe("r1");
+    });
+  });
+
+  describe("bookingList", () => {
+    it("returns bookings when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: "b1", createdAtUtc: "2024-01-01", enabled: true, isFavourite: false }],
+      });
+      const list = await bookingList("token");
+      expect(list).toHaveLength(1);
+      expect(list[0].id).toBe("b1");
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      await expect(bookingList("token")).rejects.toThrow("Failed to load bookings");
+    });
+  });
+
+  describe("bookingGet", () => {
+    it("returns booking when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "b1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const b = await bookingGet("token", "b1");
+      expect(b.id).toBe("b1");
+    });
+    it("throws Booking not found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+      await expect(bookingGet("token", "x")).rejects.toThrow("Booking not found");
+    });
+  });
+
+  describe("bookingCreate", () => {
+    it("returns created booking when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "b1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const b = await bookingCreate("token", { receiverName: "R" });
+      expect(b.id).toBe("b1");
+    });
+    it("throws with migration hint when message includes IsDraft", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: "IsDraft column missing" }),
+      });
+      await expect(bookingCreate("token", {})).rejects.toThrow(/migration|IsDraft/);
+    });
+  });
+
+  describe("draftList", () => {
+    it("returns drafts when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: "d1", createdAtUtc: "", enabled: true, isFavourite: false, isDraft: true }],
+      });
+      const list = await draftList("token");
+      expect(list).toHaveLength(1);
+      expect(list[0].isDraft).toBe(true);
+    });
+  });
+
+  describe("draftGet", () => {
+    it("returns draft when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "d1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, isDraft: true, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const d = await draftGet("token", "d1");
+      expect(d.id).toBe("d1");
+    });
+    it("throws Draft not found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+      await expect(draftGet("token", "x")).rejects.toThrow("Draft not found");
+    });
+  });
+
+  describe("draftCreate", () => {
+    it("returns created draft when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "d1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, isDraft: true, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const d = await draftCreate("token", { receiverName: "R" });
+      expect(d.id).toBe("d1");
+    });
+  });
+
+  describe("draftUpdate", () => {
+    it("returns updated draft when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "d1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, isDraft: true, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const d = await draftUpdate("token", "d1", { receiverName: "R2" });
+      expect(d.id).toBe("d1");
+    });
+  });
+
+  describe("draftConfirm", () => {
+    it("returns completed booking when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "b1", customerId: "c1", enabled: true, isTestBooking: false, isFavourite: false, header: {}, createdAtUtc: "", updatedAtUtc: "" }),
+      });
+      const b = await draftConfirm("token", "d1");
+      expect(b.id).toBe("b1");
+    });
+  });
+
+  describe("getDashboardStats", () => {
+    it("returns stats when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          countToday: 5,
+          countMonth: 20,
+          countYear: 100,
+          byCourier: [],
+          fromCities: [],
+          toCities: [],
+        }),
+      });
+      const s = await getDashboardStats("token");
+      expect(s.countToday).toBe(5);
+      expect(s.countMonth).toBe(20);
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      await expect(getDashboardStats("token")).rejects.toThrow("Failed to load dashboard stats");
+    });
+  });
+
+  describe("getMe with Roles/BusinessId/CompanyName", () => {
+    it("uses Roles (PascalCase) when roles omitted", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          userId: "u1",
+          email: "u@example.com",
+          displayName: "User",
+          Roles: ["Admin"],
+          BusinessId: "123",
+          CompanyName: "Acme",
+        }),
+      });
+      const me = await getMe("token");
+      expect(me.roles).toEqual(["Admin"]);
+      expect(me.businessId).toBe("123");
+      expect(me.companyName).toBe("Acme");
+    });
+  });
+
+  describe("login with Roles/JwtToken", () => {
+    it("uses JwtToken (PascalCase) when jwtToken omitted", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          userId: "u1",
+          email: "u@example.com",
+          displayName: "User",
+          JwtToken: "jwt-xyz",
+          Roles: ["User"],
+        }),
+      });
+      const result = await login("u@example.com", "pass");
+      expect(result.data?.jwtToken).toBe("jwt-xyz");
+      expect(result.data?.roles).toEqual(["User"]);
     });
   });
 });

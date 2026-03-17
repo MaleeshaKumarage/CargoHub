@@ -74,6 +74,7 @@ describe("Navbar", () => {
   });
 
   it("does not show Booking form link when user has no businessId", () => {
+    mockUser = { displayName: "Test", email: "u@x.com", businessId: null };
     render(<Navbar />);
     expect(screen.queryByRole("link", { name: /bookingForm/i })).not.toBeInTheDocument();
   });
