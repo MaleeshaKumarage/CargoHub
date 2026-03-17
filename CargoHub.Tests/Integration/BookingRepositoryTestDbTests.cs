@@ -108,4 +108,158 @@ public class BookingRepositoryTestDbTests : IDisposable
         var loaded = await repo.GetByIdAsync(Guid.NewGuid(), default);
         Assert.Null(loaded);
     }
+
+    [Fact]
+    public async Task ConfirmDraft_WhenDraftExists_ConvertsToCompleted()
+    {
+        var customerId = "cust-confirm";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var draftResult = await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(draftResult);
+
+        var confirmed = await repo.ConfirmDraftAsync(draftResult.Id, customerId, default);
+        Assert.True(confirmed);
+
+        var loaded = await repo.GetByIdAsync(draftResult.Id, default);
+        Assert.NotNull(loaded);
+        Assert.False(loaded.IsDraft);
+        Assert.True(loaded.Enabled);
+    }
+
+    [Fact]
+    public async Task TryAddStatusEvent_WhenStatusExists_ReturnsFalse()
+    {
+        var customerId = "cust-tryadd";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var result = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(result);
+
+        var first = await repo.TryAddStatusEventAsync(result.Id, "CustomStatus", "test", default);
+        Assert.True(first);
+        var second = await repo.TryAddStatusEventAsync(result.Id, "CustomStatus", "test", default);
+        Assert.False(second);
+    }
+
+    [Fact]
+    public async Task GetStatusHistory_ReturnsEventsForBooking()
+    {
+        var customerId = "cust-status";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var result = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(result);
+
+        var history = await repo.GetStatusHistoryAsync(result.Id, default);
+        Assert.NotEmpty(history);
+        Assert.Contains(history, h => h.Status == CargoHub.Domain.Bookings.BookingStatus.CompletedBooking);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_ReturnsCounts()
+    {
+        var customerId = "cust-stats";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, default);
+        Assert.True(stats.CountToday >= 1);
+        Assert.True(stats.CountMonth >= 1);
+        Assert.True(stats.CountYear >= 1);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WithNullCustomerId_ReturnsAllBookingsStats()
+    {
+        var customerId = "cust-all";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var stats = await repo.GetDashboardStatsAsync(null, default);
+        Assert.True(stats.CountToday >= 1);
+    }
+
+    [Fact]
+    public async Task UpdateDraft_WithShippingInfoAndPackages_UpdatesCorrectly()
+    {
+        var customerId = "cust-update";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var draftResult = await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(draftResult);
+
+        var updateRequest = new UpdateDraftRequest
+        {
+            ReferenceNumber = "REF-001",
+            PostalService = "DHL",
+            ReceiverName = "Updated R",
+            ReceiverAddress1 = "New St",
+            ReceiverPostalCode = "00200",
+            ReceiverCity = "Espoo",
+            ReceiverCountry = "FI",
+            ShippingInfo = new CreateBookingShippingInfoDto
+            {
+                GrossWeight = "10",
+                Packages = new List<CreateBookingPackageDto> { new() { Weight = "5", Description = "Box" } }
+            }
+        };
+        var updateHandler = new UpdateDraftCommandHandler(repo);
+        var updated = await updateHandler.Handle(new UpdateDraftCommand(draftResult.Id, customerId, updateRequest), default);
+
+        Assert.NotNull(updated);
+        Assert.Equal("REF-001", updated.Header.ReferenceNumber);
+        Assert.Equal("Updated R", updated.Receiver?.Name);
+        Assert.Single(updated.Packages);
+    }
 }

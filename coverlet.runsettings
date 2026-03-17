@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Exclude test project, migrations, and external-facing Infrastructure (couriers, SMTP) -->
+          <Exclude>[*.Tests]*,[*]*.Migrations*,[CargoHub.Infrastructure]*.Couriers*,[CargoHub.Infrastructure]*.Smtp*,[CargoHub.Infrastructure]*.Schema*,[CargoHub.Infrastructure]*.Auth*,[CargoHub.Infrastructure]*.Identity*,[CargoHub.Application]*.Couriers*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
