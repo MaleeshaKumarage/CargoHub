@@ -4,13 +4,10 @@ When you push to `main`, GitHub Actions builds and pushes images to Docker Hub. 
 
 ## One-time setup
 
-### 1. Create Docker Hub repositories
+### 1. Create Docker Hub repository
 
 1. Go to [hub.docker.com](https://hub.docker.com) and sign in
-2. Create three repositories (public):
-   - `cargohub` (all-in-one: db + api + portal)
-   - `cargohub-api`
-   - `cargohub-portal`
+2. Create one repository (public): `cargohub`
 
 ### 2. Create a Docker Hub access token
 
@@ -37,14 +34,10 @@ Push to `main` and the workflow will build and push. Check **Actions** tab for s
 
 ## Sharing with others
 
-**One package (simplest):**
+**One pull, one run:**
 ```bash
+docker pull maleesha404/cargohub:latest
 docker run -d -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
 ```
 
-**Or with compose:**
-```bash
-docker compose -f docker-compose.one.yml up -d
-```
-
-Images: [maleesha404/cargohub](https://hub.docker.com/r/maleesha404/cargohub) (all-in-one) | [cargohub-api](https://hub.docker.com/r/maleesha404/cargohub-api) | [cargohub-portal](https://hub.docker.com/r/maleesha404/cargohub-portal)
+Image: [maleesha404/cargohub](https://hub.docker.com/r/maleesha404/cargohub)

@@ -1,6 +1,7 @@
-# Build and push to Docker Hub on every push to main
+# Build and push single all-in-one image (db + api + portal) to Docker Hub on push to main
 # Requires GitHub Secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
-# Create repos on hub.docker.com: cargohub-api, cargohub-portal
+# Create repo on hub.docker.com: cargohub
+# Pull and run: docker pull maleesha404/cargohub:latest && docker run -d -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
 
 name: Docker Hub Push
 
@@ -28,50 +29,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/cargohub-api
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=sha,prefix=
-
-      - name: Build and push API
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata (Portal)
-        id: meta-portal
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/cargohub-portal
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=sha,prefix=
-
-      - name: Build and push Portal
-        uses: docker/build-push-action@v6
-        with:
-          context: ./portal
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta-portal.outputs.tags }}
-          labels: ${{ steps.meta-portal.outputs.labels }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=http://localhost:8080
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata (All-in-one)
-        id: meta-all
+      - name: Extract metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/cargohub
@@ -79,13 +38,13 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
             type=sha,prefix=
 
-      - name: Build and push All-in-one
+      - name: Build and push (all-in-one)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.all-in-one
           push: true
-          tags: ${{ steps.meta-all.outputs.tags }}
-          labels: ${{ steps.meta-all.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
