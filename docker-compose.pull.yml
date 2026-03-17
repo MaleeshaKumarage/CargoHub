@@ -1,6 +1,6 @@
-# CargoHub - Full stack. Run with: docker compose up -d
-# Portal: http://localhost:3000  |  API: http://localhost:8080
-# Copy .env.example to .env and adjust if needed (optional - defaults work).
+# Run from pre-built Docker Hub images (no build).
+# Images: maleesha404/cargohub-api, maleesha404/cargohub-portal
+# One command: docker compose -f docker-compose.pull.yml up -d
 
 services:
   db:
@@ -21,9 +21,7 @@ services:
       retries: 10
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: maleesha404/cargohub-api:latest
     container_name: cargohub-api
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -39,11 +37,7 @@ services:
         condition: service_healthy
 
   portal:
-    build:
-      context: ./portal
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    image: maleesha404/cargohub-portal:latest
     container_name: cargohub-portal
     ports:
       - "3000:3000"

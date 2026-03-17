@@ -1,0 +1,32 @@
+# Example: Deploy using GitHub Secrets
+# Rename to deploy.yml and configure when ready.
+#
+# Sync secrets before deploy: ./scripts/sync-secrets-to-github.ps1
+# Secrets are synced from .env (see .env.example for full list).
+
+name: Deploy (Example)
+
+on:
+  workflow_dispatch: # Manual trigger; change to push: branches: [main] for auto-deploy
+  # push:
+  #   branches: [main]
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t cargohub-api .
+
+      - name: Deploy (example - replace with your deployment step)
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings__DefaultConnection: ${{ secrets.CONNECTION_STRINGS__DEFAULT_CONNECTION }}
+          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
+          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
+          Cors__PortalOrigin: ${{ secrets.CORS__PORTAL_ORIGIN }}
+        run: |
+          echo "Add your deployment step here (e.g. push to registry, deploy to Render/Azure)"
+          # Example: docker push your-registry/cargohub-api

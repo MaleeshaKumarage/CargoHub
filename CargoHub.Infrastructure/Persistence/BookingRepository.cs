@@ -14,26 +14,52 @@ public sealed class BookingRepository : IBookingRepository
         _db = db;
     }
 
-    public async Task<List<Booking>> ListByCustomerIdAsync(string customerId, int skip = 0, int take = 100, CancellationToken cancellationToken = default)
+    public async Task<List<Booking>> ListByCustomerIdAsync(string customerId, int skip = 0, int take = 100, BookingListFilter? filter = null, CancellationToken cancellationToken = default)
     {
-        return await _db.Bookings
+        var query = _db.Bookings
             .AsNoTracking()
-            .Where(b => b.CustomerId == customerId && !b.IsDraft)
+            .Include(b => b.Packages)
+            .Where(b => b.CustomerId == customerId && !b.IsDraft);
+        query = ApplyFilter(query, filter);
+        return await query
             .OrderByDescending(b => b.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<Booking>> ListAllAsync(int skip = 0, int take = 100, CancellationToken cancellationToken = default)
+    public async Task<List<Booking>> ListAllAsync(int skip = 0, int take = 100, BookingListFilter? filter = null, CancellationToken cancellationToken = default)
     {
-        return await _db.Bookings
+        var query = _db.Bookings
             .AsNoTracking()
-            .Where(b => !b.IsDraft)
+            .Include(b => b.Packages)
+            .Where(b => !b.IsDraft);
+        query = ApplyFilter(query, filter);
+        return await query
             .OrderByDescending(b => b.CreatedAtUtc)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
+    }
+
+    private static IQueryable<Booking> ApplyFilter(IQueryable<Booking> query, BookingListFilter? filter)
+    {
+        if (filter == null) return query;
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim().ToLower();
+            query = query.Where(b =>
+                (b.ShipmentNumber != null && b.ShipmentNumber.ToLower().Contains(term)) ||
+                (b.WaybillNumber != null && b.WaybillNumber.ToLower().Contains(term)) ||
+                (b.CustomerName != null && b.CustomerName.ToLower().Contains(term)));
+        }
+        if (filter.CreatedFrom.HasValue)
+            query = query.Where(b => b.CreatedAtUtc >= filter.CreatedFrom.Value);
+        if (filter.CreatedTo.HasValue)
+            query = query.Where(b => b.CreatedAtUtc <= filter.CreatedTo.Value);
+        if (filter.Enabled.HasValue)
+            query = query.Where(b => b.Enabled == filter.Enabled.Value);
+        return query;
     }
 
     public async Task<List<Booking>> ListDraftsByCustomerIdAsync(string customerId, int skip = 0, int take = 100, CancellationToken cancellationToken = default)

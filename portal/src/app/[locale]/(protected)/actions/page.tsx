@@ -66,12 +66,12 @@ export default function ActionsPage() {
 
   function isDuplicateEntry(newEntry: AddressEntry, existingList: AddressEntry[]): boolean {
     return existingList.some((existing) => 
-      existing.name.trim().toLowerCase() === newEntry.name.trim().toLowerCase() &&
-      existing.address1.trim().toLowerCase() === newEntry.address1.trim().toLowerCase() &&
+      (existing.name ?? "").trim().toLowerCase() === (newEntry.name ?? "").trim().toLowerCase() &&
+      (existing.address1 ?? "").trim().toLowerCase() === (newEntry.address1 ?? "").trim().toLowerCase() &&
       (existing.address2 ?? "").trim().toLowerCase() === (newEntry.address2 ?? "").trim().toLowerCase() &&
-      existing.postalCode.trim().toLowerCase() === newEntry.postalCode.trim().toLowerCase() &&
-      existing.city.trim().toLowerCase() === newEntry.city.trim().toLowerCase() &&
-      existing.country.trim().toLowerCase() === newEntry.country.trim().toLowerCase() &&
+      (existing.postalCode ?? "").trim().toLowerCase() === (newEntry.postalCode ?? "").trim().toLowerCase() &&
+      (existing.city ?? "").trim().toLowerCase() === (newEntry.city ?? "").trim().toLowerCase() &&
+      (existing.country ?? "").trim().toLowerCase() === (newEntry.country ?? "").trim().toLowerCase() &&
       (existing.email ?? "").trim().toLowerCase() === (newEntry.email ?? "").trim().toLowerCase() &&
       (existing.phoneNumber ?? "").trim() === (newEntry.phoneNumber ?? "").trim() &&
       (existing.contactPersonName ?? "").trim().toLowerCase() === (newEntry.contactPersonName ?? "").trim().toLowerCase() &&

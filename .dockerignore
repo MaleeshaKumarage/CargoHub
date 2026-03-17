@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Build outputs
+**/bin
+**/obj
+**/out
+
+# IDE
+.vs
+.vscode
+.idea
+*.user
+*.suo
+
+# Node (portal - not needed for API image)
+portal/node_modules
+portal/.next
+portal/out
+
+# Test
+**/CargoHub.Tests
+**/*.Tests
+
+# Launcher (dev only)
+CargoHub.Launcher
+
+# Docs and deployment guide (not needed in image)
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Misc
+*.log
+.env
+.env.*
+!.env.example

@@ -145,9 +145,10 @@ npm run dev      # In portal/ directory for UI
 - `Cors:PortalOrigin` - Allowed CORS origins
 - `Bootstrap:Secret` - SuperAdmin creation secret
 
-**Environment Variables:**
+**Environment Variables / Secrets:**
 - `ASPNETCORE_ENVIRONMENT` - Development/Production
 - `NEXT_PUBLIC_API_URL` - Portal API URL (portal/.env.local)
+- Secrets live in `.env` (copy from `.env.example`). See [SECRETS.md](SECRETS.md) for GitHub Secrets.
 
 ## Important Notes
 

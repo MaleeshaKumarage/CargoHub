@@ -15,8 +15,8 @@ public sealed class ListBookingsQueryHandler : IRequestHandler<ListBookingsQuery
     public async Task<List<BookingListDto>> Handle(ListBookingsQuery request, CancellationToken cancellationToken)
     {
         var list = string.IsNullOrEmpty(request.CustomerId)
-            ? await _repository.ListAllAsync(request.Skip, request.Take, cancellationToken)
-            : await _repository.ListByCustomerIdAsync(request.CustomerId, request.Skip, request.Take, cancellationToken);
+            ? await _repository.ListAllAsync(request.Skip, request.Take, null, cancellationToken)
+            : await _repository.ListByCustomerIdAsync(request.CustomerId, request.Skip, request.Take, null, cancellationToken);
         var ids = list.Select(b => b.Id).ToList();
         var statusByBooking = await _repository.GetStatusHistoryForBookingIdsAsync(ids, cancellationToken);
         return list.Select(b => new BookingListDto
