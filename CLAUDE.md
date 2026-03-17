@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HiavaNet is a .NET 8 backend API with a Next.js 16 portal frontend. It follows Clean Architecture with CQRS using MediatR.
+CargoHub is a .NET 8 backend API with a Next.js 16 portal frontend. It follows Clean Architecture with CQRS using MediatR.
 
 **Projects:**
-- `HiavaNet.Api` - ASP.NET Core Web API (entry point)
-- `HiavaNet.Application` - Business logic, MediatR handlers, DTOs
-- `HiavaNet.Domain` - Domain entities (Booking, Company, etc.)
-- `HiavaNet.Infrastructure` - EF Core, Identity, external services
-- `HiavaNet.Launcher` - Dev launcher that starts API + Portal together
-- `HiavaNet.Tests` - xUnit tests
+- `CargoHub.Api` - ASP.NET Core Web API (entry point)
+- `CargoHub.Application` - Business logic, MediatR handlers, DTOs
+- `CargoHub.Domain` - Domain entities (Booking, Company, etc.)
+- `CargoHub.Infrastructure` - EF Core, Identity, external services
+- `CargoHub.Launcher` - Dev launcher that starts API + Portal together
+- `CargoHub.Tests` - xUnit tests
 - `portal/` - Next.js 16 frontend with React 19, Tailwind CSS 4, shadcn/ui
 
 ## Common Commands
@@ -27,7 +27,7 @@ HiavaNet is a .NET 8 backend API with a Next.js 16 portal frontend. It follows C
 ./run.ps1
 
 # Run only API (requires PostgreSQL running via Docker)
-dotnet run --project HiavaNet.Api
+dotnet run --project CargoHub.Api
 
 # Build
 dotnet build
@@ -41,7 +41,7 @@ dotnet test --filter "FullyQualifiedName~TestClassName"
 # Add EF Core migration (API must be stopped)
 ./add-migration.ps1
 # Or manually:
-dotnet ef migrations add <Name> -p HiavaNet.Infrastructure -s HiavaNet.Api
+dotnet ef migrations add <Name> -p CargoHub.Infrastructure -s CargoHub.Api
 ```
 
 ### Frontend (Portal)
@@ -98,8 +98,8 @@ docker compose up -d
 
 ### Entity Framework
 
-- `ApplicationDbContext` in `HiavaNet.Infrastructure/Persistence/`
-- Migrations are in `HiavaNet.Infrastructure/Migrations/`
+- `ApplicationDbContext` in `CargoHub.Infrastructure/Persistence/`
+- Migrations are in `CargoHub.Infrastructure/Migrations/`
 - Migrations apply automatically on startup (`db.Database.Migrate()`)
 - Critical schema ensured via `db.EnsureCriticalSchema()` for idempotency
 
@@ -115,8 +115,8 @@ docker compose up -d
 ### Running Locally
 
 **Option 1: Visual Studio (Recommended)**
-1. Open `HiavaNet.Backend.sln`
-2. Right-click `HiavaNet.Launcher` → Set as Startup Project
+1. Open `CargoHub.Backend.sln`
+2. Right-click `CargoHub.Launcher` → Set as Startup Project
 3. Press F5
 4. API runs at http://localhost:5299, Portal at http://localhost:3000
 
@@ -128,8 +128,8 @@ npm run dev      # In portal/ directory for UI
 
 ### Project Startup Configuration
 
-- `HiavaNet.Launcher` - Runs both API and Portal (Development only)
-- `HiavaNet.Api` - Runs API only (use for API-only debugging)
+- `CargoHub.Launcher` - Runs both API and Portal (Development only)
+- `CargoHub.Api` - Runs API only (use for API-only debugging)
 
 ## Testing
 

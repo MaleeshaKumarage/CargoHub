@@ -1,6 +1,6 @@
 # Scope: Token
 
-Internal token endpoint under `/api/v1/token`. Auth: **token.middleware** — expects header `hiava-header: hiava-backend` (server-to-server or internal use).
+Internal token endpoint under `/api/v1/token`. Auth: **token.middleware** — expects header `cargohub-header: cargohub-backend` (server-to-server or internal use).
 
 ## Endpoints
 

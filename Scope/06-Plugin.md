@@ -1,6 +1,6 @@
 # Scope: Plugin
 
-Plugin endpoints under `/api/v1/plugin`. Auth: **JWT (authMiddleWare)** for all except login and refresh-device. Login returns JWT with claims `iss: "Hiava"`, `plugin-id`, `customer-id`. See [02-Accounts-And-Auth.md](02-Accounts-And-Auth.md) for plugin auth.
+Plugin endpoints under `/api/v1/plugin`. Auth: **JWT (authMiddleWare)** for all except login and refresh-device. Login returns JWT with claims `iss: "CargoHub"`, `plugin-id`, `customer-id`. See [02-Accounts-And-Auth.md](02-Accounts-And-Auth.md) for plugin auth.
 
 ## Public
 

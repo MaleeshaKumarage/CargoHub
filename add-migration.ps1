@@ -9,7 +9,7 @@ $root = $PSScriptRoot
 
 Push-Location $root
 try {
-    dotnet ef migrations add InitialCreate -p HiavaNet.Infrastructure -s HiavaNet.Api
+    dotnet ef migrations add InitialCreate -p CargoHub.Infrastructure -s CargoHub.Api
     if ($LASTEXITCODE -ne 0) { throw "Migration command failed" }
     Write-Host "Done. Start the API; migrations will apply on startup." -ForegroundColor Green
 } finally {

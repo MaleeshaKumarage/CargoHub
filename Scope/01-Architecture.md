@@ -25,15 +25,15 @@ Clean Architecture, CQRS, MediatR, and separated user-account handling.
 
 **Option A (recommended):** Single Application assembly, separate by folder/namespace:
 
-- **HiavaNet.Application/Accounts/** — All account-related use cases:
+- **CargoHub.Application/Accounts/** — All account-related use cases:
   - **Commands**: PortalLoginCommand, PortalRegisterCommand, RequestPasswordResetCommand, ResetPasswordCommand, VerifyEmailCommand, UpdateVerificationStatusCommand, PluginLoginCommand, IntegrationAuthCommand; optional LinkSocialLoginCommand.
   - **Queries**: GetUserByEmailQuery, GetSubUsersQuery, etc., if needed.
   - **Handlers**: One per command/query.
   - **Dtos**: Portal response DTOs (PortalLoginResponse, PortalRegisterResponse, etc.) and request DTOs.
   - **Abstractions**: IPortalCookieService, IWebSocketTokenService (defined in Application, implemented in Infrastructure).
 - **Domain**: Add account-related value objects or entities only if not purely Identity; Domain can stay minimal for accounts.
-- **Infrastructure**: Keep HiavaNet.Infrastructure/Identity/ and add HiavaNet.Infrastructure/Accounts/ for cookie encryption, token issuance, and account-specific persistence. Implement Application account abstractions here.
+- **Infrastructure**: Keep CargoHub.Infrastructure/Identity/ and add CargoHub.Infrastructure/Accounts/ for cookie encryption, token issuance, and account-specific persistence. Implement Application account abstractions here.
 
-**Option B:** Separate assembly (e.g. HiavaNet.Application.Accounts) for a strict physical boundary.
+**Option B:** Separate assembly (e.g. CargoHub.Application.Accounts) for a strict physical boundary.
 
 **Api**: Controllers (PortalController, PluginController, IntegrationController) only send MediatR commands/queries from the Accounts module and set cookies/headers from handler results; no account logic in controllers.

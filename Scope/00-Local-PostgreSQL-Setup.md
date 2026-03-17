@@ -18,7 +18,7 @@ When you **start the solution from Visual Studio** (F5 or Start), the API projec
 
 So you only need to have **Docker Desktop running**; then press F5 and the DB and API start together.
 
-**If you previously used the old database name (hiavanet):** The Docker setup now creates a database named `portal` and uses a new volume `portal_pgdata`. To start clean: run `docker compose down -v` (this removes the old volume), then start again (F5 or `.\run.ps1`). The new container will create the `portal` database. To keep existing data, you would need to rename the database inside PostgreSQL or attach the old volume manually.
+**If you previously used the old database name (CargoHub):** The Docker setup now creates a database named `portal` and uses a new volume `portal_pgdata`. To start clean: run `docker compose down -v` (this removes the old volume), then start again (F5 or `.\run.ps1`). The new container will create the `portal` database. To keep existing data, you would need to rename the database inside PostgreSQL or attach the old volume manually.
 
 **First-time setup (create database tables):** The first time you run the app, the database has no tables yet. You need to create the initial migration **once** (with the API **stopped**):
 
@@ -33,11 +33,11 @@ So you only need to have **Docker Desktop running**; then press F5 and the DB an
 - **With Docker:** from the solution root run  
   `Get-Content Scope\apply-IsActive-migration.sql -Raw | docker exec -i portal-db psql -U postgres -d portal`
 - **Or** stop the API and run  
-  `dotnet ef database update --project HiavaNet.Infrastructure --startup-project HiavaNet.Api`
+  `dotnet ef database update --project CargoHub.Infrastructure --startup-project CargoHub.Api`
 
 ### Run from command line
 
-From the **solution root** (`HiavaNet.Backend`):
+From the **solution root** (`CargoHub.Backend`):
 
 ```powershell
 .\run.ps1
@@ -105,7 +105,7 @@ If you installed pgAdmin from the [pgAdmin installer](https://www.pgadmin.org/do
 
 4. **Configure the API**
    - Either add a connection string in `appsettings.Development.json` (see below), or use the default: `Host=localhost;Port=5432;Database=portal;Username=postgres;Password=postgres`.
-   - Run the API: `dotnet run --project HiavaNet.Api --urls "http://localhost:5000"`. On first run, EF Core will apply migrations and create tables.
+   - Run the API: `dotnet run --project CargoHub.Api --urls "http://localhost:5000"`. On first run, EF Core will apply migrations and create tables.
 
 ---
 
@@ -128,7 +128,7 @@ If you installed pgAdmin from the [pgAdmin installer](https://www.pgadmin.org/do
 
 ## Configure the API (optional)
 
-To override the connection string (e.g. different password or database name) without changing code, add to **HiavaNet.Api/appsettings.Development.json**:
+To override the connection string (e.g. different password or database name) without changing code, add to **CargoHub.Api/appsettings.Development.json**:
 
 ```json
 {
@@ -145,7 +145,7 @@ To override the connection string (e.g. different password or database name) wit
 Do **not** commit real passwords to git. For local-only use, `appsettings.Development.json` is usually gitignored; if not, use [user-secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets):
 
 ```bash
-cd HiavaNet.Api
+cd CargoHub.Api
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=portal;Username=postgres;Password=YOUR_PASSWORD"
 ```
 
@@ -154,5 +154,5 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Po
 ## Verify
 
 - **Docker:** Run `.\run.ps1`, then in another terminal run `.\Scope\run-verify.ps1`.
-- **Local PostgreSQL:** Start the API with `dotnet run --project HiavaNet.Api --urls "http://localhost:5000"`, then run `.\Scope\run-verify.ps1`.
+- **Local PostgreSQL:** Start the API with `dotnet run --project CargoHub.Api --urls "http://localhost:5000"`, then run `.\Scope\run-verify.ps1`.
 - In pgAdmin, connect to the server and open **Databases** → **portal** → **Schemas** → **public** → **Tables** to see the tables created by migrations.

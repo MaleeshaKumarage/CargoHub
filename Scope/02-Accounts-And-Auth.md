@@ -38,11 +38,11 @@ Implement cookie encrypt/decrypt in .NET to match Node (SHA512-derived key/iv, A
 
 ## Plugin auth
 
-- POST `/api/v1/plugin/login` — body includes `authentication_code` (or similar). Internalize: validate code (DB/config), resolve to customer/user, issue JWT with claims `iss: "Hiava"`, `plugin-id`, `customer-id`. Return same response shape as current plugin login. Use existing JwtTokenFactory or Accounts token service.
+- POST `/api/v1/plugin/login` — body includes `authentication_code` (or similar). Internalize: validate code (DB/config), resolve to customer/user, issue JWT with claims `iss: "CargoHub"`, `plugin-id`, `customer-id`. Return same response shape as current plugin login. Use existing JwtTokenFactory or Accounts token service.
 
 ## Integration auth
 
-- POST `/api/v1/integration/auth` — body with integration credentials. Internalize lookup (e.g. integration_username / integration_password or token), resolve to customer_mapping_ID, issue JWT with `iss: "Hiava"` and customer id. Use same JWT validation as plugin (Bearer) for integration routes.
+- POST `/api/v1/integration/auth` — body with integration credentials. Internalize lookup (e.g. integration_username / integration_password or token), resolve to customer_mapping_ID, issue JWT with `iss: "CargoHub"` and customer id. Use same JWT validation as plugin (Bearer) for integration routes.
 
 JWT issuer/audience/signing key must match existing config for plugin/integration clients.
 

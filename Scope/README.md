@@ -1,6 +1,6 @@
-# HiavaNet.Backend — Scope (future use)
+# CargoHub.Backend — Scope (future use)
 
-This folder holds the scope for the .NET conversion of **booking-backend**, with internalized **hiavanet-userapi** and compatibility with **hiavanet-portal**. Each function/feature has its own scope document.
+This folder holds the scope for the .NET conversion of **booking-backend**, with internalized **CargoHub-userapi** and compatibility with **CargoHub-portal**. Each function/feature has its own scope document.
 
 ## Overview
 
@@ -22,7 +22,7 @@ This folder holds the scope for the .NET conversion of **booking-backend**, with
 | [06-Plugin.md](06-Plugin.md) | Plugin feature — login, silent-login, bookings, custom-mapping |
 | [07-Integration.md](07-Integration.md) | Integration feature — auth, bookings, updates |
 | [08-Dashboard.md](08-Dashboard.md) | Dashboard feature — totals and averages |
-| [09-Token.md](09-Token.md) | Token feature — internal token with hiava-header |
+| [09-Token.md](09-Token.md) | Token feature — internal token with cargohub-header |
 | [10-PickupPoint.md](10-PickupPoint.md) | Pickup point feature — carrier pickup points |
 | [11-Transport.md](11-Transport.md) | Transport (Youredi) — status updates and booking updates |
 | [12-Health-And-Swagger.md](12-Health-And-Swagger.md) | Health check and Swagger/OpenAPI |
@@ -46,5 +46,5 @@ This folder holds the scope for the .NET conversion of **booking-backend**, with
 ## Reference
 
 - **booking-backend**: Node/Express source — `C:\Users\malee\source\repos\booking-backend`
-- **hiavanet-userapi**: Java (accounts) + Python (API) — logic to be internalized
-- **hiavanet-portal**: Frontend — must work without change against this backend
+- **CargoHub-userapi**: Java (accounts) + Python (API) — logic to be internalized
+- **CargoHub-portal**: Frontend — must work without change against this backend
