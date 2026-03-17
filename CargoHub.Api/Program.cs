@@ -55,8 +55,14 @@ if (string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), 
 var builder = WebApplication.CreateBuilder(args);
 
 // In Development, always listen on 5299 so the portal (NEXT_PUBLIC_API_URL=http://localhost:5299) can reach the API.
+// In Production (e.g. Render), use PORT from environment (default 8080 for local Docker).
 if (builder.Environment.IsDevelopment())
     builder.WebHost.UseUrls("http://localhost:5299");
+else
+{
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
 
 // Configure database connection for PostgreSQL.
 // NOTE: update "DefaultConnection" in appsettings.json or user-secrets
