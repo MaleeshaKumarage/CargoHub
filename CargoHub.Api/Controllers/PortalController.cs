@@ -133,8 +133,38 @@ public class PortalController : ControllerBase
             DisplayName = displayName,
             Roles = roles,
             BusinessId = businessId,
-            CompanyName = companyName
+            CompanyName = companyName,
+            Theme = user?.Theme ?? "minimalism"
         });
+    }
+
+    private static readonly HashSet<string> ValidThemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "skeuomorphism", "neobrutalism", "claymorphism", "minimalism"
+    };
+
+    /// <summary>Update current user preferences (e.g. theme). Body: { theme }.</summary>
+    [HttpPatch("me/preferences")]
+    [Authorize]
+    public async Task<IActionResult> UpdatePreferences([FromBody] CargoHub.Application.Auth.Dtos.UpdatePreferencesRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request.Theme) || !ValidThemes.Contains(request.Theme.Trim()))
+            return BadRequest(new { message = "Theme must be one of: skeuomorphism, neobrutalism, claymorphism, minimalism" });
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+            return Unauthorized();
+
+        user.Theme = request.Theme.Trim();
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return StatusCode(500, new { message = "Failed to update preferences" });
+
+        return Ok(new { theme = user.Theme });
     }
 
     /// <summary>Request password reset; sends token (email sending optional). Body: { email }.</summary>
