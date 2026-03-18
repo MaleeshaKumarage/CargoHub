@@ -43,12 +43,12 @@ RUN rm -f /usr/bin/node /usr/bin/npm 2>/dev/null || true
 # Copy API
 COPY --from=api-build /app/publish /app/api
 
-# Copy Portal (standalone)
-COPY --from=portal-build /app/.next/standalone /app/portal
-COPY --from=portal-build /app/.next/static /app/portal/.next/static
+# Copy Portal (full build with complete node_modules - avoids standalone tracing issues)
+COPY --from=portal-build /app/.next /app/portal/.next
 COPY --from=portal-build /app/public /app/portal/public
-# Ensure @swc/helpers is present (standalone tracing can miss it)
-COPY --from=portal-build /app/node_modules/@swc /app/portal/node_modules/@swc
+COPY --from=portal-build /app/node_modules /app/portal/node_modules
+COPY --from=portal-build /app/package.json /app/portal/package.json
+COPY --from=portal-build /app/next.config.ts /app/portal/next.config.ts
 
 # Startup script (fix CRLF if from Windows)
 COPY docker/start-all-in-one.sh /start.sh
