@@ -27,4 +27,4 @@ sleep 5
 cd /app/portal
 export NODE_ENV=production
 export PORT=3000
-exec /usr/local/bin/node server.js
+exec npm run start
