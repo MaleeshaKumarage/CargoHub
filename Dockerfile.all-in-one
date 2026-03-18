@@ -35,6 +35,10 @@ ENV PATH="/usr/share/dotnet:${PATH}" \
 
 # Use Node 20 (Alpine apk has Node 24 which breaks Next.js standalone + @swc/helpers)
 COPY --from=node:20-alpine /usr/local /usr/local
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Remove Alpine's Node 24 if present (so /usr/local/bin/node wins)
+RUN rm -f /usr/bin/node /usr/bin/npm 2>/dev/null || true
 
 # Copy API
 COPY --from=api-build /app/publish /app/api
@@ -43,6 +47,8 @@ COPY --from=api-build /app/publish /app/api
 COPY --from=portal-build /app/.next/standalone /app/portal
 COPY --from=portal-build /app/.next/static /app/portal/.next/static
 COPY --from=portal-build /app/public /app/portal/public
+# Ensure @swc/helpers is present (standalone tracing can miss it)
+COPY --from=portal-build /app/node_modules/@swc /app/portal/node_modules/@swc
 
 # Startup script (fix CRLF if from Windows)
 COPY docker/start-all-in-one.sh /start.sh
