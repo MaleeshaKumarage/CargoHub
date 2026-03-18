@@ -1,40 +1,30 @@
 # Run CargoHub with Docker
 
-Any machine with Docker can run the full stack with one command.
+One image. One pull. One command.
 
 ---
 
-## Option A: One package (simplest)
+## Pull and run (recommended)
 
-Single image: db + API + portal. One container.
+Single image with db + API + portal:
+
+```bash
+docker pull maleesha404/cargohub:latest
+docker run -d -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
+```
+
+Or with compose:
 
 ```bash
 docker compose -f docker-compose.one.yml up -d
 ```
 
-Or with plain Docker:
-
-```bash
-docker run -d -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
-```
-
 - **Portal:** http://localhost:3000  
 - **API:** http://localhost:8080  
 
 ---
 
-## Option B: Separate images (3 containers)
-
-```bash
-docker compose -f docker-compose.pull.yml up -d
-```
-
-- **Portal:** http://localhost:3000  
-- **API:** http://localhost:8080  
-
----
-
-## Option C: Build from source
+## Build from source
 
 ```bash
 docker compose up -d
