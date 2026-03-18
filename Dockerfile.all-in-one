@@ -33,8 +33,8 @@ COPY --from=mcr.microsoft.com/dotnet/aspnet:8.0-alpine /usr/share/dotnet /usr/sh
 ENV PATH="/usr/share/dotnet:${PATH}" \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-# Install Node.js
-RUN apk add --no-cache nodejs
+# Use Node 20 (Alpine apk has Node 24 which breaks Next.js standalone + @swc/helpers)
+COPY --from=node:20-alpine /usr/local /usr/local
 
 # Copy API
 COPY --from=api-build /app/publish /app/api
