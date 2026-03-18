@@ -1,14 +1,28 @@
 #!/bin/sh
 set -e
 
-# Start PostgreSQL in background (uses postgres image's entrypoint)
-/usr/local/bin/docker-entrypoint.sh postgres &
-PGPID=$!
+# PostgreSQL must run as postgres user (root execution is not permitted)
+export PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+mkdir -p "$PGDATA"
+chown postgres:postgres "$PGDATA" 2>/dev/null || true
+
+# Init database if empty
+if [ ! -f "$PGDATA/PG_VERSION" ]; then
+  gosu postgres initdb -D "$PGDATA"
+  echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+  echo "listen_addresses='*'" >> "$PGDATA/postgresql.conf"
+fi
+
+# Start PostgreSQL as postgres user (gosu required - postgres refuses to run as root)
+gosu postgres postgres -D "$PGDATA" &
 
 # Wait for PostgreSQL to be ready
-until pg_isready -U postgres -d portal 2>/dev/null; do
+until pg_isready -U postgres 2>/dev/null; do
   sleep 1
 done
+
+# Create portal database if missing
+gosu postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'portal'" | grep -q 1 || gosu postgres createdb portal
 
 # Start .NET API in background
 export ASPNETCORE_ENVIRONMENT=Production
