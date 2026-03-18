@@ -24,7 +24,9 @@ APIPID=$!
 sleep 5
 
 # Start Portal (foreground - keeps container alive)
+# HOSTNAME=0.0.0.0 required so Next.js accepts connections from outside container
 cd /app/portal
 export NODE_ENV=production
 export PORT=3000
+export HOSTNAME=0.0.0.0
 exec npm run start
