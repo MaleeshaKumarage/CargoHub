@@ -1,5 +1,6 @@
-# Single image: db + api + portal. One command: docker compose -f docker-compose.one.yml up -d
-# Portal: http://localhost:3000  |  API: http://localhost:8080
+# Single image: db + api + portal + nginx. One command: docker compose -f docker-compose.one.yml up -d
+# Direct: http://localhost:3000 (portal), http://localhost:8080 (API)
+# Public demo: ngrok tunnels to **8888** (nginx: UI + /api). Set CORS__PORTAL_ORIGIN to your https ngrok URL.
 
 services:
   cargohub:
@@ -8,6 +9,7 @@ services:
     pull_policy: always
     container_name: cargohub
     ports:
+      - "8888:8888"
       - "3000:3000"
       - "8080:8080"
       # ngrok local API / dashboard (only when NGROK_AUTHTOKEN is set — see Dockerfile.all-in-one)
