@@ -1,0 +1,184 @@
+# One pipeline: push code → build & push image → deploy on Mac Mini.
+# ngrok runs inside the container when NGROK_AUTHTOKEN is set (no ngrok install on host required).
+#
+# Secrets (repo → Settings → Secrets → Actions):
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  — required for build + Mac deploy (authenticated pull; avoids Hub timeouts/rate limits)
+#   NGROK_AUTHTOKEN                      — optional; passed into container for in-image ngrok
+#   BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN — optional for compose
+#
+# Mac Mini: Docker + self-hosted runner (ngrok binary on host not required).
+
+name: Docker Hub + Mac deploy + ngrok
+
+on:
+  push:
+    branches: [main, master, development]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-mac-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/cargohub
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Build and push (all-in-one)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.all-in-one
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-on-mac:
+    name: Deploy on Mac + smoke + ngrok URLs
+    needs: build-and-push
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      # Authenticated pulls avoid Docker Hub anonymous rate limits and are more reliable than
+      # unauthenticated pulls (which often hit Client.Timeout / slow auth.docker.io).
+      - name: Login to Docker Hub (for pull on Mac)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::warning::DOCKERHUB_USERNAME or DOCKERHUB_TOKEN missing — pull may hit rate limits or timeouts."
+          else
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          fi
+
+      - name: Pull latest image and restart stack
+        env:
+          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
+          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
+          CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+          # Longer waits for slow registry / auth.docker.io (default 60s is often too low on home networks)
+          COMPOSE_HTTP_TIMEOUT: "600"
+        run: |
+          set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
+          COMPOSE="docker compose -f docker-compose.one.yml"
+          if [ -f "$HOME/.cargohub.env" ]; then
+            COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
+          fi
+
+          echo "Stopping existing stack and freeing ports..."
+          $COMPOSE down --remove-orphans 2>/dev/null || true
+          docker rm -f cargohub 2>/dev/null || true
+          # Remove any container still bound to host ports (stale manual runs, duplicate stacks)
+          for port in 8888 8080 3000 4040; do
+            for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
+              echo "Removing container $id (was using port $port)"
+              docker rm -f "$id" || true
+            done
+          done
+
+          max=6
+          n=1
+          while [ "$n" -le "$max" ]; do
+            echo "docker compose pull (attempt $n/$max, COMPOSE_HTTP_TIMEOUT=$COMPOSE_HTTP_TIMEOUT)..."
+            if $COMPOSE pull; then
+              break
+            fi
+            if [ "$n" -eq "$max" ]; then
+              echo "::error::docker compose pull failed after $max attempts. Check network, Docker Hub status, and DOCKERHUB_* secrets on the runner."
+              exit 1
+            fi
+            wait_sec=$((n * 20))
+            echo "Pull failed; retrying in ${wait_sec}s..."
+            sleep "$wait_sec"
+            n=$((n+1))
+          done
+
+          $COMPOSE up -d --force-recreate --remove-orphans
+
+      - name: Prune old images (optional)
+        run: docker image prune -f || true
+
+      - name: Smoke test (API + portal + nginx :8888)
+        run: |
+          set -e
+          echo "Waiting for Postgres, API, Next.js, nginx..."
+          sleep 25
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            "http://localhost:8080/api/v1/health_"
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            -o /dev/null "http://localhost:3000/"
+          # Same as internet users: nginx :8888 -> /api + Next
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            "http://localhost:8888/api/v1/health_"
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            -o /dev/null "http://localhost:8888/en/"
+          echo "Smoke tests passed (direct :3000/:8080 and public :8888)."
+
+      - name: Show public URLs (ngrok)
+        continue-on-error: true
+        env:
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+        run: |
+          if [ -z "$NGROK_AUTHTOKEN" ]; then
+            echo "::notice::NGROK_AUTHTOKEN not set — in-container ngrok is disabled. Add repo secret to enable public URLs."
+            exit 0
+          fi
+
+          echo "Waiting for ngrok tunnels (polls localhost:4040, up to ~2 min)..."
+          TUNNELS=$(python3 scripts/wait-ngrok-tunnels.py)
+          TUNNEL_COUNT=$(echo "$TUNNELS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('tunnels') or []))" 2>/dev/null || echo 0)
+
+          if [ "$TUNNEL_COUNT" = "0" ]; then
+            echo "::warning::No ngrok tunnels yet. Diagnostics:"
+            echo "--- curl :4040 (raw) ---"
+            curl -sv "http://127.0.0.1:4040/api/tunnels" 2>&1 | tail -30 || true
+            echo "--- docker ps (cargohub) ---"
+            docker ps -a --filter name=cargohub --no-trunc 2>/dev/null || true
+            echo "--- docker logs cargohub (last 80 lines) ---"
+            docker logs cargohub 2>&1 | tail -80 || true
+            echo "--- /tmp/ngrok.log inside container ---"
+            docker exec cargohub tail -60 /tmp/ngrok.log 2>/dev/null || echo "(no log or container not running)"
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "  PUBLIC URLS (share these for remote demo)"
+          echo "=========================================="
+          echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
+          echo ""
+          echo "(See the **Summary** tab on this job for a copy-friendly table.)"

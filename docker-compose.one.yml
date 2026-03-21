@@ -1,18 +1,28 @@
-# Single image: db + api + portal. One command: docker compose -f docker-compose.one.yml up -d
-# Portal: http://localhost:3000  |  API: http://localhost:8080
+# Single image: db + api + portal + nginx. One command: docker compose -f docker-compose.one.yml up -d
+# Direct: http://localhost:3000 (portal), http://localhost:8080 (API)
+# Public demo: ngrok tunnels to **8888** (nginx: UI + /api). Set CORS__PORTAL_ORIGIN to your https ngrok URL.
 
 services:
   cargohub:
     image: maleesha404/cargohub:latest
+    # Always pull :latest on deploy so GitHub Actions / compose up actually updates the container
+    pull_policy: always
     container_name: cargohub
     ports:
+      - "8888:8888"
       - "3000:3000"
       - "8080:8080"
+      # ngrok local API / dashboard (only when NGROK_AUTHTOKEN is set — see Dockerfile.all-in-one)
+      - "4040:4040"
     volumes:
       - cargohub_data:/var/lib/postgresql/data
     environment:
       Bootstrap__Secret: ${Bootstrap__Secret:-SuperAdminBootstrapSecret}
       Jwt__SigningKey: ${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}
+      # For public demo (e.g. ngrok): set to your portal URL, e.g. https://xxx.ngrok-free.app
+      Cors__PortalOrigin: ${CORS__PORTAL_ORIGIN:-http://localhost:3000}
+      # Optional: starts in-container ngrok (token from GitHub Actions secret or .env)
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
 
 volumes:
   cargohub_data:

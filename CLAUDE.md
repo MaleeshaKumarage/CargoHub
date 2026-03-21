@@ -46,6 +46,8 @@ dotnet ef migrations add <Name> -p CargoHub.Infrastructure -s CargoHub.Api
 
 ### Frontend (Portal)
 
+Use **Node.js** from `portal/.nvmrc` (e.g. `nvm use` / `fnm use` in `portal/`) so local versions match CI. **Vitest** is pinned to **3.x** (Vite-based) for compatibility with Node 20.11+; Vitest 4+ pulls in rolldown which needs **Node ≥20.12** (`util.styleText`).
+
 ```bash
 # Install dependencies
 cd portal && npm install
@@ -131,6 +133,15 @@ npm run dev      # In portal/ directory for UI
 - `CargoHub.Launcher` - Runs both API and Portal (Development only)
 - `CargoHub.Api` - Runs API only (use for API-only debugging)
 
+### Docker all-in-one + ngrok (remote demo)
+
+- **Image:** `Dockerfile.all-in-one` — PostgreSQL + API + Next.js + **nginx** on **`:8888`** (single public entry: UI + `/api`).
+- **ngrok:** `ngrok.yml` tunnels **one** address — **`:8888`** (not separate 3000/8080). Dashboard on host **`:4040`**.
+- **Portal API URL:** Production image builds with `NEXT_PUBLIC_API_URL=__SAME_ORIGIN__`; `portal/src/lib/api.ts` uses `window.location.origin` in the browser so API calls match the ngrok URL.
+- **CORS:** Set `Cors__PortalOrigin` / `CORS__PORTAL_ORIGIN` to the **HTTPS ngrok origin** (same as the public URL) when testing from the internet.
+- **Routes:** Portal uses locale prefixes — e.g. **`/en/login`**, **`/en/dashboard`** — not bare `/dashboard`.
+- **Docs:** See [RUN.md](RUN.md) and `docker-compose.one.yml`.
+
 ## Testing
 
 - xUnit with Moq and NSubstitute
@@ -147,12 +158,14 @@ npm run dev      # In portal/ directory for UI
 
 **Environment Variables / Secrets:**
 - `ASPNETCORE_ENVIRONMENT` - Development/Production
-- `NEXT_PUBLIC_API_URL` - Portal API URL (portal/.env.local)
+- `NEXT_PUBLIC_API_URL` - Portal API URL (portal/.env.local); Docker all-in-one build uses `__SAME_ORIGIN__` (see `api.ts`)
+- `Cors:PortalOrigin` / `CORS__PORTAL_ORIGIN` - Must match the browser origin (e.g. ngrok HTTPS URL) for remote demos
 - Secrets live in `.env` (copy from `.env.example`). See [SECRETS.md](SECRETS.md) for GitHub Secrets.
 
 ## Important Notes
 
 - **Port 5433** is used for PostgreSQL to avoid conflicts with local PostgreSQL on 5432
+- **Docker public port 8888** — nginx fronts Next (`:3000`) and API (`:8080`); use this for a single ngrok URL
 - **build.ps1** stops running processes before building to avoid "file is locked" errors
 - Portal auto-starts from API in Development mode if found at solution root
 - Docker Desktop must be running for local database
