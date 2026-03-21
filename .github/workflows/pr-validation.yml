@@ -1,35 +1,27 @@
-# PR validation: build, test, and coverage on every pull request
-# Runs on GitHub-hosted runners — no server needed
-#
-# To block direct commits: Settings → Branches → Add rule for main & development
-#   - Require a pull request before merging
-#   - Require status checks (this workflow) to pass
+# Single responsibility per job:
+#   1. portal-ci      — Node, Vitest, portal coverage artifact
+#   2. backend-ci     — .NET build/test, backend coverage artifact
+#   3. coverage-gates — download both artifacts, summary + 75% enforcement
+#   4. notify-pr-failure — issue on fork-safe branches only
 
 name: PR Validation
 
 on:
   pull_request:
     branches: [main, master, development]
-  # Manual: Actions → PR Validation → Run workflow (full test + coverage gates)
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  portal-ci:
+    name: 1 — Portal (Vitest + coverage)
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Vitest 4 / rolldown requires util.styleText (Node 20.12+)
           node-version-file: portal/.nvmrc
 
       - name: Install portal dependencies
@@ -38,11 +30,24 @@ jobs:
       - name: Portal test with coverage
         run: cd portal && npm run test:coverage
 
-      - name: Upload portal coverage
+      - name: Upload portal coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: portal-coverage
           path: portal/coverage/
+          retention-days: 14
+
+  backend-ci:
+    name: 2 — Backend (.NET + coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Restore
         run: dotnet restore CargoHub.Backend.sln
@@ -67,15 +72,45 @@ jobs:
             -targetdir:"./CoverageReport" \
             -reporttypes:"Html;HtmlSummary;Badges"
 
-      - name: Upload coverage report
+      - name: Upload TestResults (coverage)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-testresults
+          path: TestResults/
+          retention-days: 14
+
+      - name: Upload HTML coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: CoverageReport/
+          retention-days: 14
 
-      - name: Coverage summary
+  coverage-gates:
+    name: 3 — Coverage thresholds (75%)
+    needs: [portal-ci, backend-ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for scripts consistency)
+        uses: actions/checkout@v4
+
+      - name: Install jq and bc
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq bc
+
+      - name: Download portal coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: portal-coverage
+          path: portal/coverage
+
+      - name: Download backend TestResults
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-testresults
+          path: TestResults
+
+      - name: Coverage summary (Job Summary)
         run: |
-          # Backend coverage
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
           BACKEND_LINE="N/A"
           BACKEND_BRANCH="N/A"
@@ -85,16 +120,12 @@ jobs:
             BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" 2>/dev/null | cut -d'"' -f2)
             [ -n "$BRANCH_RATE" ] && BACKEND_BRANCH=$(awk "BEGIN {printf \"%.1f\", $BRANCH_RATE*100}" 2>/dev/null)
           fi
-
-          # Portal (frontend) coverage
           PORTAL_LINE="N/A"
           PORTAL_BRANCH="N/A"
           if [ -f portal/coverage/coverage-summary.json ]; then
             PORTAL_LINE=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json 2>/dev/null || echo "N/A")
             PORTAL_BRANCH=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json 2>/dev/null || echo "N/A")
           fi
-
-          # Build Markdown report (displayed on the job page and in step log)
           {
             echo "## Coverage Report"
             echo ""
@@ -110,14 +141,14 @@ jobs:
             echo "| **Line** | ${PORTAL_LINE}% | 75% min |"
             echo "| **Branch** | ${PORTAL_BRANCH}% | 75% min |"
             echo ""
-            echo "**Artifacts:** Backend HTML report: **coverage-report** | Portal HTML report: **portal-coverage**"
-          } | tee -a $GITHUB_STEP_SUMMARY
+            echo "**Artifacts:** Backend HTML: **coverage-report** | Portal: **portal-coverage**"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Enforce backend coverage threshold (75% line and branch minimum)
+      - name: Enforce backend coverage (75% line & branch)
         run: |
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
           if [ -z "$COV_FILE" ] || [ ! -f "$COV_FILE" ]; then
-            echo "Backend coverage file not found"
+            echo "::error::Backend coverage file not found"
             exit 1
           fi
           LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
@@ -126,40 +157,41 @@ jobs:
           BRANCH_PCT=$(echo "$BRANCH_RATE * 100" | bc)
           FAIL=0
           if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
-            echo "::error::Backend line coverage ${LINE_PCT}% is below 75% minimum - PR cannot merge"
+            echo "::error::Backend line coverage ${LINE_PCT}% is below 75% minimum"
             FAIL=1
           fi
           if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
-            echo "::error::Backend branch coverage ${BRANCH_PCT}% is below 75% minimum - PR cannot merge"
+            echo "::error::Backend branch coverage ${BRANCH_PCT}% is below 75% minimum"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
 
-      - name: Enforce portal coverage threshold (75% line and branch minimum)
+      - name: Enforce portal coverage (75% line & branch)
         run: |
           if [ ! -f portal/coverage/coverage-summary.json ]; then
-            echo "Portal coverage file not found"
+            echo "::error::Portal coverage file not found"
             exit 1
           fi
           LINE_PCT=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json)
           BRANCH_PCT=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json)
           FAIL=0
           if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
-            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum - PR cannot merge"
+            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum"
             FAIL=1
           fi
           if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
-            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum - PR cannot merge"
+            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
 
-  # Does not run for fork PRs (token cannot open issues in the base repo from forks).
   notify-pr-failure:
-    name: Open GitHub issue on PR validation failure
-    needs: [build-and-test]
+    name: 4 — Open issue on failure
+    needs: [portal-ci, backend-ci, coverage-gates]
     if: |
-      failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+      always() &&
+      (needs['portal-ci'].result == 'failure' || needs['backend-ci'].result == 'failure' || needs['coverage-gates'].result == 'failure') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -174,9 +206,14 @@ jobs:
             const prLine = pr
               ? `| **PR** | #${pr.number} — ${pr.title} |`
               : '| **PR** | (workflow_dispatch) |';
+            const failed = [];
+            if (process.env.PORTAL === 'failure') failed.push('portal-ci');
+            if (process.env.BACKEND === 'failure') failed.push('backend-ci');
+            if (process.env.GATES === 'failure') failed.push('coverage-gates');
             const title = `[CI] PR Validation failed — ${branch} (run ${context.runId})`;
             const body = [
-              '### PR Validation (tests / coverage) failed',
+              '### Failed job(s)',
+              failed.map(f => `- **${f}**`).join('\n') || '- (unknown)',
               '',
               '| | |',
               '|-|-|',
@@ -195,3 +232,7 @@ jobs:
               body,
             });
             console.log('Created GitHub issue for failed PR validation.');
+        env:
+          PORTAL: ${{ needs['portal-ci'].result }}
+          BACKEND: ${{ needs['backend-ci'].result }}
+          GATES: ${{ needs['coverage-gates'].result }}
