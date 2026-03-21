@@ -113,6 +113,21 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 6. **Runner user** must be in the **`docker`** group (`sudo usermod -aG docker $USER` and re-login).
 
+### `Bind for 0.0.0.0:8080 failed: port is already allocated`
+
+Something else is using **3000** or **8080** (often an old `cargohub` container or a manual `docker run`). The deploy workflow now runs **`compose down`**, removes **`cargohub`**, then removes any container bound to those ports before starting.
+
+**Manual fix on the Mac:**
+
+```bash
+docker compose -f docker-compose.one.yml down --remove-orphans
+docker rm -f cargohub 2>/dev/null || true
+docker ps -q --filter publish=8080 | xargs -r docker rm -f
+docker ps -q --filter publish=3000 | xargs -r docker rm -f
+```
+
+Then run the workflow again or `docker compose -f docker-compose.one.yml up -d`.
+
 ### Deploy ran but `docker ps` looks unchanged
 
 - **Same image tag:** `latest` was updated on the registry, but Compose reused the old container. The repo uses `pull_policy: always` and `docker compose up -d --force-recreate` so the next deploy recreates the container. To fix manually:  

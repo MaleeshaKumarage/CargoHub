@@ -80,6 +80,18 @@ jobs:
           if [ -f "$HOME/.cargohub.env" ]; then
             COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
           fi
+
+          echo "Stopping existing stack and freeing ports 3000 / 8080..."
+          $COMPOSE down --remove-orphans 2>/dev/null || true
+          docker rm -f cargohub 2>/dev/null || true
+          # Remove any container still bound to host ports (stale manual runs, duplicate stacks)
+          for port in 8080 3000; do
+            for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
+              echo "Removing container $id (was using port $port)"
+              docker rm -f "$id" || true
+            done
+          done
+
           $COMPOSE pull
           $COMPOSE up -d --force-recreate --remove-orphans
 
