@@ -1,11 +1,12 @@
-# One pipeline: push code → build & push image to Docker Hub → deploy on Mac Mini → restart ngrok.
+# One pipeline: push code → build & push image → deploy on Mac Mini.
+# ngrok runs inside the container when NGROK_AUTHTOKEN is set (no ngrok install on host required).
 #
 # Secrets (repo → Settings → Secrets → Actions):
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  — required for build
-#   NGROK_AUTHTOKEN                      — optional; without it, ngrok step is skipped
+#   NGROK_AUTHTOKEN                      — optional; passed into container for in-image ngrok
 #   BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN — optional for compose
 #
-# Mac Mini: install Docker, ngrok, self-hosted runner; runner user in `docker` group.
+# Mac Mini: Docker + self-hosted runner (ngrok binary on host not required).
 
 name: Docker Hub + Mac deploy + ngrok
 
@@ -60,7 +61,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-on-mac:
-    name: Deploy on Mac + smoke + ngrok
+    name: Deploy on Mac + smoke + ngrok URLs
     needs: build-and-push
     runs-on: self-hosted
     steps:
@@ -74,6 +75,7 @@ jobs:
           Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: |
           set -e
           COMPOSE="docker compose -f docker-compose.one.yml"
@@ -85,7 +87,7 @@ jobs:
           $COMPOSE down --remove-orphans 2>/dev/null || true
           docker rm -f cargohub 2>/dev/null || true
           # Remove any container still bound to host ports (stale manual runs, duplicate stacks)
-          for port in 8080 3000; do
+          for port in 8080 3000 4040; do
             for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
               echo "Removing container $id (was using port $port)"
               docker rm -f "$id" || true
@@ -109,32 +111,23 @@ jobs:
             -o /dev/null "http://localhost:3000/"
           echo "Smoke tests passed."
 
-      - name: Restart ngrok (public URLs)
-        id: ngrok
+      - name: Show public URLs (ngrok)
         continue-on-error: true
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: |
-          set -e
-          if ! command -v ngrok >/dev/null 2>&1; then
-            echo "::warning::ngrok is not installed on this runner. Install: https://ngrok.com/download"
-            exit 0
-          fi
           if [ -z "$NGROK_AUTHTOKEN" ]; then
-            echo "::notice::Set NGROK_AUTHTOKEN in repo secrets to enable public tunnels after each deploy."
+            echo "::notice::NGROK_AUTHTOKEN not set — in-container ngrok is disabled. Add repo secret to enable public URLs."
             exit 0
           fi
-          ngrok config add-authtoken "$NGROK_AUTHTOKEN" 2>/dev/null || true
-          pkill -f '[n]grok' || true
-          sleep 2
-          nohup ngrok start --all --config "$GITHUB_WORKSPACE/ngrok.yml" >> /tmp/ngrok-cargohub.log 2>&1 &
-          sleep 5
-          TUNNELS=$(curl -fsS http://127.0.0.1:4040/api/tunnels 2>/dev/null || echo "{}")
-          echo "$TUNNELS" | head -c 4000
+          echo "Waiting for in-container ngrok API on localhost:4040..."
+          sleep 15
+          TUNNELS=$(curl -fsS --retry 10 --retry-delay 3 "http://127.0.0.1:4040/api/tunnels" 2>/dev/null || echo "{}")
+
           echo ""
-          echo "## ngrok tunnels" >> "$GITHUB_STEP_SUMMARY"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          echo "$TUNNELS" | head -c 8000 >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "=========================================="
+          echo "  PUBLIC URLS (share these for remote demo)"
+          echo "=========================================="
+          echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
           echo ""
-          echo "Log: /tmp/ngrok-cargohub.log"
+          echo "(See the **Summary** tab on this job for a copy-friendly table.)"

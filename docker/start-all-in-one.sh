@@ -37,6 +37,18 @@ APIPID=$!
 # Give API time to start and run migrations
 sleep 5
 
+# Optional: ngrok inside the container (set NGROK_AUTHTOKEN at docker run / compose)
+# Public URLs: open http://localhost:4040 on the host when port 4040 is published, or check container logs
+if [ -n "$NGROK_AUTHTOKEN" ]; then
+  echo "Starting ngrok (in-container)..."
+  ngrok config add-authtoken "$NGROK_AUTHTOKEN" 2>/dev/null || true
+  ngrok start --all --config /etc/ngrok/ngrok.yml >> /tmp/ngrok.log 2>&1 &
+  sleep 3
+  echo "ngrok tunnel status:"
+  curl -sS "http://127.0.0.1:4040/api/tunnels" 2>/dev/null | head -c 4000 || echo "(ngrok API not ready yet — check /tmp/ngrok.log)"
+  echo ""
+fi
+
 # Start Portal (foreground - keeps container alive)
 # HOSTNAME=0.0.0.0 required so Next.js accepts connections from outside container
 cd /app/portal
