@@ -50,7 +50,8 @@ jobs:
             COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
           fi
           $COMPOSE pull
-          $COMPOSE up -d
+          # Without --force-recreate, Compose may keep the old container even after pull (same :latest tag)
+          $COMPOSE up -d --force-recreate --remove-orphans
 
       - name: Prune old images (optional)
         run: docker image prune -f || true

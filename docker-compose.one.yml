@@ -4,6 +4,8 @@
 services:
   cargohub:
     image: maleesha404/cargohub:latest
+    # Always pull :latest on deploy so GitHub Actions / compose up actually updates the container
+    pull_policy: always
     container_name: cargohub
     ports:
       - "3000:3000"

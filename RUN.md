@@ -109,3 +109,15 @@ After you register a **self-hosted GitHub Actions runner** on the machine where 
 5. **Public URL (ngrok):** Expose ports `3000` and `8080` (or use a reverse proxy). Set `CORS__PORTAL_ORIGIN` to your **portal** HTTPS URL. The baked-in `NEXT_PUBLIC_API_URL` in the public image points at `http://localhost:8080`; for a single demo URL you may need a custom build or two ngrok tunnels — see `DEPLOYMENT.md` if present.
 
 6. **Runner + Docker:** The user running the runner must be able to run `docker` (e.g. in the `docker` group).
+
+### Deploy ran but `docker ps` looks unchanged
+
+- **Same image tag:** `latest` was updated on the registry, but Compose reused the old container. The repo uses `pull_policy: always` and `docker compose up -d --force-recreate` so the next deploy recreates the container. To fix manually:  
+  `docker compose -f docker-compose.one.yml pull && docker compose -f docker-compose.one.yml up -d --force-recreate`
+
+### No deploy job at all (nothing runs on the Mac Mini)
+
+- **Workflow file must exist on `main`.** Auto-deploy (`workflow_run`) only uses workflows from the **default branch**. Merge your CI/deploy YAML to `main` first.
+- **Actions → Deploy (self-hosted):** Open the latest run. If it’s **skipped**, the `if:` condition failed (e.g. `workflow_run` after a failed Docker Hub Push). Use **Run workflow** manually to test the runner.
+- **Runner offline:** Repo → **Settings** → **Actions** → **Runners** — green / idle. The terminal should show **Listening for jobs**.
+- **Wrong repo / fork:** Self-hosted runners are registered **per repository**; the job only runs for that repo’s workflows.
