@@ -40,6 +40,16 @@ ENV PATH="/usr/local/bin:${PATH}"
 # Remove Alpine's Node 24 if present (so /usr/local/bin/node wins)
 RUN rm -f /usr/bin/node /usr/bin/npm 2>/dev/null || true
 
+# ngrok agent (optional — started at runtime if NGROK_AUTHTOKEN is set)
+RUN apk add --no-cache curl ca-certificates \
+  && ARCH=$(uname -m) \
+  && case "$ARCH" in x86_64) N=amd64 ;; aarch64) N=arm64 ;; *) N=amd64 ;; esac \
+  && curl -fsSL "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${N}.tgz" | tar xz -C /usr/local/bin ngrok \
+  && chmod +x /usr/local/bin/ngrok
+
+# Tunnel definitions (authtoken via env at runtime)
+COPY ngrok.yml /etc/ngrok/ngrok.yml
+
 # Copy API
 COPY --from=api-build /app/publish /app/api
 
@@ -61,5 +71,6 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     Bootstrap__Secret="SuperAdminBootstrapSecret" \
     Jwt__SigningKey="DemoJwtKey-ChangeMe-AtLeast32Chars"
 
-EXPOSE 3000 8080
+# 4040 = ngrok local API / web UI (when ngrok is enabled)
+EXPOSE 3000 8080 4040
 ENTRYPOINT ["/start.sh"]

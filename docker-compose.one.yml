@@ -10,6 +10,8 @@ services:
     ports:
       - "3000:3000"
       - "8080:8080"
+      # ngrok local API / dashboard (only when NGROK_AUTHTOKEN is set — see Dockerfile.all-in-one)
+      - "4040:4040"
     volumes:
       - cargohub_data:/var/lib/postgresql/data
     environment:
@@ -17,6 +19,8 @@ services:
       Jwt__SigningKey: ${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}
       # For public demo (e.g. ngrok): set to your portal URL, e.g. https://xxx.ngrok-free.app
       Cors__PortalOrigin: ${CORS__PORTAL_ORIGIN:-http://localhost:3000}
+      # Optional: starts in-container ngrok (token from GitHub Actions secret or .env)
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
 
 volumes:
   cargohub_data:
