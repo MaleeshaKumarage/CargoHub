@@ -15,9 +15,11 @@ on:
     branches: [main, master, development]
   workflow_dispatch:
 
+# Do not cancel in-flight runs: a new push to the same branch would otherwise kill the Mac
+# deploy mid-pull (looks like random failures/cancellations). Queued runs wait instead.
 concurrency:
   group: docker-mac-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
