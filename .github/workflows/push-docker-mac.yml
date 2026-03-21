@@ -120,9 +120,22 @@ jobs:
             echo "::notice::NGROK_AUTHTOKEN not set — in-container ngrok is disabled. Add repo secret to enable public URLs."
             exit 0
           fi
-          echo "Waiting for in-container ngrok API on localhost:4040..."
-          sleep 15
-          TUNNELS=$(curl -fsS --retry 10 --retry-delay 3 "http://127.0.0.1:4040/api/tunnels" 2>/dev/null || echo "{}")
+
+          echo "Waiting for ngrok tunnels (polls localhost:4040, up to ~2 min)..."
+          TUNNELS=$(python3 scripts/wait-ngrok-tunnels.py)
+          TUNNEL_COUNT=$(echo "$TUNNELS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('tunnels') or []))" 2>/dev/null || echo 0)
+
+          if [ "$TUNNEL_COUNT" = "0" ]; then
+            echo "::warning::No ngrok tunnels yet. Diagnostics:"
+            echo "--- curl :4040 (raw) ---"
+            curl -sv "http://127.0.0.1:4040/api/tunnels" 2>&1 | tail -30 || true
+            echo "--- docker ps (cargohub) ---"
+            docker ps -a --filter name=cargohub --no-trunc 2>/dev/null || true
+            echo "--- docker logs cargohub (last 80 lines) ---"
+            docker logs cargohub 2>&1 | tail -80 || true
+            echo "--- /tmp/ngrok.log inside container ---"
+            docker exec cargohub tail -60 /tmp/ngrok.log 2>/dev/null || echo "(no log or container not running)"
+          fi
 
           echo ""
           echo "=========================================="
