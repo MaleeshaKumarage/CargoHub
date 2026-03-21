@@ -34,7 +34,14 @@ def main():
         print(f"::notice title=Public URL — {label}::{safe}", file=sys.stderr)
 
     if not rows:
-        print("  (no tunnels in response — is ngrok running inside the container?)")
+        print("  (no tunnels in response)")
+        print("")
+        print("  Troubleshooting:")
+        print("  - Image must include ngrok (Dockerfile.all-in-one) — pull latest :latest")
+        print("  - NGROK_AUTHTOKEN must be passed into the container (compose env / GitHub secret)")
+        print("  - ngrok.yml uses web_addr: 0.0.0.0:4040 so the host can reach the API")
+        print("  - Check: docker logs cargohub 2>&1 | tail -80")
+        print("  - Check: docker exec cargohub tail -50 /tmp/ngrok.log")
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path and rows:

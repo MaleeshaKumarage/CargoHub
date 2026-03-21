@@ -13,7 +13,7 @@ docker pull maleesha404/cargohub:latest
 docker run -d -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
 ```
 
-**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. Then open **http://localhost:4040** on the host for the ngrok dashboard and JSON with **`public_url`** for portal (3000) and API (8080). You do **not** need ngrok installed on the host.
+**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. **`ngrok.yml` uses `web_addr: 0.0.0.0:4040`** so the host can reach the ngrok API on **http://localhost:4040**. You do **not** need ngrok installed on the host. If URLs are empty in CI, **pull the latest image** (older images may not include in-container ngrok).
 
 Or with compose:
 

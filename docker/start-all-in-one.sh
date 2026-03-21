@@ -43,10 +43,24 @@ if [ -n "$NGROK_AUTHTOKEN" ]; then
   echo "Starting ngrok (in-container)..."
   ngrok config add-authtoken "$NGROK_AUTHTOKEN" 2>/dev/null || true
   ngrok start --all --config /etc/ngrok/ngrok.yml >> /tmp/ngrok.log 2>&1 &
-  sleep 3
-  echo "ngrok tunnel status:"
-  curl -sS "http://127.0.0.1:4040/api/tunnels" 2>/dev/null | head -c 4000 || echo "(ngrok API not ready yet — check /tmp/ngrok.log)"
-  echo ""
+  # Wait until API responds (tunnels may take a few more seconds)
+  i=0
+  while [ "$i" -lt 60 ]; do
+    if curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
+      echo "ngrok API is up."
+      break
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  if [ "$i" -ge 60 ]; then
+    echo "ngrok API did not become ready. Last 50 lines of /tmp/ngrok.log:"
+    tail -50 /tmp/ngrok.log 2>/dev/null || true
+  else
+    echo "ngrok tunnel status:"
+    curl -sS "http://127.0.0.1:4040/api/tunnels" 2>/dev/null | head -c 4000 || true
+    echo ""
+  fi
 fi
 
 # Start Portal (foreground - keeps container alive)

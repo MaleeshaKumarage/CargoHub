@@ -1,8 +1,9 @@
 # Used by GitHub Actions on your self-hosted Mac to expose portal (3000) + API (8080).
 # Auth token comes from repo secret NGROK_AUTHTOKEN (not stored in this file).
 # https://ngrok.com/docs/agent/config/v2/
-
+# Bind web UI / API on all interfaces so host can reach :4040 via docker -p 4040:4040
 version: "2"
+web_addr: 0.0.0.0:4040
 tunnels:
   portal:
     proto: http
