@@ -13,6 +13,8 @@ services:
     environment:
       Bootstrap__Secret: ${Bootstrap__Secret:-SuperAdminBootstrapSecret}
       Jwt__SigningKey: ${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}
+      # For public demo (e.g. ngrok): set to your portal URL, e.g. https://xxx.ngrok-free.app
+      Cors__PortalOrigin: ${CORS__PORTAL_ORIGIN:-http://localhost:3000}
 
 volumes:
   cargohub_data:

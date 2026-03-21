@@ -210,3 +210,15 @@ When you push changes to GitHub:
 - **Vercel** automatically redeploys the portal.
 
 No manual steps needed.
+
+---
+
+## Alternative: Self-hosted runner + Docker (home server)
+
+If you run **Docker** on your own machine (e.g. Mac Mini + Ubuntu) with a **GitHub self-hosted runner**:
+
+1. Register the runner on the machine (repo → **Settings** → **Actions** → **Runners**).
+2. Push to `main`: **Docker Hub Push** builds the image, then **Deploy (self-hosted)** runs (see `.github/workflows/deploy-self-hosted.yml`).
+3. Optional: set GitHub Actions secrets `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`, `CORS__PORTAL_ORIGIN`, or create `~/.cargohub.env` on the runner for `CORS__PORTAL_ORIGIN` (ngrok portal URL).
+
+Details: **`RUN.md`** → section **Self-hosted runner**.
