@@ -1,0 +1,183 @@
+# Part 2 of 2: runs AFTER "Docker — build & push image" succeeds (one Mac deploy at a time).
+# Avoids queueing full pipelines on a single self-hosted runner (no build+deploy pile-up).
+#
+# workflow_run: requires this file on the default branch. Triggering workflow name must match exactly.
+
+name: Docker — deploy on Mac
+
+on:
+  workflow_run:
+    workflows: ["Docker — build & push image"]
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # Single deploy slot worldwide — branches wait in line instead of parallel half-stuck runs
+  group: docker-mac-deploy-self-hosted
+  cancel-in-progress: false
+
+jobs:
+  deploy-mac:
+    name: Deploy on Mac (pull, compose, smoke, ngrok)
+    runs-on: self-hosted
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(fromJSON('["main","master","development"]'), github.event.workflow_run.head_branch)
+    timeout-minutes: 60
+    env:
+      COMPOSE_HTTP_TIMEOUT: "600"
+      TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+      TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+
+    steps:
+      - name: Print trigger context
+        run: |
+          set -e
+          echo "=== Triggered by successful build ==="
+          echo "head_branch=$TRIGGER_BRANCH"
+          echo "head_sha=$TRIGGER_SHA"
+          echo "triggering_run=${{ github.event.workflow_run.id }}"
+          echo "hostname=$(hostname 2>/dev/null || echo n/a)"
+          uname -a 2>/dev/null || true
+
+      - name: Checkout repository (same commit as build)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set Compose command (optional ~/.cargohub.env)
+        run: |
+          set -e
+          if [ -f "$HOME/.cargohub.env" ]; then
+            echo "COMPOSE_CMD=docker compose -f docker-compose.one.yml --env-file $HOME/.cargohub.env" >> "$GITHUB_ENV"
+          else
+            echo "COMPOSE_CMD=docker compose -f docker-compose.one.yml" >> "$GITHUB_ENV"
+          fi
+
+      - name: Log in to Docker Hub (authenticated pull)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          else
+            echo "::warning::DOCKERHUB_* missing for login"
+          fi
+
+      - name: Stop stack & free ports (8888, 8080, 3000, 4040)
+        run: |
+          set -e
+          $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
+          docker rm -f cargohub 2>/dev/null || true
+          for port in 8888 8080 3000 4040; do
+            for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
+              docker rm -f "$id" || true
+            done
+          done
+
+      - name: Pull image (retry)
+        run: |
+          set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
+          n=1
+          max=6
+          while [ "$n" -le "$max" ]; do
+            echo "compose pull attempt $n/$max..."
+            if $COMPOSE_CMD pull; then break; fi
+            if [ "$n" -eq "$max" ]; then echo "::error::pull failed"; exit 1; fi
+            sleep $((n * 20))
+            n=$((n+1))
+          done
+
+      - name: Start stack (compose up)
+        env:
+          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
+          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
+          CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+        run: |
+          set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
+          $COMPOSE_CMD up -d --force-recreate --remove-orphans
+
+      - name: Prune dangling images
+        run: docker image prune -f || true
+
+      - name: Wait for stack boot
+        run: sleep 25
+
+      - name: Smoke — API :8080
+        run: |
+          set -e
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
+
+      - name: Smoke — Portal :3000
+        run: |
+          set -e
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/"
+
+      - name: Smoke — nginx :8888
+        run: |
+          set -e
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
+
+      - name: Set IMAGE_DIGEST for summary
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          IMG="${DOCKERHUB_USERNAME}/cargohub:latest"
+          DIG=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMG" 2>/dev/null || echo "")
+          echo "IMAGE_DIGEST=$DIG" >> "$GITHUB_ENV"
+
+      - name: Write deployment report (Job Summary)
+        run: chmod +x scripts/ci/deploy-summary.sh 2>/dev/null; sh scripts/ci/deploy-summary.sh
+
+      - name: Show public ngrok URLs
+        continue-on-error: true
+        env:
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+        run: |
+          if [ -z "$NGROK_AUTHTOKEN" ]; then exit 0; fi
+          TUNNELS=$(python3 scripts/wait-ngrok-tunnels.py)
+          echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
+
+  notify-deploy-failure:
+    name: Open issue on deploy failure
+    needs: [deploy-mac]
+    if: ${{ always() && needs.deploy-mac.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = process.env.TRIGGER_BRANCH || 'unknown';
+            const sha = process.env.TRIGGER_SHA || '';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `[CI] Mac deploy failed — ${ref} (run ${context.runId})`;
+            const body = [
+              '### deploy-mac failed',
+              `| **Branch** | \`${ref}\` |`,
+              `| **Commit** | \`${sha}\` |`,
+              '',
+              `**[Deploy workflow run →](${runUrl})**',
+              '',
+              '_Build succeeded; failure is on the self-hosted runner._',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+        env:
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
