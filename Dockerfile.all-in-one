@@ -1,5 +1,5 @@
 # All-in-one: PostgreSQL + API + Portal in a single image
-# Run: docker run -p 3000:3000 -p 8080:8080 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
+# Run (include 8888 for nginx = one public URL with ngrok): docker run -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
 
 # ---- Build API ----
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS api-build
@@ -16,7 +16,8 @@ RUN dotnet publish CargoHub.Api/CargoHub.Api.csproj -c Release -o /app/publish -
 # ---- Build Portal ----
 FROM node:20-alpine AS portal-build
 WORKDIR /app
-ENV NEXT_PUBLIC_API_URL=http://localhost:8080
+# Same-origin API via nginx + single ngrok URL (browser uses window.location.origin)
+ENV NEXT_PUBLIC_API_URL=__SAME_ORIGIN__
 COPY portal/package.json portal/package-lock.json* ./
 RUN npm ci
 COPY portal/ .
@@ -40,6 +41,21 @@ ENV PATH="/usr/local/bin:${PATH}"
 # Remove Alpine's Node 24 if present (so /usr/local/bin/node wins)
 RUN rm -f /usr/bin/node /usr/bin/npm 2>/dev/null || true
 
+# ngrok agent (optional — started at runtime if NGROK_AUTHTOKEN is set)
+RUN apk add --no-cache curl ca-certificates \
+  && ARCH=$(uname -m) \
+  && case "$ARCH" in x86_64) N=amd64 ;; aarch64) N=arm64 ;; *) N=amd64 ;; esac \
+  && curl -fsSL "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${N}.tgz" | tar xz -C /usr/local/bin ngrok \
+  && chmod +x /usr/local/bin/ngrok
+
+# Tunnel definitions (authtoken via env at runtime)
+COPY ngrok.yml /etc/ngrok/ngrok.yml
+
+# nginx: single public port 8888 -> Next :3000 + ASP.NET :8080 (/api)
+RUN apk add --no-cache nginx \
+  && rm -f /etc/nginx/http.d/default.conf
+COPY docker/nginx-public.conf /etc/nginx/http.d/cargohub.conf
+
 # Copy API
 COPY --from=api-build /app/publish /app/api
 
@@ -61,5 +77,6 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     Bootstrap__Secret="SuperAdminBootstrapSecret" \
     Jwt__SigningKey="DemoJwtKey-ChangeMe-AtLeast32Chars"
 
-EXPOSE 3000 8080
+# 8888 = nginx (use this for ngrok). 4040 = ngrok local API. 3000/8080 = direct debug.
+EXPOSE 3000 8080 4040 8888
 ENTRYPOINT ["/start.sh"]
