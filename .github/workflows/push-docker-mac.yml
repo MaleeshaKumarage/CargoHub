@@ -2,7 +2,7 @@
 # ngrok runs inside the container when NGROK_AUTHTOKEN is set (no ngrok install on host required).
 #
 # Secrets (repo → Settings → Secrets → Actions):
-#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  — required for build
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  — required for build + Mac deploy (authenticated pull; avoids Hub timeouts/rate limits)
 #   NGROK_AUTHTOKEN                      — optional; passed into container for in-image ngrok
 #   BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN — optional for compose
 #
@@ -70,14 +70,31 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      # Authenticated pulls avoid Docker Hub anonymous rate limits and are more reliable than
+      # unauthenticated pulls (which often hit Client.Timeout / slow auth.docker.io).
+      - name: Login to Docker Hub (for pull on Mac)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::warning::DOCKERHUB_USERNAME or DOCKERHUB_TOKEN missing — pull may hit rate limits or timeouts."
+          else
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          fi
+
       - name: Pull latest image and restart stack
         env:
           Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+          # Longer waits for slow registry / auth.docker.io (default 60s is often too low on home networks)
+          COMPOSE_HTTP_TIMEOUT: "600"
         run: |
           set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
           COMPOSE="docker compose -f docker-compose.one.yml"
           if [ -f "$HOME/.cargohub.env" ]; then
             COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
@@ -94,7 +111,23 @@ jobs:
             done
           done
 
-          $COMPOSE pull
+          max=6
+          n=1
+          while [ "$n" -le "$max" ]; do
+            echo "docker compose pull (attempt $n/$max, COMPOSE_HTTP_TIMEOUT=$COMPOSE_HTTP_TIMEOUT)..."
+            if $COMPOSE pull; then
+              break
+            fi
+            if [ "$n" -eq "$max" ]; then
+              echo "::error::docker compose pull failed after $max attempts. Check network, Docker Hub status, and DOCKERHUB_* secrets on the runner."
+              exit 1
+            fi
+            wait_sec=$((n * 20))
+            echo "Pull failed; retrying in ${wait_sec}s..."
+            sleep "$wait_sec"
+            n=$((n+1))
+          done
+
           $COMPOSE up -d --force-recreate --remove-orphans
 
       - name: Prune old images (optional)
