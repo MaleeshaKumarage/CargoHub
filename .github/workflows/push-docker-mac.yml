@@ -1,12 +1,10 @@
-# One pipeline: push code → build & push image → deploy on Mac Mini.
-# ngrok runs inside the container when NGROK_AUTHTOKEN is set (no ngrok install on host required).
+# Pipeline layout (single responsibility per job / step):
+#   1. build-image     — Docker Buildx + push only (Ubuntu)
+#   2. deploy-mac       — self-hosted: login → stop → pull → up → smoke → report → ngrok
+#   3. notify-failure   — open GitHub issue if build or deploy failed
 #
-# Secrets (repo → Settings → Secrets → Actions):
-#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  — required for build + Mac deploy (authenticated pull; avoids Hub timeouts/rate limits)
-#   NGROK_AUTHTOKEN                      — optional; passed into container for in-image ngrok
-#   BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN — optional for compose
-#
-# Mac Mini: Docker + self-hosted runner (ngrok binary on host not required).
+# Secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (build + Mac pull)
+#          NGROK_AUTHTOKEN, BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN (optional)
 
 name: Docker Hub + Mac deploy + ngrok
 
@@ -17,30 +15,33 @@ on:
 
 concurrency:
   group: docker-mac-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build-and-push:
-    name: Build and push image
+  # --- Job 1: produce container image only ---
+  build-image:
+    name: 1 — Build & push image (Ubuntu)
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Compute image tags & labels
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -49,7 +50,8 @@ jobs:
             type=raw,value=latest
             type=sha,prefix=
 
-      - name: Build and push (all-in-one)
+      - name: Build and push (Dockerfile.all-in-one)
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -60,19 +62,48 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-on-mac:
-    name: Deploy on Mac + smoke + ngrok URLs
-    needs: build-and-push
+  # --- Job 2: Mac runner only (deploy + verify + reporting) ---
+  deploy-mac:
+    name: 2 — Deploy on Mac (pull, compose, smoke, ngrok)
+    needs: build-image
     runs-on: self-hosted
+    env:
+      COMPOSE_HTTP_TIMEOUT: "600"
+      IMAGE_DIGEST: ${{ needs.build-image.outputs.image_digest }}
+
     steps:
-      - name: Checkout
+      - name: Print runner & git context
+        run: |
+          set -e
+          echo "=== Runner ==="
+          echo "hostname=$(hostname 2>/dev/null || echo n/a)"
+          uname -a 2>/dev/null || true
+          echo "=== Git ==="
+          echo "ref=${{ github.ref }}"
+          echo "sha=${{ github.sha }}"
+          echo "workflow=${{ github.workflow }}"
+          echo "run_id=${{ github.run_id }}"
+          echo "actor=${{ github.actor }}"
+          echo "=== Image from build job (Ubuntu) ==="
+          echo "digest=$IMAGE_DIGEST"
+
+      - name: Checkout repository (deploy scripts & compose)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
 
-      # Authenticated pulls avoid Docker Hub anonymous rate limits and are more reliable than
-      # unauthenticated pulls (which often hit Client.Timeout / slow auth.docker.io).
-      - name: Login to Docker Hub (for pull on Mac)
+      - name: Set Compose command (optional ~/.cargohub.env)
+        run: |
+          set -e
+          if [ -f "$HOME/.cargohub.env" ]; then
+            echo "COMPOSE_CMD=docker compose -f docker-compose.one.yml --env-file $HOME/.cargohub.env" >> "$GITHUB_ENV"
+            echo "Using ~/.cargohub.env for compose."
+          else
+            echo "COMPOSE_CMD=docker compose -f docker-compose.one.yml" >> "$GITHUB_ENV"
+            echo "No ~/.cargohub.env — compose env from workflow secrets only."
+          fi
+
+      - name: Log in to Docker Hub (authenticated pull)
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -84,26 +115,12 @@ jobs:
             echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
           fi
 
-      - name: Pull latest image and restart stack
-        env:
-          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
-          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
-          CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
-          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
-          # Longer waits for slow registry / auth.docker.io (default 60s is often too low on home networks)
-          COMPOSE_HTTP_TIMEOUT: "600"
+      - name: Stop stack & free ports (8888, 8080, 3000, 4040)
         run: |
           set -e
-          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
-          COMPOSE="docker compose -f docker-compose.one.yml"
-          if [ -f "$HOME/.cargohub.env" ]; then
-            COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
-          fi
-
           echo "Stopping existing stack and freeing ports..."
-          $COMPOSE down --remove-orphans 2>/dev/null || true
+          $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
           docker rm -f cargohub 2>/dev/null || true
-          # Remove any container still bound to host ports (stale manual runs, duplicate stacks)
           for port in 8888 8080 3000 4040; do
             for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
               echo "Removing container $id (was using port $port)"
@@ -111,15 +128,19 @@ jobs:
             done
           done
 
+      - name: Pull image (retry)
+        run: |
+          set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
           max=6
           n=1
           while [ "$n" -le "$max" ]; do
             echo "docker compose pull (attempt $n/$max, COMPOSE_HTTP_TIMEOUT=$COMPOSE_HTTP_TIMEOUT)..."
-            if $COMPOSE pull; then
+            if $COMPOSE_CMD pull; then
               break
             fi
             if [ "$n" -eq "$max" ]; then
-              echo "::error::docker compose pull failed after $max attempts. Check network, Docker Hub status, and DOCKERHUB_* secrets on the runner."
+              echo "::error::docker compose pull failed after $max attempts."
               exit 1
             fi
             wait_sec=$((n * 20))
@@ -128,57 +149,121 @@ jobs:
             n=$((n+1))
           done
 
-          $COMPOSE up -d --force-recreate --remove-orphans
-
-      - name: Prune old images (optional)
-        run: docker image prune -f || true
-
-      - name: Smoke test (API + portal + nginx :8888)
+      - name: Start stack (compose up)
+        env:
+          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
+          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
+          CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: |
           set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
+          $COMPOSE_CMD up -d --force-recreate --remove-orphans
+
+      - name: Prune dangling images
+        run: docker image prune -f || true
+
+      - name: Wait for stack boot
+        run: |
           echo "Waiting for Postgres, API, Next.js, nginx..."
           sleep 25
+
+      - name: Smoke — API :8080 health
+        run: |
+          set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             "http://localhost:8080/api/v1/health_"
+
+      - name: Smoke — Portal :3000
+        run: |
+          set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             -o /dev/null "http://localhost:3000/"
-          # Same as internet users: nginx :8888 -> /api + Next
+
+      - name: Smoke — Public nginx :8888 (API + UI)
+        run: |
+          set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             "http://localhost:8888/api/v1/health_"
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             -o /dev/null "http://localhost:8888/en/"
-          echo "Smoke tests passed (direct :3000/:8080 and public :8888)."
+          echo "Smoke tests passed."
 
-      - name: Show public URLs (ngrok)
+      - name: Write deployment report (Job Summary)
+        run: |
+          set -e
+          chmod +x scripts/ci/deploy-summary.sh 2>/dev/null || true
+          sh scripts/ci/deploy-summary.sh
+
+      - name: Show public ngrok URLs
         continue-on-error: true
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: |
           if [ -z "$NGROK_AUTHTOKEN" ]; then
-            echo "::notice::NGROK_AUTHTOKEN not set — in-container ngrok is disabled. Add repo secret to enable public URLs."
+            echo "::notice::NGROK_AUTHTOKEN not set — in-container ngrok is disabled."
             exit 0
           fi
-
           echo "Waiting for ngrok tunnels (polls localhost:4040, up to ~2 min)..."
           TUNNELS=$(python3 scripts/wait-ngrok-tunnels.py)
           TUNNEL_COUNT=$(echo "$TUNNELS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('tunnels') or []))" 2>/dev/null || echo 0)
-
           if [ "$TUNNEL_COUNT" = "0" ]; then
             echo "::warning::No ngrok tunnels yet. Diagnostics:"
-            echo "--- curl :4040 (raw) ---"
             curl -sv "http://127.0.0.1:4040/api/tunnels" 2>&1 | tail -30 || true
-            echo "--- docker ps (cargohub) ---"
             docker ps -a --filter name=cargohub --no-trunc 2>/dev/null || true
-            echo "--- docker logs cargohub (last 80 lines) ---"
             docker logs cargohub 2>&1 | tail -80 || true
-            echo "--- /tmp/ngrok.log inside container ---"
-            docker exec cargohub tail -60 /tmp/ngrok.log 2>/dev/null || echo "(no log or container not running)"
+            docker exec cargohub tail -60 /tmp/ngrok.log 2>/dev/null || true
           fi
-
           echo ""
           echo "=========================================="
-          echo "  PUBLIC URLS (share these for remote demo)"
+          echo "  PUBLIC URLS (remote demo)"
           echo "=========================================="
           echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
           echo ""
           echo "(See the **Summary** tab on this job for a copy-friendly table.)"
+
+  # --- Job 3: failure notification ---
+  notify-failure:
+    name: 3 — Open issue on failure
+    needs: [build-image, deploy-mac]
+    if: ${{ always() && (needs['build-image'].result == 'failure' || needs['deploy-mac'].result == 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      BUILD_RESULT: ${{ needs['build-image'].result }}
+      DEPLOY_RESULT: ${{ needs['deploy-mac'].result }}
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.ref.replace('refs/heads/', '');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const build = process.env.BUILD_RESULT || '';
+            const deploy = process.env.DEPLOY_RESULT || '';
+            const failed = [];
+            if (build === 'failure') failed.push('build-image (Docker build/push)');
+            if (deploy === 'failure') failed.push('deploy-mac (Mac pull/smoke/ngrok)');
+            const title = `[CI] Docker + Mac deploy failed — ${ref} (run ${context.runId})`;
+            const body = [
+              '### Failed job(s)',
+              failed.map(f => `- **${f}**`).join('\n') || '- (unknown)',
+              '',
+              '| | |',
+              '|-|-|',
+              `| **Branch** | \`${ref}\` |`,
+              `| **Commit** | \`${context.sha}\` |`,
+              `| **Workflow** | \`${context.workflow}\` |`,
+              '',
+              `**[View run logs →](${runUrl})**`,
+              '',
+              '_Issue created automatically when this workflow fails._',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            console.log('Created GitHub issue for failed deploy pipeline.');
