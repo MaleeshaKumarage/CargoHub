@@ -1,5 +1,5 @@
 # Legacy example (ubuntu-latest + custom deploy step).
-# For a home server with a self-hosted runner, use: deploy-self-hosted.yml
+# For Mac Mini + Docker + ngrok, use: push-docker-mac.yml (unified pipeline).
 
 name: Deploy (Example)
 
@@ -23,4 +23,4 @@ jobs:
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           Cors__PortalOrigin: ${{ secrets.CORS__PORTAL_ORIGIN }}
         run: |
-          echo "Replace with your cloud deploy, or use deploy-self-hosted.yml for Docker on your own machine."
+          echo "Replace with your cloud deploy, or use push-docker-mac.yml for Docker + ngrok on your own machine."

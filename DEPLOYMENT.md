@@ -218,7 +218,7 @@ No manual steps needed.
 If you run **Docker** on your own machine (e.g. Mac Mini + Ubuntu) with a **GitHub self-hosted runner**:
 
 1. Register the runner on the machine (repo → **Settings** → **Actions** → **Runners**).
-2. Push to `main`: **Docker Hub Push** builds the image, then **Deploy (self-hosted)** runs (see `.github/workflows/deploy-self-hosted.yml`).
-3. Optional: set GitHub Actions secrets `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`, `CORS__PORTAL_ORIGIN`, or create `~/.cargohub.env` on the runner for `CORS__PORTAL_ORIGIN` (ngrok portal URL).
+2. Push to `main` / `master` / `development`: **Docker Hub + Mac deploy + ngrok** (see `.github/workflows/push-docker-mac.yml`) builds, pushes to Docker Hub, deploys on the Mac, and restarts ngrok if `NGROK_AUTHTOKEN` is set.
+3. Optional secrets: `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`, `CORS__PORTAL_ORIGIN`, `NGROK_AUTHTOKEN`, or `~/.cargohub.env` on the runner.
 
-Details: **`RUN.md`** → section **Self-hosted runner**.
+Details: **`RUN.md`** → **Self-hosted runner** and **Test the GitHub Actions pipeline**.

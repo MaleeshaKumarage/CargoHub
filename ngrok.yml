@@ -1,0 +1,12 @@
+# Used by GitHub Actions on your self-hosted Mac to expose portal (3000) + API (8080).
+# Auth token comes from repo secret NGROK_AUTHTOKEN (not stored in this file).
+# https://ngrok.com/docs/agent/config/v2/
+
+version: "2"
+tunnels:
+  portal:
+    proto: http
+    addr: 3000
+  api:
+    proto: http
+    addr: 8080
