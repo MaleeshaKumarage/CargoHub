@@ -111,7 +111,7 @@ jobs:
             -o /dev/null "http://localhost:3000/"
           echo "Smoke tests passed."
 
-      - name: Show ngrok public URLs (from container :4040)
+      - name: Show public URLs (ngrok)
         continue-on-error: true
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
@@ -123,14 +123,11 @@ jobs:
           echo "Waiting for in-container ngrok API on localhost:4040..."
           sleep 15
           TUNNELS=$(curl -fsS --retry 10 --retry-delay 3 "http://127.0.0.1:4040/api/tunnels" 2>/dev/null || echo "{}")
-          echo "$TUNNELS" | head -c 8000
+
           echo ""
-          {
-            echo "## ngrok public URLs (in-container)"
-            echo "Open **http://localhost:4040** on the Mac for the ngrok dashboard."
-            echo ""
-            echo '```json'
-            echo "$TUNNELS" | head -c 12000
-            echo ""
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "=========================================="
+          echo "  PUBLIC URLS (share these for remote demo)"
+          echo "=========================================="
+          echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
+          echo ""
+          echo "(See the **Summary** tab on this job for a copy-friendly table.)"

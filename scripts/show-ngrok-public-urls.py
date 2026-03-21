@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Parse ngrok /api/tunnels JSON from stdin; print public URLs and append GitHub Actions step summary."""
+import json
+import os
+import sys
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        print("Could not parse ngrok response.")
+        sys.exit(0)
+
+    tunnels = data.get("tunnels") or []
+    rows = []
+    for t in tunnels:
+        name = (t.get("name") or "").strip()
+        url = (t.get("public_url") or "").strip()
+        if not url:
+            continue
+        if name == "portal":
+            label = "Portal (Next.js UI)"
+        elif name == "api":
+            label = "API (backend)"
+        else:
+            label = name or "tunnel"
+        print(f"  {label}")
+        print(f"  {url}")
+        print("")
+        rows.append((label, url))
+        safe = url.replace("%", "%25").replace("\n", " ")
+        print(f"::notice title=Public URL — {label}::{safe}", file=sys.stderr)
+
+    if not rows:
+        print("  (no tunnels in response — is ngrok running inside the container?)")
+
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path and rows:
+        lines = [f"| **{lbl}** | `{u}` |" for lbl, u in rows]
+        table = "\n".join(lines)
+        body = (
+            "## Public URLs (remote access)\n\n"
+            "Open these from **any browser** (internet). On the Mac: **http://localhost:4040** "
+            "for the ngrok dashboard.\n\n"
+            "| Service | URL |\n"
+            "|---------|-----|\n"
+            f"{table}\n\n"
+            "<details><summary>Raw ngrok JSON</summary>\n\n"
+            f"```json\n{raw[:12000]}\n```\n\n"
+            "</details>\n"
+        )
+        with open(summary_path, "a", encoding="utf-8") as f:
+            f.write(body)
+
+
+if __name__ == "__main__":
+    main()

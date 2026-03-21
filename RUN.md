@@ -89,7 +89,7 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 **Secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (required). Optional: `NGROK_AUTHTOKEN`, `CORS__PORTAL_ORIGIN`, `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`.
 
-**Manual run:** Actions → **Docker Hub + Mac deploy + ngrok** → **Run workflow**. The job **Show ngrok public URLs** prints tunnel JSON from `http://localhost:4040` on the Mac.
+**Manual run:** Actions → **Docker Hub + Mac deploy + ngrok** → **Run workflow**. The step **Show public URLs (ngrok)** prints **Portal** and **API** links in the job log, adds **GitHub Actions notices** (hover the run), and writes a **markdown table** to the job **Summary** tab.
 
 ### Other workflows
 
