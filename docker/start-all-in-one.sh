@@ -37,7 +37,7 @@ APIPID=$!
 # Give API time to start and run migrations
 sleep 5
 
-# Next.js on :3000 (HOSTNAME=0.0.0.0); nginx exposes :8888 for public/ngrok
+# Next.js on :3000 (nginx will expose :8888 to the internet via ngrok)
 cd /app/portal
 export NODE_ENV=production
 export PORT=3000
