@@ -83,6 +83,13 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 ## Test the GitHub Actions pipeline
 
+### Pipeline layout (single responsibility)
+
+| Workflow | Jobs | Purpose |
+|----------|------|--------|
+| **Docker Hub + Mac deploy + ngrok** | `1 — Build & push image (Ubuntu)` → `2 — Deploy on Mac` → `3 — Open issue on failure` | Build image on GitHub-hosted Linux; deploy/smoke/report on your Mac runner. The **Deploy** job prints runner + git context, runs each smoke step separately, and appends a **deployment report** (digest, `docker ps`, `docker images`) to the job **Summary** tab. |
+| **PR Validation** | `1 — Portal` ∥ `2 — Backend` → `3 — Coverage thresholds` → `4 — Open issue on failure` | Portal and backend CI run **in parallel**; coverage gates run only if both succeed. |
+
 ### Automatic GitHub issues on failure
 
 When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflow opens a **new issue** in this repo with a link to the failed run (title includes the workflow run id). Fork PRs do not get an issue (GitHub token limits). You can close or label these like any other issue.
@@ -105,10 +112,12 @@ When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflo
 
 | Workflow | When it runs | What it tests |
 |----------|----------------|---------------|
-| **PR Validation** | PRs to `main` / `master` / `development`, or **Run workflow** | `npm test` + coverage, `dotnet build` / `dotnet test` + coverage (75% gates) |
+| **PR Validation** | PRs to `main` / `master` / `development`, or **Run workflow** | Portal + backend jobs in **parallel**; then **coverage-gates** (75% min) |
 | **Docker validate (all-in-one)** | Same PRs, or **Run workflow** | `Dockerfile.all-in-one` **builds** (no push to registry) |
 
 **Suggested order to test:** PR Validation → Docker validate → then push to `main` (full release pipeline).
+
+**Branch protection:** If you require status checks before merge, set required checks to **`portal-ci`**, **`backend-ci`**, and **`coverage-gates`** (replacing any old **`build-and-test`** check).
 
 ---
 
