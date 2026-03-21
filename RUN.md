@@ -87,16 +87,17 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 | Workflow | Jobs | Purpose |
 |----------|------|--------|
-| **Docker Hub + Mac deploy + ngrok** | `1 — Build & push image (Ubuntu)` → `2 — Deploy on Mac` → `3 — Open issue on failure` | Build image on GitHub-hosted Linux; deploy/smoke/report on your Mac runner. The **Deploy** job prints runner + git context, runs each smoke step separately, and appends a **deployment report** (digest, `docker ps`, `docker images`) to the job **Summary** tab. |
+| **Docker — build & push image** | Build & push on Ubuntu; optional issue on build failure | Runs on **every** push; **duplicate builds on the same branch cancel** so the registry always gets the latest commit quickly. |
+| **Docker — deploy on Mac** | Deploy on self-hosted runner after a **successful** build | Triggered by `workflow_run` (not a second push pipeline). **One global queue** for deploy (`docker-mac-deploy-self-hosted`) so **main / master / development** don’t each try to grab the Mac at once — avoids queue deadlocks. |
 | **PR Validation** | `1 — Portal` ∥ `2 — Backend` → `3 — Coverage thresholds` → `4 — Open issue on failure` | Portal and backend CI run **in parallel**; coverage gates run only if both succeed. |
 
 ### Automatic GitHub issues on failure
 
-When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflow opens a **new issue** in this repo with a link to the failed run (title includes the workflow run id). Fork PRs do not get an issue (GitHub token limits). You can close or label these like any other issue.
+When **PR Validation** or **Docker build / Mac deploy** fails, a workflow may open a **new issue** with a link to the failed run. Fork PRs do not get an issue from PR Validation (token limits).
 
 ### One automated release (push to `main` / `master` / `development`)
 
-**Workflow: Docker Hub + Mac deploy + ngrok**
+**Workflows: Docker — build & push image** + **Docker — deploy on Mac**
 
 | Step | Where it runs | What happens |
 |------|----------------|----------------|
@@ -106,7 +107,7 @@ When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflo
 
 **Secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (required). Optional: `NGROK_AUTHTOKEN`, `CORS__PORTAL_ORIGIN`, `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`.
 
-**Manual run:** Actions → **Docker Hub + Mac deploy + ngrok** → **Run workflow**. The step **Show public URLs (ngrok)** prints the **public** tunnel URL (nginx `:8888`) in the job log, adds **GitHub Actions notices** (hover the run), and writes a **markdown table** to the job **Summary** tab.
+**Manual run:** Actions → **Docker — build & push image** → **Run workflow** (build only on Ubuntu). **Deploy on Mac** runs automatically after that workflow **succeeds** (see **Docker — deploy on Mac** in the run list). Ngrok URLs appear in the deploy job log and **Summary**.
 
 ### Other workflows
 
@@ -125,7 +126,7 @@ When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflo
 
 1. Install **Docker** and register a **self-hosted GitHub Actions runner** on the Mac (**ngrok on the host is optional** — the app image can run ngrok inside the container).
 
-2. **Push to `main`, `master`, or `development`** (or **Run workflow**): **Docker Hub + Mac deploy + ngrok** builds the image (with embedded ngrok agent), deploys, and passes **`NGROK_AUTHTOKEN`** into the container via compose.
+2. **Push to `main`, `master`, or `development`**: **Docker — build & push image** runs on GitHub-hosted runners; then **Docker — deploy on Mac** runs on your Mac (pulls the image, starts the stack, optional ngrok via **`NGROK_AUTHTOKEN`**).
 
 3. **Secrets:** `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` (required). **`NGROK_AUTHTOKEN`** — [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken); add as repo secret. Optional: `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`, `CORS__PORTAL_ORIGIN`.
 
@@ -136,6 +137,13 @@ When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflo
 6. **`CORS__PORTAL_ORIGIN`:** Set to your **HTTPS ngrok origin** (same URL as the **public** tunnel, e.g. `https://xyz.ngrok-free.app`) so the API allows browser requests from the portal. Without this, login/API calls from the internet can fail with CORS.
 
 7. **Runner user** must be in the **`docker`** group (`sudo usermod -aG docker $USER` and re-login).
+
+8. **`workflow_run` requirement:** The file **`.github/workflows/docker-deploy-mac.yml` must exist on the repository default branch** (usually `main`) or GitHub will **not** trigger **Docker — deploy on Mac** after builds. Merge CI changes to `main` (or change the default branch in repo settings).
+
+### Deploy stuck on **“Set up job”** or long **Queued**
+
+- **One global deploy queue** — pushes to `main` / `master` / `development` each finish **build** on Ubuntu first; **deploy** runs **one at a time** on the Mac. Extra deploys **wait in line** (FIFO), which can look slow but avoids parallel half-states on a single runner.
+- If **Set up job** never finishes: restart the runner service; check disk space and **`_diag`** logs.
 
 ### `Bind for 0.0.0.0:8080 failed: port is already allocated`
 
@@ -157,7 +165,7 @@ Then run the workflow again or `docker compose -f docker-compose.one.yml up -d`.
 
 Anonymous pulls from Docker Hub are **rate-limited** and often **slow**; `Client.Timeout exceeded while awaiting headers` usually means the registry or auth endpoint didn’t respond in time.
 
-- The **Docker Hub + Mac deploy** workflow logs in with **`DOCKERHUB_USERNAME`** / **`DOCKERHUB_TOKEN`** before `compose pull`, retries pulls, and sets a longer **`COMPOSE_HTTP_TIMEOUT`**.
+- **Docker — deploy on Mac** logs in with **`DOCKERHUB_USERNAME`** / **`DOCKERHUB_TOKEN`** before `compose pull`, retries pulls, and sets a longer **`COMPOSE_HTTP_TIMEOUT`**.
 - Ensure those **same repo secrets** exist and are available to the self-hosted runner job.
 - **Manual pull on the Mac:** `docker login` then `docker compose -f docker-compose.one.yml pull`.
 
@@ -168,7 +176,7 @@ Anonymous pulls from Docker Hub are **rate-limited** and often **slow**; `Client
 
 ### No deploy job on the Mac (second job missing)
 
-- **Workflow file must exist on `main`.** Merge CI YAML to `main` so pushes trigger **Docker Hub + Mac deploy + ngrok**.
+- **Workflow files must exist on the default branch** (`workflow_run` reads them from there). Merge CI YAML to `main` so **Docker — deploy on Mac** can trigger after builds.
 - **First job failed (Docker Hub):** The Mac job only runs if **Build and push image** succeeds — check secrets and build logs.
 - **Runner offline:** **Settings** → **Actions** → **Runners** — idle. Terminal: **Listening for jobs**.
 - **Wrong repo:** Self-hosted runners are **per repository**.

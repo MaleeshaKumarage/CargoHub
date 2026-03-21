@@ -1,0 +1,90 @@
+# Part 1 of 2: build & push only (Ubuntu). Fast; duplicate runs on same branch cancel.
+# Part 2: docker-deploy-mac.yml runs on the self-hosted runner after this workflow succeeds.
+
+name: Docker — build & push image
+
+on:
+  push:
+    branches: [main, master, development]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-image:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image tags & labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/cargohub
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Build and push (Dockerfile.all-in-one)
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.all-in-one
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify-build-failure:
+    name: Open issue on build failure
+    needs: [build-image]
+    if: ${{ always() && needs.build-image.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.ref.replace('refs/heads/', '');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `[CI] Docker build/push failed — ${ref} (run ${context.runId})`;
+            const body = [
+              '### Failed job',
+              '- **build-image** (Docker build/push on Ubuntu)',
+              '',
+              `| **Branch** | \`${ref}\` |`,
+              `| **Commit** | \`${context.sha}\` |`,
+              '',
+              `**[View run logs →](${runUrl})**`,
+              '',
+              '_Deploy to Mac did not run (build failed)._',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
