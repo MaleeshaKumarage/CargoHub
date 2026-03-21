@@ -1,0 +1,33 @@
+# Verifies Dockerfile.all-in-one builds (no registry push).
+# Run automatically on PRs; run manually: Actions → Docker validate (all-in-one) → Run workflow.
+
+name: Docker validate (all-in-one)
+
+on:
+  pull_request:
+    branches: [main, master, development]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build all-in-one image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.all-in-one
+          push: false
+          tags: cargohub:ci-verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

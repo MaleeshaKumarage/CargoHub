@@ -50,7 +50,20 @@ jobs:
             COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
           fi
           $COMPOSE pull
-          $COMPOSE up -d
+          # Without --force-recreate, Compose may keep the old container even after pull (same :latest tag)
+          $COMPOSE up -d --force-recreate --remove-orphans
 
       - name: Prune old images (optional)
         run: docker image prune -f || true
+
+      - name: Smoke test (API + portal on localhost)
+        run: |
+          set -e
+          echo "Waiting for Postgres, API, and Next.js to become ready..."
+          sleep 20
+          curl -sfS --retry 20 --retry-delay 5 --retry-all-errors \
+            "http://localhost:8080/api/v1/health_"
+          curl -sfS --retry 20 --retry-delay 5 --retry-all-errors \
+            -o /dev/null "http://localhost:3000/"
+          echo "Smoke tests passed."
+
