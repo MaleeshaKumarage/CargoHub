@@ -10,6 +10,8 @@ name: PR Validation
 on:
   pull_request:
     branches: [main, master, development]
+  # Manual: Actions → PR Validation → Run workflow (full test + coverage gates)
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -27,7 +29,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Vitest 4 / rolldown requires util.styleText (Node 20.12+)
+          node-version-file: portal/.nvmrc
 
       - name: Install portal dependencies
         run: cd portal && npm ci

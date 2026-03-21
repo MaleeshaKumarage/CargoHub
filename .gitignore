@@ -39,6 +39,10 @@ packages/
 .env.local
 .env.*.local
 
+# Python (CI helper scripts)
+**/__pycache__/
+*.py[cod]
+
 # Misc
 *.log
 *.tmp

@@ -1,0 +1,9 @@
+# Single tunnel to nginx :8888 — nginx proxies / -> Next :3000 and /api -> ASP.NET :8080.
+# One public URL = same origin for browser + API (portal uses NEXT_PUBLIC __SAME_ORIGIN__).
+# Auth token: NGROK_AUTHTOKEN at runtime.
+version: "2"
+web_addr: 0.0.0.0:4040
+tunnels:
+  public:
+    proto: http
+    addr: 8888

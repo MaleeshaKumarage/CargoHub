@@ -1,7 +1,30 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5299';
-const BASE = `${API_URL}/api/v1/portal`;
-const ADMIN_BASE = `${API_URL}/api/v1/admin`;
-const COMPANY_BASE = `${API_URL}/api/v1/company`;
+/**
+ * API base URL. In Docker + nginx + single ngrok URL, use __SAME_ORIGIN__ so the browser
+ * calls /api on the same host as the UI. SSR uses 127.0.0.1:8080 inside the container.
+ */
+function getApiUrl(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    if (!env || env === '__SAME_ORIGIN__') {
+      return window.location.origin;
+    }
+    return env;
+  }
+  if (!env || env === '__SAME_ORIGIN__') {
+    return 'http://127.0.0.1:8080';
+  }
+  return env;
+}
+
+function portalBase(): string {
+  return `${getApiUrl()}/api/v1/portal`;
+}
+function adminBase(): string {
+  return `${getApiUrl()}/api/v1/admin`;
+}
+function companyBase(): string {
+  return `${getApiUrl()}/api/v1/company`;
+}
 
 export type LoginResponse = {
   userId: string;
@@ -30,7 +53,7 @@ export type RegisterBody = {
 };
 
 export async function login(account: string, password: string): Promise<LoginResult> {
-  const res = await fetch(`${BASE}/login`, {
+  const res = await fetch(`${portalBase()}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, password }),
@@ -57,7 +80,7 @@ export async function login(account: string, password: string): Promise<LoginRes
 }
 
 export async function register(body: RegisterBody): Promise<LoginResult> {
-  const res = await fetch(`${BASE}/register`, {
+  const res = await fetch(`${portalBase()}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -75,7 +98,7 @@ export async function register(body: RegisterBody): Promise<LoginResult> {
 export type AuthResult = { success: boolean; message?: string | null };
 
 export async function requestPasswordReset(email: string): Promise<AuthResult> {
-  const res = await fetch(`${BASE}/requestPasswordReset`, {
+  const res = await fetch(`${portalBase()}/requestPasswordReset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
@@ -88,7 +111,7 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<AuthResult> {
-  const res = await fetch(`${BASE}/resetPassword`, {
+  const res = await fetch(`${portalBase()}/resetPassword`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, newPassword }),
@@ -109,7 +132,7 @@ export type BrandingResponse = {
 };
 
 export async function getBranding(): Promise<BrandingResponse> {
-  const res = await fetch(`${BASE}/branding`);
+  const res = await fetch(`${portalBase()}/branding`);
   if (!res.ok) {
     return { appName: 'Portal', logoUrl: '', primaryColor: '', secondaryColor: '' };
   }
@@ -135,7 +158,7 @@ export type PortalMeResponse = {
 };
 
 export async function getMe(token: string): Promise<PortalMeResponse> {
-  const res = await fetch(`${BASE}/me`, {
+  const res = await fetch(`${portalBase()}/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load current user');
@@ -158,7 +181,7 @@ export type DesignTheme = (typeof DESIGN_THEMES)[number];
 
 /** Update user theme preference (PATCH /api/v1/portal/me/preferences). */
 export async function updateTheme(token: string, theme: string): Promise<void> {
-  const res = await fetch(`${BASE}/me/preferences`, {
+  const res = await fetch(`${portalBase()}/me/preferences`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ theme }),
@@ -171,7 +194,7 @@ export async function updateTheme(token: string, theme: string): Promise<void> {
 
 /** Registered courier IDs for the booking form dropdown (GET /api/v1/portal/couriers). */
 export async function getCouriers(token: string): Promise<string[]> {
-  const res = await fetch(`${BASE}/couriers`, {
+  const res = await fetch(`${portalBase()}/couriers`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load couriers');
@@ -198,7 +221,7 @@ export type AdminUser = {
 };
 
 export async function adminGetCompanies(token: string): Promise<AdminCompany[]> {
-  const res = await fetch(`${ADMIN_BASE}/companies`, {
+  const res = await fetch(`${adminBase()}/companies`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -210,7 +233,7 @@ export async function adminGetCompanies(token: string): Promise<AdminCompany[]> 
 }
 
 export async function adminGetUsers(token: string, businessId?: string | null): Promise<AdminUser[]> {
-  const url = businessId ? `${ADMIN_BASE}/users?businessId=${encodeURIComponent(businessId)}` : `${ADMIN_BASE}/users`;
+  const url = businessId ? `${adminBase()}/users?businessId=${encodeURIComponent(businessId)}` : `${adminBase()}/users`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error('Failed to load users');
   return res.json();
@@ -221,7 +244,7 @@ export async function adminPatchUser(
   userId: string,
   body: { role?: string; isActive?: boolean }
 ): Promise<void> {
-  const res = await fetch(`${ADMIN_BASE}/users/${encodeURIComponent(userId)}`, {
+  const res = await fetch(`${adminBase()}/users/${encodeURIComponent(userId)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -253,7 +276,7 @@ export type CompanyCreated = {
 };
 
 export async function createCompany(token: string, body: CreateCompanyBody): Promise<CompanyCreated> {
-  const res = await fetch(COMPANY_BASE, {
+  const res = await fetch(companyBase(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -300,7 +323,7 @@ export async function getAddressBook(
   token: string,
   options?: { companyId?: string }
 ): Promise<AddressBookListResponse> {
-  const url = new URL(`${BASE}/company/address-book`);
+  const url = new URL(`${portalBase()}/company/address-book`);
   if (options?.companyId) url.searchParams.set('companyId', options.companyId);
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
@@ -313,7 +336,7 @@ export async function getAddressBook(
 }
 
 export async function addSender(token: string, entry: AddressEntry, companyId?: string | null): Promise<AddressEntry> {
-  const url = new URL(`${BASE}/company/senders`);
+  const url = new URL(`${portalBase()}/company/senders`);
   if (companyId) url.searchParams.set('companyId', companyId);
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -328,7 +351,7 @@ export async function addSender(token: string, entry: AddressEntry, companyId?: 
 }
 
 export async function addReceiver(token: string, entry: AddressEntry, companyId?: string | null): Promise<AddressEntry> {
-  const url = new URL(`${BASE}/company/receivers`);
+  const url = new URL(`${portalBase()}/company/receivers`);
   if (companyId) url.searchParams.set('companyId', companyId);
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -504,7 +527,7 @@ export type CreateBookingBody = {
 };
 
 export async function bookingList(token: string, skip = 0, take = 100): Promise<BookingListItem[]> {
-  const res = await fetch(`${BASE}/bookings?skip=${skip}&take=${take}`, {
+  const res = await fetch(`${portalBase()}/bookings?skip=${skip}&take=${take}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load bookings');
@@ -512,7 +535,7 @@ export async function bookingList(token: string, skip = 0, take = 100): Promise<
 }
 
 export async function bookingGet(token: string, id: string): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings/${id}`, {
+  const res = await fetch(`${portalBase()}/bookings/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -524,7 +547,7 @@ export async function bookingGet(token: string, id: string): Promise<BookingDeta
 
 /** Fetches waybill PDF for a completed booking. Returns a blob URL to open/print. Revoke with URL.revokeObjectURL after use. */
 export async function getWaybillPdfBlobUrl(token: string, bookingId: string): Promise<string> {
-  const res = await fetch(`${BASE}/bookings/${bookingId}/waybill`, {
+  const res = await fetch(`${portalBase()}/bookings/${bookingId}/waybill`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -548,7 +571,7 @@ function apiError(res: Response, data: Record<string, unknown>, fallback: string
 }
 
 export async function bookingCreate(token: string, body: CreateBookingBody): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings`, {
+  const res = await fetch(`${portalBase()}/bookings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -567,7 +590,7 @@ export async function bookingCreate(token: string, body: CreateBookingBody): Pro
 // --- Drafts: save as draft, retrieve, fill rest, confirm to complete ---
 
 export async function draftList(token: string, skip = 0, take = 100): Promise<BookingListItem[]> {
-  const res = await fetch(`${BASE}/bookings/draft?skip=${skip}&take=${take}`, {
+  const res = await fetch(`${portalBase()}/bookings/draft?skip=${skip}&take=${take}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load drafts');
@@ -575,7 +598,7 @@ export async function draftList(token: string, skip = 0, take = 100): Promise<Bo
 }
 
 export async function draftGet(token: string, id: string): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings/draft/${id}`, {
+  const res = await fetch(`${portalBase()}/bookings/draft/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -586,7 +609,7 @@ export async function draftGet(token: string, id: string): Promise<BookingDetail
 }
 
 export async function draftCreate(token: string, body: CreateBookingBody): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings/draft`, {
+  const res = await fetch(`${portalBase()}/bookings/draft`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -601,7 +624,7 @@ export async function draftCreate(token: string, body: CreateBookingBody): Promi
 export type UpdateDraftBody = CreateBookingBody;
 
 export async function draftUpdate(token: string, id: string, body: UpdateDraftBody): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings/draft/${id}`, {
+  const res = await fetch(`${portalBase()}/bookings/draft/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -615,7 +638,7 @@ export async function draftUpdate(token: string, id: string, body: UpdateDraftBo
 }
 
 export async function draftConfirm(token: string, id: string): Promise<BookingDetail> {
-  const res = await fetch(`${BASE}/bookings/draft/${id}/confirm`, {
+  const res = await fetch(`${portalBase()}/bookings/draft/${id}/confirm`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -641,7 +664,7 @@ export type DashboardStats = {
 };
 
 export async function getDashboardStats(token: string): Promise<DashboardStats> {
-  const res = await fetch(`${BASE}/dashboard/stats`, {
+  const res = await fetch(`${portalBase()}/dashboard/stats`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load dashboard stats');
