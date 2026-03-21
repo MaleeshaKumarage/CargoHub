@@ -46,6 +46,8 @@ dotnet ef migrations add <Name> -p CargoHub.Infrastructure -s CargoHub.Api
 
 ### Frontend (Portal)
 
+Use **Node.js** from `portal/.nvmrc` (e.g. `nvm use` / `fnm use` in `portal/`) so local versions match CI. **Vitest** is pinned to **3.x** (Vite-based) for compatibility with Node 20.11+; Vitest 4+ pulls in rolldown which needs **Node ≥20.12** (`util.styleText`).
+
 ```bash
 # Install dependencies
 cd portal && npm install

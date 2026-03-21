@@ -65,7 +65,7 @@ public class RegisterUserCommandHandlerTests
         companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
 
         var regService = new Mock<IUserRegistrationService>();
-        regService.Setup(r => r.CreateUserAsync("a@b.com", "P@ss1", It.IsAny<string?>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        regService.Setup(r => r.CreateUserAsync("a@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(("user-1", "a@b.com", "User", "1234567-8", "cust-1"));
 
         var jwtFactory = new Mock<IJwtTokenFactory>();

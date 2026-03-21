@@ -140,6 +140,14 @@ docker ps -q --filter publish=3000 | xargs -r docker rm -f
 
 Then run the workflow again or `docker compose -f docker-compose.one.yml up -d`.
 
+### `docker compose pull` / `auth.docker.io` timeout on the Mac
+
+Anonymous pulls from Docker Hub are **rate-limited** and often **slow**; `Client.Timeout exceeded while awaiting headers` usually means the registry or auth endpoint didn’t respond in time.
+
+- The **Docker Hub + Mac deploy** workflow logs in with **`DOCKERHUB_USERNAME`** / **`DOCKERHUB_TOKEN`** before `compose pull`, retries pulls, and sets a longer **`COMPOSE_HTTP_TIMEOUT`**.
+- Ensure those **same repo secrets** exist and are available to the self-hosted runner job.
+- **Manual pull on the Mac:** `docker login` then `docker compose -f docker-compose.one.yml pull`.
+
 ### Deploy ran but `docker ps` looks unchanged
 
 - **Same image tag:** `latest` was updated on the registry, but Compose reused the old container. The repo uses `pull_policy: always` and `docker compose up -d --force-recreate` so the next deploy recreates the container. To fix manually:  
