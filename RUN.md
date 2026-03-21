@@ -83,6 +83,10 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 ## Test the GitHub Actions pipeline
 
+### Automatic GitHub issues on failure
+
+When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflow opens a **new issue** in this repo with a link to the failed run (title includes the workflow run id). Fork PRs do not get an issue (GitHub token limits). You can close or label these like any other issue.
+
 ### One automated release (push to `main` / `master` / `development`)
 
 **Workflow: Docker Hub + Mac deploy + ngrok**

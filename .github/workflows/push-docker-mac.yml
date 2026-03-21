@@ -184,3 +184,49 @@ jobs:
           echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
           echo ""
           echo "(See the **Summary** tab on this job for a copy-friendly table.)"
+
+  # Opens one issue per failed run (title includes run id — not deduplicated).
+  notify-failure:
+    name: Open GitHub issue on pipeline failure
+    needs: [build-and-push, deploy-on-mac]
+    if: ${{ always() && (needs['build-and-push'].result == 'failure' || needs['deploy-on-mac'].result == 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      BUILD_RESULT: ${{ needs['build-and-push'].result }}
+      DEPLOY_RESULT: ${{ needs['deploy-on-mac'].result }}
+    steps:
+      - name: Create issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.ref.replace('refs/heads/', '');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const build = process.env.BUILD_RESULT || '';
+            const deploy = process.env.DEPLOY_RESULT || '';
+            const failed = [];
+            if (build === 'failure') failed.push('build-and-push (Docker build/push)');
+            if (deploy === 'failure') failed.push('deploy-on-mac (Mac pull/smoke/ngrok)');
+            const title = `[CI] Docker + Mac deploy failed — ${ref} (run ${context.runId})`;
+            const body = [
+              '### Failed job(s)',
+              failed.map(f => `- **${f}**`).join('\n') || '- (unknown)',
+              '',
+              '| | |',
+              '|-|-|',
+              `| **Branch** | \`${ref}\` |`,
+              `| **Commit** | \`${context.sha}\` |`,
+              `| **Workflow** | \`${context.workflow}\` |`,
+              '',
+              `**[View run logs →](${runUrl})**`,
+              '',
+              '_Issue created automatically when this workflow fails._',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            console.log('Created GitHub issue for failed deploy pipeline.');
