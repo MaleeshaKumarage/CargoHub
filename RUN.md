@@ -137,6 +137,19 @@ When **PR Validation** or **Docker Hub + Mac deploy + ngrok** fails, the workflo
 
 7. **Runner user** must be in the **`docker`** group (`sudo usermod -aG docker $USER` and re-login).
 
+### Deploy job stuck on **“Set up job”** (many minutes, no steps run)
+
+That phase runs **on the self-hosted runner before your first step** (GitHub prepares the job, downloads actions, creates the workspace). It is **not** your shell steps yet.
+
+| Likely cause | What to do |
+|--------------|------------|
+| **Another job still using the same runner** | Only **one** job runs per runner at a time. With `cancel-in-progress: false`, extra workflow runs **queue**. In the UI you may see one run **waiting** while another’s **Deploy** job is active. Wait, or cancel duplicate runs you don’t need. |
+| **Runner process stuck / updated** | On the Mac: **restart the Actions runner** (stop/start the service or `./run.sh` listener). Check **`_diag`** logs under the runner install folder. |
+| **Disk full or very slow disk / network** | Free space; ensure the machine can reach **github.com** and **registry-1.docker.io** quickly. |
+| **Antivirus / Spotlight** scanning the runner `_work` folder | Exclude the runner directory from real-time scan if safe for your policy. |
+
+The workflow sets **`timeout-minutes: 60`** on the Mac deploy job so a hung job **fails** instead of running forever.
+
 ### `Bind for 0.0.0.0:8080 failed: port is already allocated`
 
 Something else is using **8888**, **3000**, or **8080** (often an old `cargohub` container or a manual `docker run`). The deploy workflow now runs **`compose down`**, removes **`cargohub`**, then removes any container bound to those ports before starting.

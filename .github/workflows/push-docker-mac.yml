@@ -67,6 +67,8 @@ jobs:
     name: 2 — Deploy on Mac (pull, compose, smoke, ngrok)
     needs: build-image
     runs-on: self-hosted
+    # Fails fast if the runner hangs (see RUN.md — stuck on "Set up job")
+    timeout-minutes: 60
     env:
       COMPOSE_HTTP_TIMEOUT: "600"
       IMAGE_DIGEST: ${{ needs.build-image.outputs.image_digest }}
