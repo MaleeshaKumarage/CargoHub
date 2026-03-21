@@ -10,10 +10,15 @@ Single image with db + API + portal:
 
 ```bash
 docker pull maleesha404/cargohub:latest
-docker run -d -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
+docker run -d -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
 ```
 
-**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. **`ngrok.yml` uses `web_addr: 0.0.0.0:4040`** so the host can reach the ngrok API on **http://localhost:4040**. You do **not** need ngrok installed on the host. If URLs are empty in CI, **pull the latest image** (older images may not include in-container ngrok).
+- **`:8888`** — **nginx**: same origin for UI + API (what you should expose behind **one** ngrok tunnel). Example: `https://<subdomain>.ngrok-free.app/en/` and API at `.../api/v1/...`.
+- **`:3000` / `:8080`** — direct Next.js / API (debug or local-only).
+
+**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. **`ngrok.yml` tunnels port `8888` (nginx)** so one HTTPS URL serves the portal and `/api`. **`ngrok.yml` uses `web_addr: 0.0.0.0:4040`** so the host can reach the ngrok API on **http://localhost:4040**. You do **not** need ngrok installed on the host. If URLs are empty in CI, **pull the latest image** (older images may not include in-container ngrok).
+
+**Paths:** The portal uses **locale-prefixed routes** (e.g. **`/en/login`**, **`/en/dashboard`**). **`/dashboard` alone returns 404** — use **`/en/dashboard`** (or your default locale).
 
 Or with compose:
 
@@ -21,8 +26,9 @@ Or with compose:
 docker compose -f docker-compose.one.yml up -d
 ```
 
-- **Portal:** http://localhost:3000  
-- **API:** http://localhost:8080  
+- **Public (nginx, same as ngrok):** http://localhost:8888  
+- **Portal (direct):** http://localhost:3000  
+- **API (direct):** http://localhost:8080  
 - **ngrok dashboard (if token set):** http://localhost:4040  
 
 ---
@@ -89,7 +95,7 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 **Secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (required). Optional: `NGROK_AUTHTOKEN`, `CORS__PORTAL_ORIGIN`, `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`.
 
-**Manual run:** Actions → **Docker Hub + Mac deploy + ngrok** → **Run workflow**. The step **Show public URLs (ngrok)** prints **Portal** and **API** links in the job log, adds **GitHub Actions notices** (hover the run), and writes a **markdown table** to the job **Summary** tab.
+**Manual run:** Actions → **Docker Hub + Mac deploy + ngrok** → **Run workflow**. The step **Show public URLs (ngrok)** prints the **public** tunnel URL (nginx `:8888`) in the job log, adds **GitHub Actions notices** (hover the run), and writes a **markdown table** to the job **Summary** tab.
 
 ### Other workflows
 
@@ -114,19 +120,20 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 5. **Local env (optional):** `~/.cargohub.env` on the Mac for extra compose vars.
 
-6. **`CORS__PORTAL_ORIGIN`:** Set to your **portal** HTTPS ngrok URL when testing from the internet. The baked-in `NEXT_PUBLIC_API_URL` may still point at `localhost:8080` for API calls from the browser in some setups — use the **API** tunnel URL or a custom build if needed.
+6. **`CORS__PORTAL_ORIGIN`:** Set to your **HTTPS ngrok origin** (same URL as the **public** tunnel, e.g. `https://xyz.ngrok-free.app`) so the API allows browser requests from the portal. Without this, login/API calls from the internet can fail with CORS.
 
 7. **Runner user** must be in the **`docker`** group (`sudo usermod -aG docker $USER` and re-login).
 
 ### `Bind for 0.0.0.0:8080 failed: port is already allocated`
 
-Something else is using **3000** or **8080** (often an old `cargohub` container or a manual `docker run`). The deploy workflow now runs **`compose down`**, removes **`cargohub`**, then removes any container bound to those ports before starting.
+Something else is using **8888**, **3000**, or **8080** (often an old `cargohub` container or a manual `docker run`). The deploy workflow now runs **`compose down`**, removes **`cargohub`**, then removes any container bound to those ports before starting.
 
 **Manual fix on the Mac:**
 
 ```bash
 docker compose -f docker-compose.one.yml down --remove-orphans
 docker rm -f cargohub 2>/dev/null || true
+docker ps -q --filter publish=8888 | xargs -r docker rm -f
 docker ps -q --filter publish=8080 | xargs -r docker rm -f
 docker ps -q --filter publish=3000 | xargs -r docker rm -f
 ```

@@ -83,11 +83,11 @@ jobs:
             COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
           fi
 
-          echo "Stopping existing stack and freeing ports 3000 / 8080..."
+          echo "Stopping existing stack and freeing ports..."
           $COMPOSE down --remove-orphans 2>/dev/null || true
           docker rm -f cargohub 2>/dev/null || true
           # Remove any container still bound to host ports (stale manual runs, duplicate stacks)
-          for port in 8080 3000 4040; do
+          for port in 8888 8080 3000 4040; do
             for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
               echo "Removing container $id (was using port $port)"
               docker rm -f "$id" || true
@@ -100,16 +100,21 @@ jobs:
       - name: Prune old images (optional)
         run: docker image prune -f || true
 
-      - name: Smoke test (API + portal on localhost)
+      - name: Smoke test (API + portal + nginx :8888)
         run: |
           set -e
-          echo "Waiting for Postgres, API, and Next.js..."
-          sleep 20
-          curl -sfS --retry 20 --retry-delay 5 --retry-all-errors \
+          echo "Waiting for Postgres, API, Next.js, nginx..."
+          sleep 25
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             "http://localhost:8080/api/v1/health_"
-          curl -sfS --retry 20 --retry-delay 5 --retry-all-errors \
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
             -o /dev/null "http://localhost:3000/"
-          echo "Smoke tests passed."
+          # Same as internet users: nginx :8888 -> /api + Next
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            "http://localhost:8888/api/v1/health_"
+          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors \
+            -o /dev/null "http://localhost:8888/en/"
+          echo "Smoke tests passed (direct :3000/:8080 and public :8888)."
 
       - name: Show public URLs (ngrok)
         continue-on-error: true

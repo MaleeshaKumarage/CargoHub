@@ -20,7 +20,9 @@ def main():
         url = (t.get("public_url") or "").strip()
         if not url:
             continue
-        if name == "portal":
+        if name == "public":
+            label = "Public app (nginx :8888 — portal + /api)"
+        elif name == "portal":
             label = "Portal (Next.js UI)"
         elif name == "api":
             label = "API (backend)"
@@ -47,10 +49,23 @@ def main():
     if summary_path and rows:
         lines = [f"| **{lbl}** | `{u}` |" for lbl, u in rows]
         table = "\n".join(lines)
+        first_url = rows[0][1] if rows else ""
+        if first_url:
+            tip = (
+                f"**Tip:** Open **`{first_url}/en/login`** (or **`/en/dashboard`**). "
+                f"**`/dashboard` alone returns 404.** Set **`CORS__PORTAL_ORIGIN`** to `{first_url}` "
+                "if API calls fail (CORS).\n\n"
+            )
+        else:
+            tip = (
+                "**Tip:** Use locale paths (`/en/login`, `/en/dashboard`). "
+                "Set **`CORS__PORTAL_ORIGIN`** to the HTTPS origin if API calls fail.\n\n"
+            )
         body = (
             "## Public URLs (remote access)\n\n"
             "Open these from **any browser** (internet). On the Mac: **http://localhost:4040** "
             "for the ngrok dashboard.\n\n"
+            f"{tip}"
             "| Service | URL |\n"
             "|---------|-----|\n"
             f"{table}\n\n"

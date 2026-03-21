@@ -28,7 +28,7 @@ gosu postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'portal'" | gr
 export ASPNETCORE_ENVIRONMENT=Production
 export PORT=8080
 export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=portal;Username=postgres;Password=postgres"
-export Cors__PortalOrigin="http://localhost:3000"
+export Cors__PortalOrigin="${Cors__PortalOrigin:-http://localhost:3000}"
 export Bootstrap__Secret="${Bootstrap__Secret:-SuperAdminBootstrapSecret}"
 export Jwt__SigningKey="${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}"
 cd /app/api && dotnet CargoHub.Api.dll &
@@ -37,13 +37,30 @@ APIPID=$!
 # Give API time to start and run migrations
 sleep 5
 
-# Optional: ngrok inside the container (set NGROK_AUTHTOKEN at docker run / compose)
-# Public URLs: open http://localhost:4040 on the host when port 4040 is published, or check container logs
+# Next.js on :3000 (nginx will expose :8888 to the internet via ngrok)
+cd /app/portal
+export NODE_ENV=production
+export PORT=3000
+export HOSTNAME=0.0.0.0
+npm run start &
+NEXT_PID=$!
+
+echo "Waiting for Next.js on :3000..."
+sleep 12
+
+# Reverse proxy: one public port — /api -> ASP.NET :8080, / -> Next :3000
+if nginx -t 2>/dev/null; then
+  nginx
+  echo "nginx listening on :8888 ( /api -> :8080, / -> :3000 )"
+else
+  echo "WARNING: nginx -t failed"; nginx -t || true
+fi
+
+# ngrok: single tunnel to :8888 (not 3000/8080) so browser has one origin for UI + API
 if [ -n "$NGROK_AUTHTOKEN" ]; then
-  echo "Starting ngrok (in-container)..."
+  echo "Starting ngrok (in-container) -> :8888..."
   ngrok config add-authtoken "$NGROK_AUTHTOKEN" 2>/dev/null || true
   ngrok start --all --config /etc/ngrok/ngrok.yml >> /tmp/ngrok.log 2>&1 &
-  # Wait until API responds (tunnels may take a few more seconds)
   i=0
   while [ "$i" -lt 60 ]; do
     if curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
@@ -63,10 +80,5 @@ if [ -n "$NGROK_AUTHTOKEN" ]; then
   fi
 fi
 
-# Start Portal (foreground - keeps container alive)
-# HOSTNAME=0.0.0.0 required so Next.js accepts connections from outside container
-cd /app/portal
-export NODE_ENV=production
-export PORT=3000
-export HOSTNAME=0.0.0.0
-exec npm run start
+echo "Public demo: use ngrok HTTPS URL on port 8888 (nginx). Paths: /en/login, /en/dashboard — not /dashboard alone."
+wait "$NEXT_PID"
