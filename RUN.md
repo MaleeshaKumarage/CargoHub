@@ -72,6 +72,28 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 ---
 
+## Test the GitHub Actions pipeline
+
+In the repo on GitHub: **Actions** tab. You can run workflows **manually** (**Run workflow**) or they run from **pull requests** / **pushes**.
+
+| Workflow | When it runs | What it tests |
+|----------|----------------|---------------|
+| **PR Validation** | PRs to `main` / `master` / `development`, or **Run workflow** | `npm test` + coverage, `dotnet build` / `dotnet test` + coverage (75% gates) |
+| **Docker validate (all-in-one)** | Same PRs, or **Run workflow** | `Dockerfile.all-in-one` **builds** (no push to registry) |
+| **Docker Hub Push** | Push to `main` / `master`, or **Run workflow** | Build + push `cargohub:latest` (needs `DOCKERHUB_*` secrets) |
+| **Deploy (self-hosted)** | After **Docker Hub Push** succeeds, or **Run workflow** | On your Mac Mini: `docker compose pull` + `up -d`, then **curl** health + portal |
+
+**Suggested order to test everything:**
+
+1. **PR Validation** → **Run workflow** (pick your branch) — confirms tests + coverage.  
+2. **Docker validate (all-in-one)** → **Run workflow** — confirms the big image builds.  
+3. **Docker Hub Push** → **Run workflow** (usually from `main`) — confirms registry push.  
+4. **Deploy (self-hosted)** → **Run workflow** — runner must show **Listening for jobs**; after deploy, smoke tests hit `http://localhost:8080/api/v1/health_` and `http://localhost:3000`.
+
+ngrok is **not** started or checked by Actions; run ngrok separately on the server if you need a public URL.
+
+---
+
 ## Self-hosted runner (Mac Mini / home server)
 
 After you register a **self-hosted GitHub Actions runner** on the machine where Docker runs:

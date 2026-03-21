@@ -10,6 +10,8 @@ name: PR Validation
 on:
   pull_request:
     branches: [main, master, development]
+  # Manual: Actions → PR Validation → Run workflow (full test + coverage gates)
+  workflow_dispatch:
 
 jobs:
   build-and-test:
