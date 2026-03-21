@@ -1,15 +1,10 @@
-# Example: Deploy using GitHub Secrets
-# Rename to deploy.yml and configure when ready.
-#
-# Sync secrets before deploy: ./scripts/sync-secrets-to-github.ps1
-# Secrets are synced from .env (see .env.example for full list).
+# Legacy example (ubuntu-latest + custom deploy step).
+# For a home server with a self-hosted runner, use: deploy-self-hosted.yml
 
 name: Deploy (Example)
 
 on:
-  workflow_dispatch: # Manual trigger; change to push: branches: [main] for auto-deploy
-  # push:
-  #   branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy-api:
@@ -28,5 +23,4 @@ jobs:
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           Cors__PortalOrigin: ${{ secrets.CORS__PORTAL_ORIGIN }}
         run: |
-          echo "Add your deployment step here (e.g. push to registry, deploy to Render/Azure)"
-          # Example: docker push your-registry/cargohub-api
+          echo "Replace with your cloud deploy, or use deploy-self-hosted.yml for Docker on your own machine."

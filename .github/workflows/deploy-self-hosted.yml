@@ -1,0 +1,56 @@
+# Deploy the all-in-one image on your self-hosted runner (e.g. Mac Mini + Ubuntu + Docker).
+# Requires: repo → Settings → Actions → Runners → self-hosted runner online.
+#
+# Triggers:
+#   1) After "Docker Hub Push" succeeds (so :latest exists before pull)
+#   2) Manual: Actions → Deploy (self-hosted) → Run workflow
+#
+# Optional secrets (if set, passed to compose; else defaults / ~/.cargohub.env):
+#   BOOTSTRAP__SECRET, JWT__SIGNING_KEY, CORS__PORTAL_ORIGIN
+#
+# Optional on the runner machine: ~/.cargohub.env for local overrides (ngrok URLs, etc.)
+
+name: Deploy (self-hosted)
+
+on:
+  workflow_run:
+    workflows: ["Docker Hub Push"]
+    types:
+      - completed
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-self-hosted
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Only auto-deploy when Docker Hub workflow succeeded (skip failed builds)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Pull latest image and restart stack
+        env:
+          # Host env names must match docker-compose.one.yml substitutions (empty = defaults)
+          Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
+          Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
+          CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
+        run: |
+          set -e
+          COMPOSE="docker compose -f docker-compose.one.yml"
+          if [ -f "$HOME/.cargohub.env" ]; then
+            COMPOSE="$COMPOSE --env-file $HOME/.cargohub.env"
+          fi
+          $COMPOSE pull
+          $COMPOSE up -d
+
+      - name: Prune old images (optional)
+        run: docker image prune -f || true
