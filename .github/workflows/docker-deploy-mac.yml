@@ -168,7 +168,7 @@ jobs:
               `| **Branch** | \`${ref}\` |`,
               `| **Commit** | \`${sha}\` |`,
               '',
-              `**[Deploy workflow run →](${runUrl})**',
+              `**[Deploy workflow run →](${runUrl})**`,
               '',
               '_Build succeeded; failure is on the self-hosted runner._',
             ].join('\n');
