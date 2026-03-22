@@ -77,6 +77,18 @@ Copy `.env.example` to `.env` and change secrets. For Docker, keep `NEXT_PUBLIC_
 docker compose down
 ```
 
+## Restart after reboot
+
+All Compose services use **`restart: unless-stopped`**, so when Docker Desktop starts (for example after you log in on macOS or Windows), containers that were already running are started again automatically. After upgrading to this configuration, recreate the stack once so the policy applies:
+
+```bash
+docker compose up -d
+# or
+docker compose -f docker-compose.one.yml up -d
+```
+
+To keep the stack off across reboots, use `docker compose down` (or stop the containers in Docker Desktop).
+
 ## Data persistence
 
 PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to remove it.

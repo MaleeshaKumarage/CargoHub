@@ -5,6 +5,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     container_name: cargohub-db
     environment:
       POSTGRES_USER: postgres
@@ -24,6 +25,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     container_name: cargohub-api
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -44,6 +46,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    restart: unless-stopped
     container_name: cargohub-portal
     ports:
       - "3000:3000"
