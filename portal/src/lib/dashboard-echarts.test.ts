@@ -3,6 +3,7 @@ import {
   buildPeriodBarOption,
   buildCourierPieOption,
   buildCityBarOption,
+  buildMonthCalendarHeatmapOption,
 } from "./dashboard-echarts";
 
 const theme = {
@@ -70,5 +71,24 @@ describe("buildCityBarOption", () => {
     const data = series?.data as { value: number; itemStyle: { color: string } }[];
     expect(data[0].value).toBe(4);
     expect(data[0].itemStyle.color).toBe("#00f");
+  });
+});
+
+describe("buildMonthCalendarHeatmapOption", () => {
+  it("builds heatmap data for each day in month", () => {
+    const march2025 = Array.from({ length: 31 }, (_, i) => ({
+      date: `2025-03-${String(i + 1).padStart(2, "0")}`,
+      count: i === 0 ? 2 : 0,
+    }));
+    const opt = buildMonthCalendarHeatmapOption(
+      march2025,
+      theme,
+      "bookings",
+      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    );
+    const series = opt?.series?.[0] as { type: string; data: [number, number, number][] };
+    expect(series?.type).toBe("heatmap");
+    expect(series?.data?.length).toBe(31);
+    expect(series?.data?.[0]).toEqual([5, 0, 2]);
   });
 });

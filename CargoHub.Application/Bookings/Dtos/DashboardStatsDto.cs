@@ -27,13 +27,13 @@ public sealed class DashboardBookingStatsDto
     /// <summary>Last 30 days UTC, one bucket per calendar day.</summary>
     public List<DailyCountDto> BookingsPerDayLast30 { get; set; } = new();
 
+    /// <summary>Current UTC month, one bucket per calendar day (for calendar heatmap).</summary>
+    public List<DailyCountDto> BookingsPerDayCurrentMonth { get; set; } = new();
+
     public KpiExtendedDto Kpi { get; set; } = new();
 
     /// <summary>Hours from booking creation to Delivered milestone (when available).</summary>
     public DeliveryTimeDistributionDto DeliveryTime { get; set; } = new();
-
-    /// <summary>Booking creations by day-of-week (0=Sun … 6=Sat) and hour UTC.</summary>
-    public HeatmapGridDto BookingVolumeHeatmap { get; set; } = new();
 
     /// <summary>Transport/update status signals (exception/delay/error) by DOW × hour UTC.</summary>
     public HeatmapGridDto ExceptionSignalsHeatmap { get; set; } = new();
@@ -78,10 +78,15 @@ public sealed class DailyCountDto
 
 public sealed class KpiExtendedDto
 {
-    /// <summary>Average completed bookings per day over the last 30 UTC days (same scope as stats).</summary>
+    /// <summary>Average bookings per day over the last 30 UTC days (same scope as stats).</summary>
     public double AvgPerDayLast30 { get; set; }
-    public int DraftCount { get; set; }
-    public int TestBookingCount { get; set; }
+
+    /// <summary>Average bookings per day in the current UTC month (month-to-date / days elapsed).</summary>
+    public double AvgPerDayThisMonth { get; set; }
+
+    /// <summary>Average bookings per day in the current UTC year (year-to-date / days elapsed).</summary>
+    public double AvgPerDayThisYear { get; set; }
+
     /// <summary>Estimated stuck: non-draft, not delivered in status history, older than 7 days.</summary>
     public int PossiblyStuckCount { get; set; }
 }

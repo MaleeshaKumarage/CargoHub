@@ -26,9 +26,6 @@ public sealed partial class BookingRepository
         var countMonth = await baseQuery.CountAsync(b => b.CreatedAtUtc >= startOfMonth, cancellationToken);
         var countYear = await baseQuery.CountAsync(b => b.CreatedAtUtc >= startOfYear, cancellationToken);
 
-        var draftCount = await forCustomer.CountAsync(b => b.IsDraft, cancellationToken);
-        var testBookingCount = await forCustomer.CountAsync(b => b.IsTestBooking && !b.IsDraft, cancellationToken);
-
         var cutoffStuck = now.AddDays(-7);
         var possiblyStuckCount = await forCustomer
             .Where(b => !b.IsDraft && b.CreatedAtUtc < cutoffStuck)
@@ -37,6 +34,10 @@ public sealed partial class BookingRepository
 
         var countLast30 = await baseQuery.CountAsync(b => b.CreatedAtUtc >= start30, cancellationToken);
         var avgPerDayLast30 = countLast30 / 30.0;
+        var dayOfMonth = now.Day;
+        var dayOfYear = now.DayOfYear;
+        var avgPerDayThisMonth = countMonth / (double)Math.Max(1, dayOfMonth);
+        var avgPerDayThisYear = countYear / (double)Math.Max(1, dayOfYear);
 
         var rows = await baseQuery
             .Select(b => new DashboardRow(
@@ -74,7 +75,7 @@ public sealed partial class BookingRepository
         var sunburst = BuildCarrierServiceSunburst(rows);
         var sankey = BuildSankey(rows);
         var daily = BuildDailySeries(rows, now);
-        var bookingHeat = BuildBookingVolumeHeatmap(rows);
+        var calendarMonth = BuildBookingsPerDayCurrentMonth(rows, now);
         var delivery = await BuildDeliveryTimeDistributionAsync(baseQuery, cancellationToken);
         var exceptionHeat = await BuildExceptionHeatmapAsync(forCustomer, normalizedScope, cancellationToken);
 
@@ -90,15 +91,15 @@ public sealed partial class BookingRepository
             CarrierServiceSunburst = sunburst,
             LaneSankey = sankey,
             BookingsPerDayLast30 = daily,
+            BookingsPerDayCurrentMonth = calendarMonth,
             Kpi = new KpiExtendedDto
             {
                 AvgPerDayLast30 = Math.Round(avgPerDayLast30, 2),
-                DraftCount = draftCount,
-                TestBookingCount = testBookingCount,
+                AvgPerDayThisMonth = Math.Round(avgPerDayThisMonth, 2),
+                AvgPerDayThisYear = Math.Round(avgPerDayThisYear, 2),
                 PossiblyStuckCount = possiblyStuckCount
             },
             DeliveryTime = delivery,
-            BookingVolumeHeatmap = bookingHeat,
             ExceptionSignalsHeatmap = exceptionHeat
         };
     }
@@ -107,7 +108,6 @@ public sealed partial class BookingRepository
         normalizedScope switch
         {
             "drafts" => forCustomer.Where(b => b.IsDraft),
-            "tests" => forCustomer.Where(b => b.IsTestBooking && !b.IsDraft),
             _ => forCustomer.Where(b => !b.IsDraft)
         };
 
@@ -209,28 +209,27 @@ public sealed partial class BookingRepository
         return list;
     }
 
-    private static HeatmapGridDto BuildBookingVolumeHeatmap(List<DashboardRow> rows)
+    private static List<DailyCountDto> BuildBookingsPerDayCurrentMonth(List<DashboardRow> rows, DateTime nowUtc)
     {
-        var cells = new int[7, 24];
+        var y = nowUtc.Year;
+        var m = nowUtc.Month;
+        var daysInMonth = DateTime.DaysInMonth(y, m);
+        var list = new List<DailyCountDto>();
+        for (var d = 1; d <= daysInMonth; d++)
+        {
+            var date = new DateOnly(y, m, d);
+            list.Add(new DailyCountDto { Date = date.ToString("yyyy-MM-dd"), Count = 0 });
+        }
+
+        var idx = list.ToDictionary(x => x.Date, x => x);
         foreach (var r in rows)
         {
-            var utc = r.CreatedAtUtc;
-            var dow = (int)utc.DayOfWeek;
-            var h = utc.Hour;
-            cells[dow, h]++;
+            var key = DateOnly.FromDateTime(r.CreatedAtUtc).ToString("yyyy-MM-dd");
+            if (idx.TryGetValue(key, out var cell))
+                cell.Count++;
         }
 
-        var flat = new List<HeatmapCellDto>();
-        var max = 0;
-        for (var d = 0; d < 7; d++)
-        for (var h = 0; h < 24; h++)
-        {
-            var c = cells[d, h];
-            if (c > max) max = c;
-            flat.Add(new HeatmapCellDto { DayOfWeek = d, Hour = h, Count = c });
-        }
-
-        return new HeatmapGridDto { Cells = flat, MaxCount = max };
+        return list;
     }
 
     private async Task<DeliveryTimeDistributionDto> BuildDeliveryTimeDistributionAsync(

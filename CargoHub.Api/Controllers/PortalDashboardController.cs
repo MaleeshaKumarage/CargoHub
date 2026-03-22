@@ -20,7 +20,7 @@ public class PortalDashboardController : ControllerBase
     }
 
     /// <summary>Get booking stats. Super Admin sees all users' bookings; other users see only their own.</summary>
-    /// <param name="scope">Optional: all (default, non-draft), drafts, tests.</param>
+    /// <param name="scope">Optional: all (default, non-draft completed), drafts.</param>
     [HttpGet("stats")]
     public async Task<ActionResult> GetStats([FromQuery] string? scope = null)
     {
@@ -34,7 +34,7 @@ public class PortalDashboardController : ControllerBase
         }
 
         var normalized = string.IsNullOrWhiteSpace(scope) ? null : scope.Trim().ToLowerInvariant();
-        if (normalized is not (null or "all" or "drafts" or "tests"))
+        if (normalized is not (null or "all" or "drafts"))
             normalized = null;
 
         var stats = await _mediator.Send(new GetDashboardStatsQuery(customerId, normalized), HttpContext.RequestAborted);

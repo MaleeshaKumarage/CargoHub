@@ -34,6 +34,10 @@ vi.mock("@/lib/api", () => ({
   getDashboardStats: (...args: unknown[]) => mockGetDashboardStats(...args),
 }));
 
+vi.mock("@/lib/dashboard-wordcloud", () => ({
+  buildWordCloudOption: () => null,
+}));
+
 vi.mock("@/components/charts/ThemedECharts", () => ({
   ThemedECharts: () => <div data-testid="themed-echarts-stub" />,
 }));
@@ -52,10 +56,11 @@ describe("DashboardPage", () => {
       carrierServiceSunburst: null,
       laneSankey: { nodes: [], links: [] },
       bookingsPerDayLast30: [],
+      bookingsPerDayCurrentMonth: [],
       kpi: {
         avgPerDayLast30: 0,
-        draftCount: 0,
-        testBookingCount: 0,
+        avgPerDayThisMonth: 0,
+        avgPerDayThisYear: 0,
         possiblyStuckCount: 0,
       },
       deliveryTime: {
@@ -68,7 +73,6 @@ describe("DashboardPage", () => {
         outlierCount: 0,
         sampleHours: [],
       },
-      bookingVolumeHeatmap: { cells: [], maxCount: 0 },
       exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
     });
   });
