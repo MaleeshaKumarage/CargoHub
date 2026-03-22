@@ -112,6 +112,7 @@
       "scopeAll": "Completed",
       "scopeDrafts": "Drafts",
       "scopeHint": "Charts and totals follow completed vs drafts",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Lanes (origin → carrier → destination)",
       "volumeLineTitle": "Volume (last 30 days)",
       "deliveryBoxTitle": "Delivery lead time (hours)",

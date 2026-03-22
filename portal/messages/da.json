@@ -110,6 +110,7 @@
       "scopeAll": "Fuldført",
       "scopeDrafts": "Kladder",
       "scopeHint": "Diagrammer og totaler følger fuldført vs. kladder",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Ruter (fra → transportør → til)",
       "volumeLineTitle": "Volumen (30 dage)",
       "deliveryBoxTitle": "Leveringstid (timer)",

@@ -205,6 +205,18 @@ export default function DashboardPage() {
           <CardTitle>{tStats("title")}</CardTitle>
           <CardDescription>
             {isSuperAdmin ? tStats("descriptionAll") : tStats("description")}
+            {typeof process.env.NEXT_PUBLIC_BUILD_REF === "string" &&
+              process.env.NEXT_PUBLIC_BUILD_REF.length > 0 &&
+              process.env.NEXT_PUBLIC_BUILD_REF !== "local" && (
+                <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                  {tStats("buildRef", {
+                    ref:
+                      process.env.NEXT_PUBLIC_BUILD_REF.length > 12
+                        ? `${process.env.NEXT_PUBLIC_BUILD_REF.slice(0, 7)}…`
+                        : process.env.NEXT_PUBLIC_BUILD_REF,
+                  })}
+                </span>
+              )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
