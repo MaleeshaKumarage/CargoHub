@@ -796,7 +796,7 @@ export async function bookingsExportDownload(token: string, format: "csv" | "xls
 
 export type CountByKey = { key: string; count: number };
 
-export type DashboardScope = "all" | "drafts" | "tests";
+export type DashboardScope = "all" | "drafts";
 
 export type SunburstNode = { name: string; value: number; children?: SunburstNode[] };
 
@@ -809,8 +809,8 @@ export type DailyCount = { date: string; count: number };
 
 export type KpiExtended = {
   avgPerDayLast30: number;
-  draftCount: number;
-  testBookingCount: number;
+  avgPerDayThisMonth: number;
+  avgPerDayThisYear: number;
   possiblyStuckCount: number;
 };
 
@@ -840,9 +840,9 @@ export type DashboardStats = {
   carrierServiceSunburst: SunburstNode | null;
   laneSankey: SankeyGraph;
   bookingsPerDayLast30: DailyCount[];
+  bookingsPerDayCurrentMonth: DailyCount[];
   kpi: KpiExtended;
   deliveryTime: DeliveryTimeDistribution;
-  bookingVolumeHeatmap: HeatmapGrid;
   exceptionSignalsHeatmap: HeatmapGrid;
 };
 

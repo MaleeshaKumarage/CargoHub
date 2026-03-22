@@ -16,15 +16,13 @@ import { ThemedECharts } from "@/components/charts/ThemedECharts";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import {
   buildPeriodBarOption,
-  buildCourierPieOption,
-  buildCityBarOption,
-  buildSunburstOption,
   buildSankeyOption,
   buildDailyVolumeLineOption,
   buildDeliveryBoxplotOption,
   buildDayHourHeatmapOption,
-  buildTodayVsAverageBulletOption,
+  buildMonthCalendarHeatmapOption,
 } from "@/lib/dashboard-echarts";
+import { buildWordCloudOption } from "@/lib/dashboard-wordcloud";
 
 export default function DashboardPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth();
@@ -36,6 +34,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [scope, setScope] = useState<DashboardScope>("all");
+  const [avgMode, setAvgMode] = useState<"roll30" | "month" | "year">("roll30");
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
   const chartTheme = useChartTheme();
 
@@ -48,6 +47,19 @@ export default function DashboardPage() {
       tStats("dowThu"),
       tStats("dowFri"),
       tStats("dowSat"),
+    ],
+    [tStats],
+  );
+
+  const mondayFirstDowLabels = useMemo(
+    () => [
+      tStats("dowMon"),
+      tStats("dowTue"),
+      tStats("dowWed"),
+      tStats("dowThu"),
+      tStats("dowFri"),
+      tStats("dowSat"),
+      tStats("dowSun"),
     ],
     [tStats],
   );
@@ -71,20 +83,30 @@ export default function DashboardPage() {
     return buildPeriodBarOption(categories, values, barColors, themeSlice, tStats("bookings"));
   }, [stats, chartTheme.chart, themeSlice, tStats]);
 
-  const courierSunburstOption = useMemo(() => {
-    if (!stats?.carrierServiceSunburst?.children?.length) return null;
-    return buildSunburstOption(
-      stats.carrierServiceSunburst,
+  const courierWordCloudOption = useMemo(() => {
+    if (!stats?.byCourier.length) return null;
+    return buildWordCloudOption(
+      stats.byCourier,
       [...chartTheme.chart],
       themeSlice,
-      tStats("noData"),
+      tStats("bookings"),
     );
   }, [stats, chartTheme.chart, themeSlice, tStats]);
 
-  const courierPieFallbackOption = useMemo(() => {
-    if (!stats?.byCourier.length) return null;
-    return buildCourierPieOption(
-      stats.byCourier,
+  const fromCitiesWordCloudOption = useMemo(() => {
+    if (!stats?.fromCities.length) return null;
+    return buildWordCloudOption(
+      stats.fromCities,
+      [...chartTheme.chart],
+      themeSlice,
+      tStats("bookings"),
+    );
+  }, [stats, chartTheme.chart, themeSlice, tStats]);
+
+  const toCitiesWordCloudOption = useMemo(() => {
+    if (!stats?.toCities.length) return null;
+    return buildWordCloudOption(
+      stats.toCities,
       [...chartTheme.chart],
       themeSlice,
       tStats("bookings"),
@@ -124,15 +146,15 @@ export default function DashboardPage() {
     );
   }, [stats, themeSlice, tStats]);
 
-  const volumeHeatmapOption = useMemo(() => {
-    if (!stats?.bookingVolumeHeatmap?.cells?.length) return null;
-    return buildDayHourHeatmapOption(
-      stats.bookingVolumeHeatmap.cells,
-      stats.bookingVolumeHeatmap.maxCount,
+  const calendarHeatmapOption = useMemo(() => {
+    if (!stats?.bookingsPerDayCurrentMonth?.length) return null;
+    return buildMonthCalendarHeatmapOption(
+      stats.bookingsPerDayCurrentMonth,
       themeSlice,
-      dayLabels,
+      tStats("bookings"),
+      mondayFirstDowLabels,
     );
-  }, [stats, themeSlice, dayLabels]);
+  }, [stats, themeSlice, tStats, mondayFirstDowLabels]);
 
   const exceptionHeatmapOption = useMemo(() => {
     if (!stats?.exceptionSignalsHeatmap?.cells?.length) return null;
@@ -144,42 +166,12 @@ export default function DashboardPage() {
     );
   }, [stats, themeSlice, dayLabels]);
 
-  const bulletOption = useMemo(() => {
-    if (!stats) return null;
-    return buildTodayVsAverageBulletOption(
-      stats.countToday,
-      stats.kpi.avgPerDayLast30,
-      themeSlice,
-      tStats("today"),
-      tStats("volumeLineTitle"),
-    );
-  }, [stats, themeSlice, tStats]);
-
   const stuckAlert =
     stats &&
+    scope === "all" &&
     stats.kpi.possiblyStuckCount > 0 &&
     stats.countMonth > 0 &&
     stats.kpi.possiblyStuckCount / stats.countMonth >= 0.1;
-
-  const fromCitiesOption = useMemo(() => {
-    if (!stats?.fromCities.length) return null;
-    return buildCityBarOption(
-      stats.fromCities.slice(0, 8),
-      chartTheme.chart[0],
-      themeSlice,
-      tStats("bookings"),
-    );
-  }, [stats, chartTheme.chart, themeSlice, tStats]);
-
-  const toCitiesOption = useMemo(() => {
-    if (!stats?.toCities.length) return null;
-    return buildCityBarOption(
-      stats.toCities.slice(0, 8),
-      chartTheme.chart[1],
-      themeSlice,
-      tStats("bookings"),
-    );
-  }, [stats, chartTheme.chart, themeSlice, tStats]);
 
   const loadStats = useCallback(() => {
     if (!token) return;
@@ -242,71 +234,75 @@ export default function DashboardPage() {
                   >
                     {tStats("scopeDrafts")}
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={scope === "tests" ? "default" : "outline"}
-                    onClick={() => setScope("tests")}
-                  >
-                    {tStats("scopeTests")}
-                  </Button>
                 </div>
               </div>
 
-              {/* KPI cards — click scope above to filter charts */}
-              <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                <button
-                  type="button"
-                  className="rounded-lg border bg-muted/30 p-4 text-center transition hover:bg-muted/50"
-                  onClick={() => setScope("all")}
-                >
+              {/* KPI row: period totals match charts; averages in one box */}
+              <div
+                className={`grid gap-4 sm:grid-cols-2 ${scope === "all" ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+              >
+                <div className="rounded-lg border bg-muted/30 p-4 text-center">
                   <p className="text-2xl font-bold">{stats.countToday}</p>
                   <p className="text-sm text-muted-foreground">{tStats("today")}</p>
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border bg-muted/30 p-4 text-center transition hover:bg-muted/50"
-                  onClick={() => setScope("all")}
-                >
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 text-center">
                   <p className="text-2xl font-bold">{stats.countMonth}</p>
                   <p className="text-sm text-muted-foreground">{tStats("thisMonth")}</p>
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border bg-muted/30 p-4 text-center transition hover:bg-muted/50"
-                  onClick={() => setScope("all")}
-                >
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4 text-center">
                   <p className="text-2xl font-bold">{stats.countYear}</p>
                   <p className="text-sm text-muted-foreground">{tStats("thisYear")}</p>
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border bg-muted/30 p-4 text-center transition hover:bg-muted/50"
-                  onClick={() => setScope("drafts")}
-                >
-                  <p className="text-2xl font-bold">{stats.kpi.draftCount}</p>
-                  <p className="text-sm text-muted-foreground">{tStats("kpiDrafts")}</p>
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border bg-muted/30 p-4 text-center transition hover:bg-muted/50"
-                  onClick={() => setScope("tests")}
-                >
-                  <p className="text-2xl font-bold">{stats.kpi.testBookingCount}</p>
-                  <p className="text-sm text-muted-foreground">{tStats("kpiTests")}</p>
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-lg border p-4 text-center transition hover:bg-muted/50 ${
-                    stuckAlert ? "border-destructive/80 bg-destructive/10 animate-pulse" : "bg-muted/30"
-                  }`}
-                  onClick={() => setScope("all")}
-                >
-                  <p className={`text-2xl font-bold ${stuckAlert ? "text-destructive" : ""}`}>
-                    {stats.kpi.possiblyStuckCount}
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="mb-2 text-center text-xs font-medium text-muted-foreground">{tStats("avgTitle")}</p>
+                  <div className="mb-2 flex flex-wrap justify-center gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={avgMode === "roll30" ? "default" : "outline"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setAvgMode("roll30")}
+                    >
+                      {tStats("avgModeRoll30")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={avgMode === "month" ? "default" : "outline"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setAvgMode("month")}
+                    >
+                      {tStats("avgModeMonth")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={avgMode === "year" ? "default" : "outline"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setAvgMode("year")}
+                    >
+                      {tStats("avgModeYear")}
+                    </Button>
+                  </div>
+                  <p className="text-center text-2xl font-bold">
+                    {avgMode === "roll30" && stats.kpi.avgPerDayLast30}
+                    {avgMode === "month" && stats.kpi.avgPerDayThisMonth}
+                    {avgMode === "year" && stats.kpi.avgPerDayThisYear}
                   </p>
-                  <p className="text-sm text-muted-foreground">{tStats("kpiStuck")}</p>
-                </button>
+                  <p className="text-center text-xs text-muted-foreground">{tStats("avgPerDaySuffix")}</p>
+                </div>
+                {scope === "all" && (
+                  <div
+                    className={`rounded-lg border p-4 text-center ${
+                      stuckAlert ? "border-destructive/80 bg-destructive/10 animate-pulse" : "bg-muted/30"
+                    }`}
+                  >
+                    <p className={`text-2xl font-bold ${stuckAlert ? "text-destructive" : ""}`}>
+                      {stats.kpi.possiblyStuckCount}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{tStats("kpiStuck")}</p>
+                  </div>
+                )}
               </div>
 
               {/* Period comparison bar chart (Apache ECharts) */}
@@ -317,18 +313,6 @@ export default function DashboardPage() {
                   </h3>
                   <div className="h-48 w-full min-h-[192px]">
                     <ThemedECharts option={periodChartOption} height={192} />
-                  </div>
-                </div>
-              )}
-
-              {/* Today vs 30d avg (bullet) */}
-              {bulletOption && (
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("bulletTitle")}
-                  </h3>
-                  <div className="h-40 w-full min-h-[160px] max-w-md">
-                    <ThemedECharts option={bulletOption} height={160} />
                   </div>
                 </div>
               )}
@@ -357,51 +341,36 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Charts row: Sunburst (or pie) | From cities | To cities */}
+              {/* Word clouds: carriers | From | To */}
               <div className="grid gap-6 lg:grid-cols-3">
                 <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {courierSunburstOption ? tStats("sunburstTitle") : tStats("byCourier")}
-                  </h3>
-                  {stats.byCourier.length === 0 && !courierSunburstOption ? (
+                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudCarriers")}</h3>
+                  {stats.byCourier.length === 0 || !courierWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
-                    (courierSunburstOption || courierPieFallbackOption) && (
-                      <div className="h-48 w-full min-h-[192px]">
-                        <ThemedECharts
-                          option={(courierSunburstOption ?? courierPieFallbackOption)!}
-                          height={192}
-                        />
-                      </div>
-                    )
+                    <div className="h-56 w-full min-h-[224px]">
+                      <ThemedECharts option={courierWordCloudOption} height={224} />
+                    </div>
                   )}
                 </div>
                 <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("fromCities")}
-                  </h3>
-                  {stats.fromCities.length === 0 ? (
+                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudFrom")}</h3>
+                  {stats.fromCities.length === 0 || !fromCitiesWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
-                    fromCitiesOption && (
-                      <div className="h-48 w-full min-h-[192px]">
-                        <ThemedECharts option={fromCitiesOption} height={192} />
-                      </div>
-                    )
+                    <div className="h-56 w-full min-h-[224px]">
+                      <ThemedECharts option={fromCitiesWordCloudOption} height={224} />
+                    </div>
                   )}
                 </div>
                 <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("toCities")}
-                  </h3>
-                  {stats.toCities.length === 0 ? (
+                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudTo")}</h3>
+                  {stats.toCities.length === 0 || !toCitiesWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
-                    toCitiesOption && (
-                      <div className="h-48 w-full min-h-[192px]">
-                        <ThemedECharts option={toCitiesOption} height={192} />
-                      </div>
-                    )
+                    <div className="h-56 w-full min-h-[224px]">
+                      <ThemedECharts option={toCitiesWordCloudOption} height={224} />
+                    </div>
                   )}
                 </div>
               </div>
@@ -417,13 +386,13 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
-                {volumeHeatmapOption && (
+                {calendarHeatmapOption && (
                   <div>
                     <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                      {tStats("heatmapVolumeTitle")}
+                      {tStats("calendarHeatmapTitle")}
                     </h3>
                     <div className="h-72 w-full min-h-[288px]">
-                      <ThemedECharts option={volumeHeatmapOption} height={288} />
+                      <ThemedECharts option={calendarHeatmapOption} height={288} />
                     </div>
                   </div>
                 )}

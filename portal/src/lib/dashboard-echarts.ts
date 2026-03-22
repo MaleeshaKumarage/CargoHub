@@ -375,6 +375,86 @@ export function buildDayHourHeatmapOption(
   };
 }
 
+/**
+ * Month calendar heatmap (Mon–Sun columns). Hover shows bookings for that day.
+ */
+export function buildMonthCalendarHeatmapOption(
+  daily: { date: string; count: number }[],
+  theme: ThemeSlice,
+  bookingsLabel: string,
+  dowLabelsMonFirst: string[],
+): EChartsOption | null {
+  if (!daily.length) return null;
+  const first = daily[0].date;
+  const y = parseInt(first.slice(0, 4), 10);
+  const m = parseInt(first.slice(5, 7), 10) - 1;
+  const start = new Date(Date.UTC(y, m, 1));
+  const startCol = (start.getUTCDay() + 6) % 7;
+  const daysInMonth = daily.length;
+  const toolDates: string[] = [];
+  const heatData: [number, number, number][] = [];
+  let max = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const count = daily[d - 1]?.count ?? 0;
+    const idx = startCol + d - 1;
+    const col = idx % 7;
+    const row = Math.floor(idx / 7);
+    if (count > max) max = count;
+    heatData.push([col, row, count]);
+    toolDates.push(dateStr);
+  }
+
+  return {
+    tooltip: {
+      position: "top",
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      borderWidth: 1,
+      textStyle: { color: theme.foreground },
+      formatter: (params: unknown) => {
+        const p = params as { dataIndex?: number; value?: [number, number, number] };
+        const idx = p.dataIndex ?? 0;
+        const v = p.value?.[2] ?? 0;
+        const day = toolDates[idx] ?? "";
+        return `${day}<br/>${v} ${bookingsLabel}`;
+      },
+    },
+    grid: { left: 8, right: 8, top: 8, bottom: 36, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: dowLabelsMonFirst,
+      splitArea: { show: true },
+      axisLabel: { fontSize: 10, color: theme.mutedForeground },
+    },
+    yAxis: {
+      type: "category",
+      data: ["1", "2", "3", "4", "5", "6"],
+      inverse: true,
+      axisLabel: { show: false },
+      splitArea: { show: true },
+    },
+    visualMap: {
+      min: 0,
+      max: Math.max(max, 1),
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 2,
+      inRange: { color: ["#f0f0f0", "#3b82f6"] },
+      textStyle: { color: theme.mutedForeground, fontSize: 10 },
+    },
+    series: [
+      {
+        type: "heatmap",
+        data: heatData,
+        label: { show: false },
+        emphasis: { itemStyle: { shadowBlur: 6 } },
+      },
+    ],
+  };
+}
+
 /** Bullet-style: today vs 30-day average (vertical bar + horizontal markLine). */
 export function buildTodayVsAverageBulletOption(
   today: number,

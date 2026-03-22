@@ -683,10 +683,11 @@ describe("api", () => {
           carrierServiceSunburst: null,
           laneSankey: { nodes: [], links: [] },
           bookingsPerDayLast30: [],
+          bookingsPerDayCurrentMonth: [],
           kpi: {
             avgPerDayLast30: 0,
-            draftCount: 0,
-            testBookingCount: 0,
+            avgPerDayThisMonth: 0,
+            avgPerDayThisYear: 0,
             possiblyStuckCount: 0,
           },
           deliveryTime: {
@@ -699,7 +700,6 @@ describe("api", () => {
             outlierCount: 0,
             sampleHours: [],
           },
-          bookingVolumeHeatmap: { cells: [], maxCount: 0 },
           exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
         }),
       });
@@ -721,10 +721,11 @@ describe("api", () => {
           carrierServiceSunburst: null,
           laneSankey: { nodes: [], links: [] },
           bookingsPerDayLast30: [],
+          bookingsPerDayCurrentMonth: [],
           kpi: {
             avgPerDayLast30: 0,
-            draftCount: 1,
-            testBookingCount: 0,
+            avgPerDayThisMonth: 0,
+            avgPerDayThisYear: 0,
             possiblyStuckCount: 0,
           },
           deliveryTime: {
@@ -737,7 +738,6 @@ describe("api", () => {
             outlierCount: 0,
             sampleHours: [],
           },
-          bookingVolumeHeatmap: { cells: [], maxCount: 0 },
           exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
         }),
       });
