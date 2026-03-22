@@ -26,7 +26,7 @@ flowchart LR
 | [`pr-validation.yml`](./pr-validation.yml) | PRs to `main` / `master` / `development` | Portal tests → backend tests → coverage gates (75%) → optional issue on failure |
 | [`docker-validate.yml`](./docker-validate.yml) | Same PRs | Builds `Dockerfile.all-in-one` only (no push) |
 | [`docker-build-push.yml`](./docker-build-push.yml) | Push to `main` / `master` / `development` | Build & push `cargohub` image to Docker Hub |
-| [`docker-deploy-mac.yml`](./docker-deploy-mac.yml) | After **Docker — build & push** succeeds | Self-hosted Mac: pull, compose up, smoke tests, ngrok URLs |
+| [`docker-deploy-mac.yml`](./docker-deploy-mac.yml) | After **Docker — build & push** succeeds **or** manual **Run workflow** | Self-hosted Mac: pull, compose up, smoke tests, ngrok URLs |
 | [`deploy-example.yml`](./deploy-example.yml) | Manual | Example / template |
 | [`add-copilot-reviewer.yml`](./add-copilot-reviewer.yml) | As configured | Copilot reviewer automation |
 
@@ -51,6 +51,9 @@ Failure notification runs as a **separate job** (`notify-deploy-failure`) on Git
 
 ## Trigger chain (Docker)
 
-`docker-build-push.yml` completes → `workflow_run` fires → `docker-deploy-mac.yml` runs **only** if the build succeeded and the branch is `main`, `master`, or `development`.
+1. **Automatic:** `docker-build-push.yml` completes **successfully** on `main` / `master` / `development` → `workflow_run` runs `docker-deploy-mac.yml` (only those branches; see `branches:` filter).
+2. **Manual:** Actions → **Docker — deploy on Mac** → **Run workflow** (choose `main` or the branch that matches your image). Use this if the deploy job was skipped (e.g. after fixing the runner) or you need to redeploy the **latest** image from Docker Hub without rebuilding.
+
+Skipped jobs: In **Docker — build & push**, **Open issue on build failure** is skipped when the build **succeeds** — that is expected.
 
 The **workflow name** `Docker — build & push image` must stay in sync with `workflows:` in `docker-deploy-mac.yml`.
