@@ -41,7 +41,7 @@ def main():
         print("  Troubleshooting:")
         print("  - Image must include ngrok (Dockerfile.all-in-one) — pull latest :latest")
         print("  - NGROK_AUTHTOKEN must be passed into the container (compose env / GitHub secret)")
-        print("  - ngrok.yml uses web_addr: 0.0.0.0:4040 so the host can reach the API")
+        print("  - ngrok listens on :4040 inside the container; compose maps host :14040 -> :4040")
         print("  - Check: docker logs cargohub 2>&1 | tail -80")
         print("  - Check: docker exec cargohub tail -50 /tmp/ngrok.log")
 
@@ -63,8 +63,8 @@ def main():
             )
         body = (
             "## Public URLs (remote access)\n\n"
-            "Open these from **any browser** (internet). On the Mac: **http://localhost:4040** "
-            "for the ngrok dashboard.\n\n"
+            "Open these from **any browser** (internet). On the Mac: **http://localhost:14040** "
+            "for the ngrok dashboard (mapped from container :4040).\n\n"
             f"{tip}"
             "| Service | URL |\n"
             "|---------|-----|\n"

@@ -1,5 +1,5 @@
 # All-in-one: PostgreSQL + API + Portal in a single image
-# Run (include 8888 for nginx = one public URL with ngrok): docker run -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
+# Run (include 8888 for nginx = one public URL with ngrok): docker run -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 14040:4040 -v cargohub_data:/var/lib/postgresql/data maleesha404/cargohub:latest
 
 # ---- Build API ----
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS api-build
