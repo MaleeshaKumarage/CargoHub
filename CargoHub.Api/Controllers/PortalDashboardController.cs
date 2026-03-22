@@ -20,8 +20,9 @@ public class PortalDashboardController : ControllerBase
     }
 
     /// <summary>Get booking stats. Super Admin sees all users' bookings; other users see only their own.</summary>
+    /// <param name="scope">Optional: all (default, non-draft), drafts, tests.</param>
     [HttpGet("stats")]
-    public async Task<ActionResult> GetStats()
+    public async Task<ActionResult> GetStats([FromQuery] string? scope = null)
     {
         var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
         string? customerId = null;
@@ -31,7 +32,12 @@ public class PortalDashboardController : ControllerBase
             if (string.IsNullOrEmpty(customerId))
                 return Unauthorized();
         }
-        var stats = await _mediator.Send(new GetDashboardStatsQuery(customerId), HttpContext.RequestAborted);
+
+        var normalized = string.IsNullOrWhiteSpace(scope) ? null : scope.Trim().ToLowerInvariant();
+        if (normalized is not (null or "all" or "drafts" or "tests"))
+            normalized = null;
+
+        var stats = await _mediator.Send(new GetDashboardStatsQuery(customerId, normalized), HttpContext.RequestAborted);
         return Ok(stats);
     }
 }

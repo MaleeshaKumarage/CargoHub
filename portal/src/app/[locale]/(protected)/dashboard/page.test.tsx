@@ -42,12 +42,34 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetDashboardStats.mockResolvedValue({
+      scope: "all",
       countToday: 5,
       countMonth: 20,
       countYear: 100,
       byCourier: [],
       fromCities: [],
       toCities: [],
+      carrierServiceSunburst: null,
+      laneSankey: { nodes: [], links: [] },
+      bookingsPerDayLast30: [],
+      kpi: {
+        avgPerDayLast30: 0,
+        draftCount: 0,
+        testBookingCount: 0,
+        possiblyStuckCount: 0,
+      },
+      deliveryTime: {
+        sampleSize: 0,
+        minHours: 0,
+        q1Hours: 0,
+        medianHours: 0,
+        q3Hours: 0,
+        maxHours: 0,
+        outlierCount: 0,
+        sampleHours: [],
+      },
+      bookingVolumeHeatmap: { cells: [], maxCount: 0 },
+      exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
     });
   });
 
@@ -74,7 +96,7 @@ describe("DashboardPage", () => {
   });
 
   it("shows stats error when getDashboardStats fails", async () => {
-    mockGetDashboardStats.mockRejectedValueOnce(new Error("Network error"));
+    mockGetDashboardStats.mockRejectedValue(new Error("Network error"));
     render(<DashboardPage />);
     await vi.waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Network error");

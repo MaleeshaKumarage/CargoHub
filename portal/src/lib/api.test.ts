@@ -668,17 +668,79 @@ describe("api", () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          scope: "all",
           countToday: 5,
           countMonth: 20,
           countYear: 100,
           byCourier: [],
           fromCities: [],
           toCities: [],
+          carrierServiceSunburst: null,
+          laneSankey: { nodes: [], links: [] },
+          bookingsPerDayLast30: [],
+          kpi: {
+            avgPerDayLast30: 0,
+            draftCount: 0,
+            testBookingCount: 0,
+            possiblyStuckCount: 0,
+          },
+          deliveryTime: {
+            sampleSize: 0,
+            minHours: 0,
+            q1Hours: 0,
+            medianHours: 0,
+            q3Hours: 0,
+            maxHours: 0,
+            outlierCount: 0,
+            sampleHours: [],
+          },
+          bookingVolumeHeatmap: { cells: [], maxCount: 0 },
+          exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
         }),
       });
       const s = await getDashboardStats("token");
       expect(s.countToday).toBe(5);
       expect(s.countMonth).toBe(20);
+    });
+    it("passes scope query param when not all", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          scope: "drafts",
+          countToday: 0,
+          countMonth: 0,
+          countYear: 0,
+          byCourier: [],
+          fromCities: [],
+          toCities: [],
+          carrierServiceSunburst: null,
+          laneSankey: { nodes: [], links: [] },
+          bookingsPerDayLast30: [],
+          kpi: {
+            avgPerDayLast30: 0,
+            draftCount: 1,
+            testBookingCount: 0,
+            possiblyStuckCount: 0,
+          },
+          deliveryTime: {
+            sampleSize: 0,
+            minHours: 0,
+            q1Hours: 0,
+            medianHours: 0,
+            q3Hours: 0,
+            maxHours: 0,
+            outlierCount: 0,
+            sampleHours: [],
+          },
+          bookingVolumeHeatmap: { cells: [], maxCount: 0 },
+          exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
+        }),
+      });
+      await getDashboardStats("token", "drafts");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/dashboard/stats?scope=drafts"),
+        expect.anything(),
+      );
     });
     it("throws when API returns non-ok", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });

@@ -196,7 +196,7 @@ public class BookingRepositoryTestDbTests : IDisposable
         };
         await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
-        var stats = await repo.GetDashboardStatsAsync(customerId, default);
+        var stats = await repo.GetDashboardStatsAsync(customerId, null, default);
         Assert.True(stats.CountToday >= 1);
         Assert.True(stats.CountMonth >= 1);
         Assert.True(stats.CountYear >= 1);
@@ -218,7 +218,7 @@ public class BookingRepositoryTestDbTests : IDisposable
         };
         await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
-        var stats = await repo.GetDashboardStatsAsync(null, default);
+        var stats = await repo.GetDashboardStatsAsync(null, null, default);
         Assert.True(stats.CountToday >= 1);
     }
 
