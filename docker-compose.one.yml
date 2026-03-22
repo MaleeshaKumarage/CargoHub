@@ -4,6 +4,7 @@
 
 services:
   cargohub:
+    restart: unless-stopped
     image: maleesha404/cargohub:latest
     # Always pull :latest on deploy so GitHub Actions / compose up actually updates the container
     pull_policy: always
