@@ -1,5 +1,9 @@
 # Part 1 of 2: build & push only (Ubuntu). Fast; duplicate runs on same branch cancel.
 # Part 2: docker-deploy-mac.yml runs on the self-hosted runner after this workflow succeeds.
+#
+# Jobs:
+#   1. build-image        — Dockerfile.all-in-one → Docker Hub
+#   2. notify-build-failure — issue if build fails (Ubuntu; always runs after job 1)
 
 name: Docker — build & push image
 
@@ -13,6 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── Build & push (Ubuntu) ───
   build-image:
     name: Build & push image
     runs-on: ubuntu-latest
@@ -56,6 +61,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ─── Notify (only if build failed) ───
   notify-build-failure:
     name: Open issue on build failure
     needs: [build-image]

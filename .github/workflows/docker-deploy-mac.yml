@@ -2,6 +2,14 @@
 # Avoids queueing full pipelines on a single self-hosted runner (no build+deploy pile-up).
 #
 # workflow_run: requires this file on the default branch. Triggering workflow name must match exactly.
+#
+# Sections (single job = same machine as Docker; see .github/workflows/README.md):
+#   §1 Trigger & checkout
+#   §2 Compose env & registry login
+#   §3 Stop old stack & pull image
+#   §4 Start stack (compose up)
+#   §5 Smoke tests
+#   §6 Deploy summary & ngrok URLs
 
 name: Docker — deploy on Mac
 
@@ -33,7 +41,8 @@ jobs:
       TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
 
     steps:
-      - name: Print trigger context
+      # ----- §1 Trigger & checkout -----
+      - name: "§1 · Print trigger context"
         run: |
           set -e
           echo "=== Triggered by successful build ==="
@@ -43,12 +52,13 @@ jobs:
           echo "hostname=$(hostname 2>/dev/null || echo n/a)"
           uname -a 2>/dev/null || true
 
-      - name: Checkout repository (same commit as build)
+      - name: "§1 · Checkout repository (same commit as build)"
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Set Compose command (optional ~/.cargohub.env)
+      # ----- §2 Compose env & registry -----
+      - name: "§2 · Set Compose command (optional ~/.cargohub.env)"
         run: |
           set -e
           if [ -f "$HOME/.cargohub.env" ]; then
@@ -57,7 +67,7 @@ jobs:
             echo "COMPOSE_CMD=docker compose -f docker-compose.one.yml" >> "$GITHUB_ENV"
           fi
 
-      - name: Log in to Docker Hub (authenticated pull)
+      - name: "§2 · Log in to Docker Hub (authenticated pull)"
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -69,7 +79,8 @@ jobs:
             echo "::warning::DOCKERHUB_* missing for login"
           fi
 
-      - name: Stop stack & free ports (8888, 8080, 3000, 14040)
+      # ----- §3 Clean host & pull image -----
+      - name: "§3 · Stop stack & free ports (8888, 8080, 3000, 14040)"
         run: |
           set -e
           $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
@@ -80,7 +91,7 @@ jobs:
             done
           done
 
-      - name: Pull image (retry)
+      - name: "§3 · Pull image (retry)"
         run: |
           set -e
           export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
@@ -94,7 +105,8 @@ jobs:
             n=$((n+1))
           done
 
-      - name: Start stack (compose up)
+      # ----- §4 Start stack -----
+      - name: "§4 · Start stack (compose up)"
         env:
           Bootstrap__Secret: ${{ secrets.BOOTSTRAP__SECRET }}
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
@@ -105,29 +117,31 @@ jobs:
           export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
           $COMPOSE_CMD up -d --force-recreate --remove-orphans
 
-      - name: Prune dangling images
+      - name: "§4 · Prune dangling images"
         run: docker image prune -f || true
 
-      - name: Wait for stack boot
+      - name: "§4 · Wait for stack boot"
         run: sleep 25
 
-      - name: Smoke — API :8080
+      # ----- §5 Smoke tests -----
+      - name: "§5 · Smoke — API :8080"
         run: |
           set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
 
-      - name: Smoke — Portal :3000
+      - name: "§5 · Smoke — Portal :3000"
         run: |
           set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/"
 
-      - name: Smoke — nginx :8888
+      - name: "§5 · Smoke — nginx :8888"
         run: |
           set -e
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
           curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
 
-      - name: Set IMAGE_DIGEST for summary
+      # ----- §6 Report -----
+      - name: "§6 · Set IMAGE_DIGEST for summary"
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
@@ -135,10 +149,10 @@ jobs:
           DIG=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMG" 2>/dev/null || echo "")
           echo "IMAGE_DIGEST=$DIG" >> "$GITHUB_ENV"
 
-      - name: Write deployment report (Job Summary)
+      - name: "§6 · Write deployment report (Job Summary)"
         run: chmod +x scripts/ci/deploy-summary.sh 2>/dev/null; sh scripts/ci/deploy-summary.sh
 
-      - name: Show public ngrok URLs
+      - name: "§6 · Show public ngrok URLs"
         continue-on-error: true
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
@@ -147,6 +161,7 @@ jobs:
           TUNNELS=$(python3 scripts/wait-ngrok-tunnels.py)
           echo "$TUNNELS" | python3 scripts/show-ngrok-public-urls.py
 
+  # Separate job: GitHub-hosted (issues API); runs if deploy-mac failed
   notify-deploy-failure:
     name: Open issue on deploy failure
     needs: [deploy-mac]

@@ -99,6 +99,8 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 
 ### Pipeline layout (single responsibility)
 
+See **`.github/workflows/README.md`** for a full index of workflow files, triggers, and how the Mac deploy job is split into step sections (§1–§6).
+
 | Workflow | Jobs | Purpose |
 |----------|------|--------|
 | **Docker — build & push image** | Build & push on Ubuntu; optional issue on build failure | Runs on **every** push; **duplicate builds on the same branch cancel** so the registry always gets the latest commit quickly. |

@@ -1,8 +1,10 @@
-# Single responsibility per job:
+# ─────────────────────────────────────────────────────────────────────────────
+# PR Validation — four independent jobs (parallel where possible)
 #   1. portal-ci      — Node, Vitest, portal coverage artifact
 #   2. backend-ci     — .NET build/test, backend coverage artifact
 #   3. coverage-gates — download both artifacts, summary + 75% enforcement
 #   4. notify-pr-failure — issue on fork-safe branches only
+# ─────────────────────────────────────────────────────────────────────────────
 
 name: PR Validation
 
@@ -12,6 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ─── 1 · Portal (parallel with backend-ci) ───
   portal-ci:
     name: 1 — Portal (Vitest + coverage)
     runs-on: ubuntu-latest
@@ -37,6 +40,7 @@ jobs:
           path: portal/coverage/
           retention-days: 14
 
+  # ─── 2 · Backend (parallel with portal-ci) ───
   backend-ci:
     name: 2 — Backend (.NET + coverage)
     runs-on: ubuntu-latest
@@ -86,6 +90,7 @@ jobs:
           path: CoverageReport/
           retention-days: 14
 
+  # ─── 3 · Coverage gates (after portal + backend) ───
   coverage-gates:
     name: 3 — Coverage thresholds (75%)
     needs: [portal-ci, backend-ci]
@@ -97,6 +102,7 @@ jobs:
       - name: Install jq and bc
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq bc
 
+      # --- Download artifacts from portal-ci + backend-ci ---
       - name: Download portal coverage
         uses: actions/download-artifact@v4
         with:
@@ -109,6 +115,7 @@ jobs:
           name: backend-testresults
           path: TestResults
 
+      # --- Summary table in GitHub Step Summary ---
       - name: Coverage summary (Job Summary)
         run: |
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
@@ -144,6 +151,7 @@ jobs:
             echo "**Artifacts:** Backend HTML: **coverage-report** | Portal: **portal-coverage**"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # --- Fail the job if either stack is below 75% ---
       - name: Enforce backend coverage (75% line & branch)
         run: |
           COV_FILE=$(find ./TestResults -name "coverage.cobertura.xml" -print -quit 2>/dev/null)
@@ -185,6 +193,7 @@ jobs:
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
 
+  # ─── 4 · Notify (runs on failure if not a fork) ───
   notify-pr-failure:
     name: 4 — Open issue on failure
     needs: [portal-ci, backend-ci, coverage-gates]
