@@ -110,6 +110,7 @@
       "scopeAll": "Slutförda",
       "scopeDrafts": "Utkast",
       "scopeHint": "Diagram och summor följer slutförda vs. utkast",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Flöden (ursprung → speditör → destination)",
       "volumeLineTitle": "Volym (30 dagar)",
       "deliveryBoxTitle": "Leveransledtid (tim)",

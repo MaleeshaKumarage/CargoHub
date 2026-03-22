@@ -16,6 +16,9 @@ RUN dotnet publish CargoHub.Api/CargoHub.Api.csproj -c Release -o /app/publish -
 # ---- Build Portal ----
 FROM node:20-alpine AS portal-build
 WORKDIR /app
+# Baked into the client bundle so you can confirm the hosted UI matches CI (dashboard shows this).
+ARG BUILD_REF=local
+ENV NEXT_PUBLIC_BUILD_REF=$BUILD_REF
 # Same-origin API via nginx + single ngrok URL (browser uses window.location.origin)
 ENV NEXT_PUBLIC_API_URL=__SAME_ORIGIN__
 COPY portal/package.json portal/package-lock.json* ./

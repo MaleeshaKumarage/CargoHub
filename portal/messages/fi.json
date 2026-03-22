@@ -111,6 +111,7 @@
       "scopeAll": "Valmiit",
       "scopeDrafts": "Luonnokset",
       "scopeHint": "Kaaviot ja summat vastaavat valmiit vs. luonnokset",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Reitit (lähtö → kuljetus → määränpää)",
       "volumeLineTitle": "Määrä (30 pv)",
       "deliveryBoxTitle": "Toimitusaika (h)",

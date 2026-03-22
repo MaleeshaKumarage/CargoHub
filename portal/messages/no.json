@@ -110,6 +110,7 @@
       "scopeAll": "Fullført",
       "scopeDrafts": "Utkast",
       "scopeHint": "Diagrammer og totaler følger fullført vs. utkast",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Ruter (fra → transportør → til)",
       "volumeLineTitle": "Volum (30 dager)",
       "deliveryBoxTitle": "Leveringstid (timer)",

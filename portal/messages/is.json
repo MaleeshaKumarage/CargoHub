@@ -110,6 +110,7 @@
       "scopeAll": "Lokið",
       "scopeDrafts": "Drög",
       "scopeHint": "Myndrit og heildarfjöldi fylgja lokið vs. drög",
+      "buildRef": "Portal UI build: {ref}",
       "sankeyTitle": "Leiðir (frá → flutningsaðili → til)",
       "volumeLineTitle": "Magn (30 dagar)",
       "deliveryBoxTitle": "Afhendingartími (klst.)",
