@@ -24,6 +24,8 @@ public class ImportBookingsCommandHandlerTests
         Assert.Equal(1, result.CreatedCount);
         Assert.Equal(0, result.DraftCount);
         Assert.Empty(result.Errors);
+        Assert.Single(result.CreatedBookingIds);
+        Assert.Empty(result.DraftBookingIds);
         await mediator.Received(1).Send(Arg.Is<CreateBookingCommand>(c =>
             c.CustomerId == "cust-1" && c.Request.ReferenceNumber == request.ReferenceNumber), default);
     }
@@ -44,6 +46,8 @@ public class ImportBookingsCommandHandlerTests
         Assert.Equal(0, result.CreatedCount);
         Assert.Equal(1, result.DraftCount);
         Assert.Empty(result.Errors);
+        Assert.Empty(result.CreatedBookingIds);
+        Assert.Single(result.DraftBookingIds);
         await mediator.Received(1).Send(Arg.Is<CreateDraftCommand>(c =>
             c.CustomerId == "cust-1" && c.Request.ReferenceNumber == request.ReferenceNumber), default);
     }
@@ -75,6 +79,8 @@ public class ImportBookingsCommandHandlerTests
         Assert.Equal(2, result.CreatedCount);
         Assert.Equal(1, result.DraftCount);
         Assert.Empty(result.Errors);
+        Assert.Equal(2, result.CreatedBookingIds.Count);
+        Assert.Single(result.DraftBookingIds);
     }
 
     [Fact]
@@ -91,6 +97,7 @@ public class ImportBookingsCommandHandlerTests
             new List<ImportRowDto> { new(request, true) }), default);
 
         Assert.Equal(0, result.CreatedCount);
+        Assert.Empty(result.CreatedBookingIds);
         Assert.Single(result.Errors);
         Assert.Contains("REF-FULL", result.Errors[0]);
     }
@@ -110,6 +117,7 @@ public class ImportBookingsCommandHandlerTests
             new List<ImportRowDto> { new(request, IsComplete: false) }), default);
 
         Assert.Equal(0, result.DraftCount);
+        Assert.Empty(result.DraftBookingIds);
         Assert.Single(result.Errors);
         Assert.Contains("REF-DRAFT", result.Errors[0]);
         Assert.Contains("Draft create failed", result.Errors[0]);
@@ -142,6 +150,7 @@ public class ImportBookingsCommandHandlerTests
             }), default);
 
         Assert.Equal(1, result.CreatedCount);
+        Assert.Single(result.CreatedBookingIds);
         Assert.Single(result.Errors);
         Assert.Contains("REF-FAIL", result.Errors[0]);
         Assert.Contains("Simulated failure", result.Errors[0]);

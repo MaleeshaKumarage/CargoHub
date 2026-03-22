@@ -39,20 +39,21 @@ public sealed class BookingImportService
     /// </summary>
     /// <param name="stream">File stream (CSV or Excel).</param>
     /// <param name="fileName">Original filename (used to detect format).</param>
-    /// <param name="rows">Parsed rows with request and IsComplete flag.</param>
+    /// <param name="skippedEmptyRows">Rows with no cells filled (skipped).</param>
     /// <returns>Error message if validation fails; null on success.</returns>
-    public string? Parse(Stream stream, string fileName, out List<ImportRow> rows)
+    public string? Parse(Stream stream, string fileName, out List<ImportRow> rows, out int skippedEmptyRows)
     {
         rows = new List<ImportRow>();
+        skippedEmptyRows = 0;
         var isExcel = fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
                      fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
 
         if (isExcel)
-            return ParseExcel(stream, out rows);
-        return ParseCsv(stream, out rows);
+            return ParseExcel(stream, out rows, ref skippedEmptyRows);
+        return ParseCsv(stream, out rows, ref skippedEmptyRows);
     }
 
-    private string? ParseCsv(Stream stream, out List<ImportRow> rows)
+    private string? ParseCsv(Stream stream, out List<ImportRow> rows, ref int skippedEmptyRows)
     {
         rows = new List<ImportRow>();
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
@@ -76,14 +77,18 @@ public sealed class BookingImportService
         while (csv.Read())
         {
             var row = ReadCsvRow(csv, headerIndex);
-            if (row == null) continue; // skip empty rows
+            if (row == null)
+            {
+                skippedEmptyRows++;
+                continue;
+            }
             var (request, isComplete) = MapToRequest(row);
             rows.Add(new ImportRow(request, isComplete));
         }
         return null;
     }
 
-    private string? ParseExcel(Stream stream, out List<ImportRow> rows)
+    private string? ParseExcel(Stream stream, out List<ImportRow> rows, ref int skippedEmptyRows)
     {
         rows = new List<ImportRow>();
         using var workbook = new XLWorkbook(stream);
@@ -112,7 +117,11 @@ public sealed class BookingImportService
         for (var r = dataStartRow; r <= lastRow; r++)
         {
             var row = ReadExcelRow(worksheet, r, headerIndex);
-            if (row == null) continue;
+            if (row == null)
+            {
+                skippedEmptyRows++;
+                continue;
+            }
             var (request, isComplete) = MapToRequest(row);
             rows.Add(new ImportRow(request, isComplete));
         }

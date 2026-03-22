@@ -20,5 +20,7 @@ public sealed record ImportRowDto(CreateBookingRequest Request, bool IsComplete)
 public sealed record ImportBookingsResult(
     int CreatedCount,
     int DraftCount,
-    IReadOnlyList<string> Errors
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<Guid> CreatedBookingIds,
+    IReadOnlyList<Guid> DraftBookingIds
 );

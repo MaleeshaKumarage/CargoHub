@@ -190,6 +190,7 @@ builder.Services.Configure<BrandingOptions>(builder.Configuration.GetSection(Bra
 builder.Services.AddSingleton<CargoHub.Api.Services.WaybillPdfGenerator>();
 builder.Services.AddSingleton<BookingImportService>();
 builder.Services.AddSingleton<BookingExportService>();
+builder.Services.AddMemoryCache();
 
 // Register controllers; routes will later mirror the existing Node.js API surface.
 builder.Services.AddControllers();

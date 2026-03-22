@@ -16,6 +16,8 @@ public sealed class ImportBookingsCommandHandler : IRequestHandler<ImportBooking
         var created = 0;
         var draft = 0;
         var errors = new List<string>();
+        var createdIds = new List<Guid>();
+        var draftIds = new List<Guid>();
 
         foreach (var row in request.Rows)
         {
@@ -27,7 +29,10 @@ public sealed class ImportBookingsCommandHandler : IRequestHandler<ImportBooking
                         new CreateBookingCommand(request.CustomerId, request.CustomerName, row.Request, request.CompanyId),
                         cancellationToken);
                     if (result != null)
+                    {
                         created++;
+                        createdIds.Add(result.Id);
+                    }
                     else
                         errors.Add($"Row (ref: {row.Request.ReferenceNumber}): Create failed.");
                 }
@@ -37,7 +42,10 @@ public sealed class ImportBookingsCommandHandler : IRequestHandler<ImportBooking
                         new CreateDraftCommand(request.CustomerId, request.CustomerName, row.Request, request.CompanyId),
                         cancellationToken);
                     if (result != null)
+                    {
                         draft++;
+                        draftIds.Add(result.Id);
+                    }
                     else
                         errors.Add($"Row (ref: {row.Request.ReferenceNumber}): Draft create failed.");
                 }
@@ -48,6 +56,6 @@ public sealed class ImportBookingsCommandHandler : IRequestHandler<ImportBooking
             }
         }
 
-        return new ImportBookingsResult(created, draft, errors);
+        return new ImportBookingsResult(created, draft, errors, createdIds, draftIds);
     }
 }

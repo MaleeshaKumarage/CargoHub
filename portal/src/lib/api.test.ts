@@ -27,6 +27,9 @@ import {
   draftConfirm,
   getDashboardStats,
   bookingsImport,
+  bookingsImportPreview,
+  bookingsImportConfirm,
+  bookingsWaybillsBulkDownload,
   bookingsExportDownload,
   type RegisterBody,
 } from "./api";
@@ -793,13 +796,21 @@ describe("api", () => {
     it("returns counts when API returns 200", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ createdCount: 2, draftCount: 1, errors: ["row 2"] }),
+        json: async () => ({
+          createdCount: 2,
+          draftCount: 1,
+          errors: ["row 2"],
+          createdBookingIds: ["a", "b"],
+          draftBookingIds: ["c"],
+        }),
       });
       const file = new File(["a"], "t.csv", { type: "text/csv" });
       const r = await bookingsImport("tok", file);
       expect(r.createdCount).toBe(2);
       expect(r.draftCount).toBe(1);
       expect(r.errors).toEqual(["row 2"]);
+      expect(r.createdBookingIds).toEqual(["a", "b"]);
+      expect(r.draftBookingIds).toEqual(["c"]);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining("/bookings/import"),
         expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
@@ -813,6 +824,81 @@ describe("api", () => {
       });
       const file = new File(["a"], "t.csv", { type: "text/csv" });
       await expect(bookingsImport("tok", file)).rejects.toThrow("bad header");
+    });
+  });
+
+  describe("bookingsImportPreview", () => {
+    it("returns preview payload", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          sessionId: "sess-1",
+          completedCount: 2,
+          draftCount: 1,
+          skippedEmptyRows: 3,
+          totalDataRows: 3,
+        }),
+      });
+      const file = new File(["a"], "t.csv", { type: "text/csv" });
+      const r = await bookingsImportPreview("tok", file);
+      expect(r.sessionId).toBe("sess-1");
+      expect(r.completedCount).toBe(2);
+      expect(r.skippedEmptyRows).toBe(3);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/import/preview"),
+        expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+      );
+    });
+  });
+
+  describe("bookingsImportConfirm", () => {
+    it("returns result with ids", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          createdCount: 1,
+          draftCount: 0,
+          errors: [],
+          createdBookingIds: ["id1"],
+          draftBookingIds: [],
+        }),
+      });
+      const r = await bookingsImportConfirm("tok", {
+        sessionId: "s",
+        importCompleted: true,
+        importDrafts: false,
+      });
+      expect(r.createdBookingIds).toEqual(["id1"]);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/import/confirm"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"sessionId":"s"'),
+        }),
+      );
+    });
+  });
+
+  describe("bookingsWaybillsBulkDownload", () => {
+    it("downloads pdf", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        blob: async () => new Blob(["%PDF"], { type: "application/pdf" }),
+      });
+      const createObjectURL = vi.fn(() => "blob:mock");
+      vi.stubGlobal("URL", { ...globalThis.URL, createObjectURL, revokeObjectURL: vi.fn() });
+      const anchor = { click: vi.fn(), href: "", download: "" };
+      const ce = vi.spyOn(document, "createElement").mockReturnValue(anchor as unknown as HTMLElement);
+      await bookingsWaybillsBulkDownload("tok", ["a", "b"]);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/waybills/bulk"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("bookingIds"),
+        }),
+      );
+      expect(anchor.click).toHaveBeenCalled();
+      ce.mockRestore();
     });
   });
 
