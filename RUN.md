@@ -20,6 +20,8 @@ docker run -d -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_da
 
 **Paths:** The portal uses **locale-prefixed routes** (e.g. **`/en/login`**, **`/en/dashboard`**). **`/dashboard` alone returns 404** — use **`/en/dashboard`** (or your default locale).
 
+**ngrok URL:** Open **`https://<subdomain>.ngrok-free.dev/en/`** (or **`/en/login`**). The bare root **`/`** can **404** if the stack serves an **older image** without the nginx redirect; **rebuild/redeploy** so **`/` redirects to `/en/`**, or always use **`/en/`** explicitly.
+
 Or with compose:
 
 ```bash
