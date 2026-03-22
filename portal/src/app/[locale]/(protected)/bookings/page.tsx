@@ -45,7 +45,7 @@ export default function BookingsPage() {
       .then(setList)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
-  }, [token, tab, isAuthenticated, isLoading, router]);
+  }, [token, tab, isAuthenticated, isLoading]);
 
   if (!isAuthenticated || isLoading) return null;
 
