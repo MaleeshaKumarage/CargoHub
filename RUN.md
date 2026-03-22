@@ -140,12 +140,57 @@ When **PR Validation** or **Docker build / Mac deploy** fails, a workflow may op
 
 7. **Runner user** must be in the **`docker`** group (`sudo usermod -aG docker $USER` and re-login).
 
-8. **`workflow_run` requirement:** The file **`.github/workflows/docker-deploy-mac.yml` must exist on the repository default branch** (usually `main`) or GitHub will **not** trigger **Docker — deploy on Mac** after builds. Merge CI changes to `main` (or change the default branch in repo settings).
+8. **Start the runner automatically when the Mac Mini (or server) powers on:**  
+   **No** — if you only run **`./run.sh`** in a terminal, it does **not** come back after reboot and it stops when that session ends. **Yes** — if you install it as a **service** using the scripts GitHub ships in the runner folder (after **`./config.sh`**):
+
+   | OS | In the runner directory (same folder as `run.sh`) |
+   |----|-----------------------------------------------------|
+   | **macOS** | `./svc.sh install` then `./svc.sh start` — uses **launchd** so the listener starts at **login/boot** (some setups use `sudo ./svc.sh install` for a system daemon; see [Configuring the self-hosted runner as a service](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service)). |
+   | **Linux** (incl. Linux on a Mac Mini) | `sudo ./svc.sh install` → `sudo ./svc.sh start` → `sudo systemctl enable actions.runner.*.service` so **systemd** starts it **on boot**. Check: `sudo systemctl status actions.runner.*` |
+
+   **Important:** After this, do **not** also run **`./run.sh`** manually — use **only** the service (otherwise you get **“A session for this runner already exists”**).
+
+### After auto-start (`svc.sh`) — runner **offline**, deploy **fails**, or **“session already exists”** again
+
+1. **Only one process** — Close any terminal still running **`./run.sh`**. Remove duplicate autostart (**cron**, **@reboot** scripts, second **svc** install). Then stop, clear duplicates, start once:
+   ```bash
+   sudo systemctl stop 'actions.runner.*'    # Linux; on macOS use ./svc.sh stop in the runner folder
+   pkill -f Runner.Listener || true         # only if no job is running
+   sudo systemctl start 'actions.runner.*'  # or: sudo ./svc.sh start
+   ```
+2. **Service user must use Docker** — The account the service runs as must be in the **`docker`** group (`sudo usermod -aG docker <user>`). **Reboot** or **restart the service** after changing groups. Without this, deploy jobs fail when calling **`docker compose`**.
+3. **Logs (Linux):** `sudo journalctl -u 'actions.runner.*' -n 100 --no-pager`
+4. **GitHub:** **Settings → Actions → Runners** — runner should be **Idle** / online, not **Offline**.
+
+9. **`workflow_run` requirement:** The file **`.github/workflows/docker-deploy-mac.yml` must exist on the repository default branch** (usually `main`) or GitHub will **not** trigger **Docker — deploy on Mac** after builds. Merge CI changes to `main` (or change the default branch in repo settings).
 
 ### Deploy stuck on **“Set up job”** or long **Queued**
 
 - **One global deploy queue** — pushes to `main` / `master` / `development` each finish **build** on Ubuntu first; **deploy** runs **one at a time** on the Mac. Extra deploys **wait in line** (FIFO), which can look slow but avoids parallel half-states on a single runner.
 - If **Set up job** never finishes: restart the runner service; check disk space and **`_diag`** logs.
+
+### **“A session for this runner already exists”** (still “Connected to GitHub”)
+
+GitHub allows **only one active process** per runner registration. This message usually means **two** `Runner.Listener` instances are running (e.g. **systemd service** + manual **`./run.sh`**, or a **second terminal**), or an old process **didn’t exit** after a crash/reboot.
+
+**On the runner machine:**
+
+1. **Use one start method only** — either the **installed service** *or* foreground `./run.sh`, not both.
+2. **Stop the service** (Linux example — name may differ):
+   ```bash
+   sudo systemctl list-units 'actions.runner.*' --all
+   sudo systemctl stop actions.runner.*
+   ```
+3. **Kill any leftover listener** (only if nothing is legitimately running a job):
+   ```bash
+   pgrep -af Runner.Listener
+   # If you see duplicates, stop the service first, then:
+   pkill -f Runner.Listener   # use only after confirming no job in progress
+   ```
+4. **Start once:** `sudo systemctl start actions.runner.<your-unit>.service` **or** `cd ~/actions-runner/... && ./run.sh` (single session).
+5. In **GitHub → Settings → Actions → Runners**, the runner should show **Idle** and pick up the next job.
+
+If it keeps happening after reboots, ensure **only one** startup path is enabled (e.g. one **systemd** unit for this runner) — don’t also use **cron** `@reboot ./run.sh` for the same runner.
 
 ### `Bind for 0.0.0.0:8080 failed: port is already allocated`
 
@@ -182,6 +227,22 @@ If the deploy job fails on **Pull image** with messages like **`lookup registry-
 
 - **Same image tag:** `latest` was updated on the registry, but Compose reused the old container. The repo uses `pull_policy: always` and `docker compose up -d --force-recreate` so the next deploy recreates the container. To fix manually:  
   `docker compose -f docker-compose.one.yml pull && docker compose -f docker-compose.one.yml up -d --force-recreate`
+
+### **ERR_NGROK_3200** — endpoint offline (but **Docker — deploy on Mac** succeeded)
+
+They are **not contradictory**:
+
+- **Deploy success** only proves **smoke tests on the runner** — e.g. `http://localhost:8888/...` inside the machine. That does **not** check your **public** `https://….ngrok-free.dev` URL.
+- **3200** means ngrok’s **edge** has **no live tunnel** for that hostname (agent disconnected, process stopped, or the URL is **stale**).
+
+**Common causes**
+
+1. **Old URL** — On **ngrok free**, each time the in-container ngrok agent **restarts**, you often get a **new** random subdomain. A bookmark to **`merle-…-palma.ngrok-free.dev`** stays dead after the tunnel moved. **Open the current URL** from the runner: **http://localhost:4040** (ngrok API; port mapped in `docker-compose.one.yml`).
+2. **No token** — If **`NGROK_AUTHTOKEN`** is not set for the container, ngrok may not start; localhost still works, public URL never comes up.
+3. **ngrok crashed** after deploy — Check **`docker logs cargohub`** (look for ngrok) and restart: `docker compose -f docker-compose.one.yml up -d --force-recreate`.
+4. **CORS** — After the URL changes, update **`CORS__PORTAL_ORIGIN`** (compose / `~/.cargohub.env`) to the **new** `https://…` origin.
+
+**Stable hostname (optional):** ngrok **paid** plans support **reserved domains** so the public URL does not change every redeploy.
 
 ### No deploy job on the Mac (second job missing)
 
