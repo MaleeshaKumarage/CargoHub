@@ -24,7 +24,9 @@ vi.mock("@/lib/api", () => ({
   bookingList: vi.fn(),
   draftList: vi.fn(),
   bookingsExportDownload: vi.fn(),
-  bookingsImport: vi.fn(),
+  bookingsImportPreview: vi.fn(),
+  bookingsImportConfirm: vi.fn(),
+  bookingsWaybillsBulkDownload: vi.fn(),
 }));
 
 const bookingList = await import("@/lib/api").then((m) => m.bookingList);

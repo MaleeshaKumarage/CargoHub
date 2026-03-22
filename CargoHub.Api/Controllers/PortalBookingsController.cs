@@ -13,6 +13,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CargoHub.Api.Controllers;
 
@@ -33,6 +34,10 @@ public class PortalBookingsController : ControllerBase
     private readonly WaybillPdfGenerator _waybillPdfGenerator;
     private readonly BookingImportService _bookingImportService;
     private readonly BookingExportService _bookingExportService;
+    private readonly IMemoryCache _importSessionCache;
+
+    private const int BulkWaybillMaxIds = 50;
+    private static readonly TimeSpan ImportSessionTtl = TimeSpan.FromMinutes(15);
 
     public PortalBookingsController(
         IMediator mediator,
@@ -42,7 +47,8 @@ public class PortalBookingsController : ControllerBase
         ILogger<PortalBookingsController> logger,
         WaybillPdfGenerator waybillPdfGenerator,
         BookingImportService bookingImportService,
-        BookingExportService bookingExportService)
+        BookingExportService bookingExportService,
+        IMemoryCache memoryCache)
     {
         _mediator = mediator;
         _bookingRepository = bookingRepository;
@@ -52,6 +58,7 @@ public class PortalBookingsController : ControllerBase
         _waybillPdfGenerator = waybillPdfGenerator;
         _bookingImportService = bookingImportService;
         _bookingExportService = bookingExportService;
+        _importSessionCache = memoryCache;
     }
 
     private string? CustomerId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -66,6 +73,51 @@ public class PortalBookingsController : ControllerBase
             return Unauthorized();
         var list = await _mediator.Send(new ListBookingsQuery(customerId, skip, take), HttpContext.RequestAborted);
         return Ok(list);
+    }
+
+    /// <summary>Multi-page waybill PDF for many completed bookings (same order as bookingIds).</summary>
+    [HttpPost("waybills/bulk")]
+    public async Task<ActionResult> GetBulkWaybillPdf([FromBody] BulkWaybillRequestDto? request)
+    {
+        var customerId = IsSuperAdmin ? null : CustomerId;
+        if (!IsSuperAdmin && string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (request?.BookingIds == null || request.BookingIds.Count == 0)
+            return BadRequest(new { message = "bookingIds is required." });
+        if (request.BookingIds.Count > BulkWaybillMaxIds)
+            return BadRequest(new { message = $"At most {BulkWaybillMaxIds} bookings per PDF." });
+
+        var seen = new HashSet<Guid>();
+        var orderedIds = new List<Guid>();
+        foreach (var id in request.BookingIds)
+        {
+            if (seen.Add(id))
+                orderedIds.Add(id);
+        }
+
+        var details = new List<BookingDetailDto>();
+        foreach (var id in orderedIds)
+        {
+            var booking = await _mediator.Send(new GetBookingByIdQuery(id, customerId), HttpContext.RequestAborted);
+            if (booking == null)
+                return BadRequest(new { message = $"Booking {id:N} was not found or is not accessible." });
+            if (booking.IsDraft)
+                return BadRequest(new { message = $"Booking {id:N} is a draft; waybills are only for completed bookings." });
+            details.Add(booking);
+        }
+
+        try
+        {
+            foreach (var b in details)
+                await _bookingRepository.TryAddStatusEventAsync(b.Id, BookingStatus.Waybill, "waybill_printed", HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not record Waybill status for bulk waybill.");
+        }
+
+        var pdfBytes = _waybillPdfGenerator.GenerateCombined(details);
+        return File(pdfBytes, "application/pdf", "waybills.pdf");
     }
 
     /// <summary>Generate and download a sample waybill PDF for a completed booking. Route must be before GetById so /waybill is matched.</summary>
@@ -213,7 +265,63 @@ public class PortalBookingsController : ControllerBase
             $"bookings-export-{stamp}.xlsx");
     }
 
-    /// <summary>Import bookings from CSV or Excel. Headers must match export format.</summary>
+    /// <summary>Parse upload and return counts; stores rows in server cache for <see cref="ImportConfirm"/>.</summary>
+    [HttpPost("import/preview")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<ActionResult<ImportPreviewResponseDto>> ImportPreview([FromForm] IFormFile? file)
+    {
+        var customerId = CustomerId;
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+        await using var stream = file.OpenReadStream();
+        var parseError = _bookingImportService.Parse(stream, file.FileName, out var rows, out var skippedEmpty);
+        if (parseError != null)
+            return BadRequest(new { message = parseError });
+        var sessionId = Guid.NewGuid();
+        var importRows = rows.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
+        var key = ImportSessionCacheKey(customerId, sessionId);
+        _importSessionCache.Set(key, importRows, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
+        var completed = importRows.Count(r => r.IsComplete);
+        var drafts = importRows.Count - completed;
+        return Ok(new ImportPreviewResponseDto(sessionId, completed, drafts, skippedEmpty, importRows.Count));
+    }
+
+    /// <summary>Creates only the categories the user opted into; consumes the preview session.</summary>
+    [HttpPost("import/confirm")]
+    public async Task<ActionResult<ImportBookingsResult>> ImportConfirm([FromBody] ImportConfirmRequestDto? body)
+    {
+        var customerId = CustomerId;
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (body == null)
+            return BadRequest(new { message = "Request body is required." });
+        var key = ImportSessionCacheKey(customerId, body.SessionId);
+        if (!_importSessionCache.TryGetValue(key, out List<ImportRowDto>? cached) || cached == null)
+            return BadRequest(new { message = "Import session expired or invalid. Upload the file again." });
+        _importSessionCache.Remove(key);
+
+        var toImport = new List<ImportRowDto>();
+        foreach (var row in cached)
+        {
+            if (row.IsComplete && body.ImportCompleted)
+                toImport.Add(row);
+            else if (!row.IsComplete && body.ImportDrafts)
+                toImport.Add(row);
+        }
+        if (toImport.Count == 0)
+            return BadRequest(new { message = "Nothing selected to import." });
+
+        var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email) ?? "";
+        var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var result = await _mediator.Send(
+            new ImportBookingsCommand(customerId, displayName, companyId, toImport),
+            HttpContext.RequestAborted);
+        return Ok(result);
+    }
+
+    /// <summary>Import bookings from CSV or Excel in one step (all rows). Prefer import/preview + import/confirm from the portal.</summary>
     [HttpPost("import")]
     [RequestSizeLimit(25_000_000)]
     public async Task<ActionResult<ImportBookingsResult>> ImportBookings([FromForm] IFormFile? file)
@@ -224,7 +332,7 @@ public class PortalBookingsController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "No file uploaded." });
         await using var stream = file.OpenReadStream();
-        var parseError = _bookingImportService.Parse(stream, file.FileName, out var rows);
+        var parseError = _bookingImportService.Parse(stream, file.FileName, out var rows, out _);
         if (parseError != null)
             return BadRequest(new { message = parseError });
         var importRows = rows.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
@@ -235,6 +343,9 @@ public class PortalBookingsController : ControllerBase
             HttpContext.RequestAborted);
         return Ok(result);
     }
+
+    private static string ImportSessionCacheKey(string customerId, Guid sessionId) =>
+        $"booking-import:{customerId}:{sessionId:N}";
 
     /// <summary>Returns (CompanyId, _) for the current user's company. CompanyId is null if user has no company.</summary>
     private async Task<(Guid? CompanyId, IReadOnlySet<string>?)> GetCompanyIdAndAllowedSlotsAsync(CancellationToken cancellationToken)

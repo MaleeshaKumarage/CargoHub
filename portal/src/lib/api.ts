@@ -654,9 +654,23 @@ export type BookingImportResult = {
   createdCount: number;
   draftCount: number;
   errors: string[];
+  createdBookingIds: string[];
+  draftBookingIds: string[];
 };
 
-/** Upload CSV or Excel; headers must match export format. */
+function parseImportResult(data: Record<string, unknown>): BookingImportResult {
+  const ids = (k: string) =>
+    Array.isArray(data[k]) ? (data[k] as unknown[]).map((x) => String(x)) : [];
+  return {
+    createdCount: Number(data.createdCount ?? 0),
+    draftCount: Number(data.draftCount ?? 0),
+    errors: Array.isArray(data.errors) ? (data.errors as string[]) : [],
+    createdBookingIds: ids("createdBookingIds"),
+    draftBookingIds: ids("draftBookingIds"),
+  };
+}
+
+/** Upload CSV or Excel; headers must match export format (single-step import). */
 export async function bookingsImport(token: string, file: File): Promise<BookingImportResult> {
   const form = new FormData();
   form.append("file", file);
@@ -673,11 +687,91 @@ export async function bookingsImport(token: string, file: File): Promise<Booking
       "Import failed";
     throw new Error(msg);
   }
+  return parseImportResult(data);
+}
+
+export type BookingImportPreview = {
+  sessionId: string;
+  completedCount: number;
+  draftCount: number;
+  skippedEmptyRows: number;
+  totalDataRows: number;
+};
+
+/** Parse file and return counts; server holds rows until confirm. */
+export async function bookingsImportPreview(token: string, file: File): Promise<BookingImportPreview> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${portalBase()}/bookings/import/preview`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.title === "string" && data.title) ||
+      "Import preview failed";
+    throw new Error(msg);
+  }
   return {
-    createdCount: Number(data.createdCount ?? 0),
+    sessionId: String(data.sessionId ?? ""),
+    completedCount: Number(data.completedCount ?? 0),
     draftCount: Number(data.draftCount ?? 0),
-    errors: Array.isArray(data.errors) ? (data.errors as string[]) : [],
+    skippedEmptyRows: Number(data.skippedEmptyRows ?? 0),
+    totalDataRows: Number(data.totalDataRows ?? 0),
   };
+}
+
+export async function bookingsImportConfirm(
+  token: string,
+  body: { sessionId: string; importCompleted: boolean; importDrafts: boolean },
+): Promise<BookingImportResult> {
+  const res = await fetch(`${portalBase()}/bookings/import/confirm`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId: body.sessionId,
+      importCompleted: body.importCompleted,
+      importDrafts: body.importDrafts,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.title === "string" && data.title) ||
+      "Import failed";
+    throw new Error(msg);
+  }
+  return parseImportResult(data);
+}
+
+/** One multi-page PDF for completed bookings (waybills). */
+export async function bookingsWaybillsBulkDownload(token: string, bookingIds: string[]): Promise<void> {
+  const res = await fetch(`${portalBase()}/bookings/waybills/bulk`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ bookingIds }),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(data.message ?? "Could not generate waybills PDF");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "waybills.pdf";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Download completed bookings as CSV or Excel (same template as import). */

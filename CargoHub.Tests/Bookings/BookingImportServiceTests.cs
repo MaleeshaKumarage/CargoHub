@@ -13,9 +13,10 @@ public class BookingImportServiceTests
     {
         var csv = "WrongHeader1,WrongHeader2\nval1,val2";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-        var error = _service.Parse(stream, "test.csv", out var rows);
+        var error = _service.Parse(stream, "test.csv", out var rows, out var skipped);
 
         Assert.NotNull(error);
+        Assert.Equal(0, skipped);
         Assert.Contains("Header", error);
         Assert.Empty(rows);
     }
@@ -25,9 +26,10 @@ public class BookingImportServiceTests
     {
         var csv = BuildCsvHeader() + "\n" + BuildCompleteRow();
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-        var error = _service.Parse(stream, "test.csv", out var rows);
+        var error = _service.Parse(stream, "test.csv", out var rows, out var skipped);
 
         Assert.Null(error);
+        Assert.Equal(0, skipped);
         Assert.Single(rows);
         Assert.True(rows[0].IsComplete);
         Assert.Equal("REF1", rows[0].Request.ReferenceNumber);
@@ -41,9 +43,10 @@ public class BookingImportServiceTests
     {
         var csv = BuildCsvHeader() + "\n" + BuildDraftRow();
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-        var error = _service.Parse(stream, "test.csv", out var rows);
+        var error = _service.Parse(stream, "test.csv", out var rows, out var skipped);
 
         Assert.Null(error);
+        Assert.Equal(0, skipped);
         Assert.Single(rows);
         Assert.False(rows[0].IsComplete);
         Assert.Equal("REF2", rows[0].Request.ReferenceNumber);
@@ -54,9 +57,10 @@ public class BookingImportServiceTests
     {
         var csv = BuildCsvHeader() + "\n" + BuildCompleteRow() + "\n" + BuildDraftRow() + "\n" + BuildCompleteRow();
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
-        var error = _service.Parse(stream, "test.csv", out var rows);
+        var error = _service.Parse(stream, "test.csv", out var rows, out var skipped);
 
         Assert.Null(error);
+        Assert.Equal(0, skipped);
         Assert.Equal(3, rows.Count);
         Assert.True(rows[0].IsComplete);
         Assert.False(rows[1].IsComplete);
