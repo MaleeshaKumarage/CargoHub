@@ -650,23 +650,119 @@ export async function draftConfirm(token: string, id: string): Promise<BookingDe
   return res.json();
 }
 
+export type BookingImportResult = {
+  createdCount: number;
+  draftCount: number;
+  errors: string[];
+};
+
+/** Upload CSV or Excel; headers must match export format. */
+export async function bookingsImport(token: string, file: File): Promise<BookingImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${portalBase()}/bookings/import`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.title === "string" && data.title) ||
+      "Import failed";
+    throw new Error(msg);
+  }
+  return {
+    createdCount: Number(data.createdCount ?? 0),
+    draftCount: Number(data.draftCount ?? 0),
+    errors: Array.isArray(data.errors) ? (data.errors as string[]) : [],
+  };
+}
+
+/** Download completed bookings as CSV or Excel (same template as import). */
+export async function bookingsExportDownload(token: string, format: "csv" | "xlsx"): Promise<void> {
+  const res = await fetch(`${portalBase()}/bookings/export?format=${format}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(data.message ?? "Export failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `bookings-export.${format === "csv" ? "csv" : "xlsx"}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- Dashboard stats (JWT required) ---
 
 export type CountByKey = { key: string; count: number };
 
+export type DashboardScope = "all" | "drafts" | "tests";
+
+export type SunburstNode = { name: string; value: number; children?: SunburstNode[] };
+
+export type SankeyGraph = {
+  nodes: { name: string }[];
+  links: { source: string; target: string; value: number }[];
+};
+
+export type DailyCount = { date: string; count: number };
+
+export type KpiExtended = {
+  avgPerDayLast30: number;
+  draftCount: number;
+  testBookingCount: number;
+  possiblyStuckCount: number;
+};
+
+export type DeliveryTimeDistribution = {
+  sampleSize: number;
+  minHours: number;
+  q1Hours: number;
+  medianHours: number;
+  q3Hours: number;
+  maxHours: number;
+  outlierCount: number;
+  sampleHours: number[];
+};
+
+export type HeatmapCell = { dayOfWeek: number; hour: number; count: number };
+
+export type HeatmapGrid = { cells: HeatmapCell[]; maxCount: number };
+
 export type DashboardStats = {
+  scope: string;
   countToday: number;
   countMonth: number;
   countYear: number;
   byCourier: CountByKey[];
   fromCities: CountByKey[];
   toCities: CountByKey[];
+  carrierServiceSunburst: SunburstNode | null;
+  laneSankey: SankeyGraph;
+  bookingsPerDayLast30: DailyCount[];
+  kpi: KpiExtended;
+  deliveryTime: DeliveryTimeDistribution;
+  bookingVolumeHeatmap: HeatmapGrid;
+  exceptionSignalsHeatmap: HeatmapGrid;
 };
 
-export async function getDashboardStats(token: string): Promise<DashboardStats> {
-  const res = await fetch(`${portalBase()}/dashboard/stats`, {
+export async function getDashboardStats(
+  token: string,
+  scope?: DashboardScope | null,
+): Promise<DashboardStats> {
+  const q =
+    scope && scope !== "all"
+      ? `?scope=${encodeURIComponent(scope)}`
+      : "";
+  const res = await fetch(`${portalBase()}/dashboard/stats${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to load dashboard stats');
+  if (!res.ok) throw new Error("Failed to load dashboard stats");
   return res.json();
 }

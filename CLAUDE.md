@@ -137,7 +137,7 @@ npm run dev      # In portal/ directory for UI
 
 - **CI:** `docker-build-push.yml` (Ubuntu build/push) → `docker-deploy-mac.yml` (`workflow_run`, self-hosted deploy — avoids queue deadlocks on one Mac runner).
 - **Image:** `Dockerfile.all-in-one` — PostgreSQL + API + Next.js + **nginx** on **`:8888`** (single public entry: UI + `/api`).
-- **ngrok:** `ngrok.yml` tunnels **one** address — **`:8888`** (not separate 3000/8080). Dashboard on host **`:4040`**.
+- **ngrok:** `ngrok.yml` tunnels **one** address — **`:8888`** (not separate 3000/8080). In-container ngrok web UI is **`:4040`**; compose maps host **`:14040`** → **`:4040`** to avoid clashing with host ngrok on **`:4040`**.
 - **Portal API URL:** Production image builds with `NEXT_PUBLIC_API_URL=__SAME_ORIGIN__`; `portal/src/lib/api.ts` uses `window.location.origin` in the browser so API calls match the ngrok URL.
 - **CORS:** Set `Cors__PortalOrigin` / `CORS__PORTAL_ORIGIN` to the **HTTPS ngrok origin** (same as the public URL) when testing from the internet.
 - **Routes:** Portal uses locale prefixes — e.g. **`/en/login`**, **`/en/dashboard`** — not bare `/dashboard`.

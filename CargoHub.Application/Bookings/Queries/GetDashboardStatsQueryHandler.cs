@@ -14,6 +14,6 @@ public sealed class GetDashboardStatsQueryHandler : IRequestHandler<GetDashboard
 
     public Task<DashboardBookingStatsDto> Handle(GetDashboardStatsQuery request, CancellationToken cancellationToken)
     {
-        return _repository.GetDashboardStatsAsync(request.CustomerId, cancellationToken);
+        return _repository.GetDashboardStatsAsync(request.CustomerId, request.Scope, cancellationToken);
     }
 }

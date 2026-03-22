@@ -32,5 +32,6 @@ public interface IBookingRepository
     /// <summary>Get status history for multiple bookings in one query. Keys are booking IDs; values are ordered by OccurredAtUtc.</summary>
     Task<Dictionary<Guid, List<BookingStatusEventDto>>> GetStatusHistoryForBookingIdsAsync(IEnumerable<Guid> bookingIds, CancellationToken cancellationToken = default);
     /// <summary>When customerId is null, returns stats for all bookings (Super Admin). Otherwise for that customer only.</summary>
-    Task<DashboardBookingStatsDto> GetDashboardStatsAsync(string? customerId, CancellationToken cancellationToken = default);
+    /// <param name="scope">all (non-draft), drafts, or tests.</param>
+    Task<DashboardBookingStatsDto> GetDashboardStatsAsync(string? customerId, string? scope, CancellationToken cancellationToken = default);
 }

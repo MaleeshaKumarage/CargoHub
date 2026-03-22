@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using CargoHub.Api.Services;
 using CargoHub.Application.Auth;
@@ -30,8 +31,18 @@ public class PortalBookingsController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<PortalBookingsController> _logger;
     private readonly WaybillPdfGenerator _waybillPdfGenerator;
+    private readonly BookingImportService _bookingImportService;
+    private readonly BookingExportService _bookingExportService;
 
-    public PortalBookingsController(IMediator mediator, IBookingRepository bookingRepository, ICompanyRepository companyRepository, UserManager<ApplicationUser> userManager, ILogger<PortalBookingsController> logger, WaybillPdfGenerator waybillPdfGenerator)
+    public PortalBookingsController(
+        IMediator mediator,
+        IBookingRepository bookingRepository,
+        ICompanyRepository companyRepository,
+        UserManager<ApplicationUser> userManager,
+        ILogger<PortalBookingsController> logger,
+        WaybillPdfGenerator waybillPdfGenerator,
+        BookingImportService bookingImportService,
+        BookingExportService bookingExportService)
     {
         _mediator = mediator;
         _bookingRepository = bookingRepository;
@@ -39,6 +50,8 @@ public class PortalBookingsController : ControllerBase
         _userManager = userManager;
         _logger = logger;
         _waybillPdfGenerator = waybillPdfGenerator;
+        _bookingImportService = bookingImportService;
+        _bookingExportService = bookingExportService;
     }
 
     private string? CustomerId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -173,6 +186,53 @@ public class PortalBookingsController : ControllerBase
         var result = await _mediator.Send(new ConfirmDraftCommand(id, customerId), HttpContext.RequestAborted);
         if (result == null)
             return NotFound();
+        return Ok(result);
+    }
+
+    /// <summary>Download completed bookings as CSV or Excel (columns match export/import template).</summary>
+    [HttpGet("export")]
+    public async Task<ActionResult> ExportBookings([FromQuery] string format = "csv")
+    {
+        var customerId = IsSuperAdmin ? null : CustomerId;
+        if (!IsSuperAdmin && string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        var fmt = string.IsNullOrWhiteSpace(format) ? "csv" : format.Trim().ToLowerInvariant();
+        if (fmt is not ("csv" or "xlsx" or "xls"))
+            return BadRequest(new { message = "format must be csv or xlsx" });
+        var details = await _mediator.Send(new ExportBookingsQuery(customerId, 0, 10_000, null), HttpContext.RequestAborted);
+        var stamp = DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        if (fmt == "csv")
+        {
+            var bytes = _bookingExportService.ExportBulkToCsv(details);
+            return File(bytes, "text/csv; charset=utf-8", $"bookings-export-{stamp}.csv");
+        }
+        var excel = _bookingExportService.ExportBulkToExcel(details);
+        return File(
+            excel,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"bookings-export-{stamp}.xlsx");
+    }
+
+    /// <summary>Import bookings from CSV or Excel. Headers must match export format.</summary>
+    [HttpPost("import")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<ActionResult<ImportBookingsResult>> ImportBookings(IFormFile? file)
+    {
+        var customerId = CustomerId;
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+        await using var stream = file.OpenReadStream();
+        var parseError = _bookingImportService.Parse(stream, file.FileName, out var rows);
+        if (parseError != null)
+            return BadRequest(new { message = parseError });
+        var importRows = rows.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
+        var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email) ?? "";
+        var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var result = await _mediator.Send(
+            new ImportBookingsCommand(customerId, displayName, companyId, importRows),
+            HttpContext.RequestAborted);
         return Ok(result);
     }
 

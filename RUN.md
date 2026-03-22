@@ -10,13 +10,13 @@ Single image with db + API + portal:
 
 ```bash
 docker pull maleesha404/cargohub:latest
-docker run -d -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 4040:4040 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
+docker run -d -p 8888:8888 -p 3000:3000 -p 8080:8080 -p 14040:4040 -v cargohub_data:/var/lib/postgresql/data --name cargohub maleesha404/cargohub:latest
 ```
 
 - **`:8888`** — **nginx**: same origin for UI + API (what you should expose behind **one** ngrok tunnel). Example: `https://<subdomain>.ngrok-free.app/en/` and API at `.../api/v1/...`.
 - **`:3000` / `:8080`** — direct Next.js / API (debug or local-only).
 
-**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. **`ngrok.yml` tunnels port `8888` (nginx)** so one HTTPS URL serves the portal and `/api`. **`ngrok.yml` uses `web_addr: 0.0.0.0:4040`** so the host can reach the ngrok API on **http://localhost:4040**. You do **not** need ngrok installed on the host. If URLs are empty in CI, **pull the latest image** (older images may not include in-container ngrok).
+**Public URLs (ngrok inside the image):** set `-e NGROK_AUTHTOKEN=your_token` on `docker run` (or use `docker-compose.one.yml`). The image includes the ngrok agent; tunnels start automatically. **`ngrok.yml` tunnels port `8888` (nginx)** so one HTTPS URL serves the portal and `/api`. Inside the container, ngrok’s web API listens on **`:4040`**; map it to **`14040` on the host** (e.g. `-p 14040:4040`) so you can open **http://localhost:14040** without colliding with a **standalone ngrok on the host** (which often uses `:4040`). You do **not** need ngrok installed on the host. If URLs are empty in CI, **pull the latest image** (older images may not include in-container ngrok).
 
 **Paths:** The portal uses **locale-prefixed routes** (e.g. **`/en/login`**, **`/en/dashboard`**). **`/dashboard` alone returns 404** — use **`/en/dashboard`** (or your default locale).
 
@@ -31,7 +31,7 @@ docker compose -f docker-compose.one.yml up -d
 - **Public (nginx, same as ngrok):** http://localhost:8888  
 - **Portal (direct):** http://localhost:3000  
 - **API (direct):** http://localhost:8080  
-- **ngrok dashboard (if token set):** http://localhost:4040  
+- **ngrok dashboard (if token set):** http://localhost:14040 (mapped from container `:4040`)  
 
 ---
 
@@ -77,6 +77,18 @@ Copy `.env.example` to `.env` and change secrets. For Docker, keep `NEXT_PUBLIC_
 docker compose down
 ```
 
+## Restart after reboot
+
+All Compose services use **`restart: unless-stopped`**, so when Docker Desktop starts (for example after you log in on macOS or Windows), containers that were already running are started again automatically. After upgrading to this configuration, recreate the stack once so the policy applies:
+
+```bash
+docker compose up -d
+# or
+docker compose -f docker-compose.one.yml up -d
+```
+
+To keep the stack off across reboots, use `docker compose down` (or stop the containers in Docker Desktop).
+
 ## Data persistence
 
 PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to remove it.
@@ -86,6 +98,8 @@ PostgreSQL data is stored in a Docker volume. Use `docker compose down -v` to re
 ## Test the GitHub Actions pipeline
 
 ### Pipeline layout (single responsibility)
+
+See **`.github/workflows/README.md`** for a full index of workflow files, triggers, and how the Mac deploy job is split into step sections (§1–§6).
 
 | Workflow | Jobs | Purpose |
 |----------|------|--------|
@@ -105,7 +119,7 @@ When **PR Validation** or **Docker build / Mac deploy** fails, a workflow may op
 |------|----------------|----------------|
 | 1. Build & push | GitHub (Ubuntu) | Builds `Dockerfile.all-in-one`, pushes `cargohub:latest` + `:sha` to Docker Hub |
 | 2. Deploy on Mac | Your self-hosted runner | `docker compose pull` + `up -d --force-recreate`, smoke tests |
-| 3. ngrok | **Inside the container** | If `NGROK_AUTHTOKEN` is set (GitHub secret), ngrok starts in the image; use **http://localhost:4040** on the Mac for public URLs (no ngrok binary on the host required) |
+| 3. ngrok | **Inside the container** | If `NGROK_AUTHTOKEN` is set (GitHub secret), ngrok starts in the image; use **http://localhost:14040** on the Mac for the ngrok dashboard (no ngrok binary on the host required) |
 
 **Secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (required). Optional: `NGROK_AUTHTOKEN`, `CORS__PORTAL_ORIGIN`, `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`.
 
@@ -132,7 +146,7 @@ When **PR Validation** or **Docker build / Mac deploy** fails, a workflow may op
 
 3. **Secrets:** `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` (required). **`NGROK_AUTHTOKEN`** — [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken); add as repo secret. Optional: `BOOTSTRAP__SECRET`, `JWT__SIGNING_KEY`, `CORS__PORTAL_ORIGIN`.
 
-4. **Public URLs:** On the Mac, open **http://localhost:4040** (mapped from the container) for the ngrok UI and **`public_url`** list. Or read the **Show ngrok public URLs** step in the Actions run.
+4. **Public URLs:** On the Mac, open **http://localhost:14040** (mapped from container `:4040`) for the ngrok UI and **`public_url`** list. Or read the **Show ngrok public URLs** step in the Actions run.
 
 5. **Local env (optional):** `~/.cargohub.env` on the Mac for extra compose vars.
 
@@ -204,9 +218,14 @@ docker rm -f cargohub 2>/dev/null || true
 docker ps -q --filter publish=8888 | xargs -r docker rm -f
 docker ps -q --filter publish=8080 | xargs -r docker rm -f
 docker ps -q --filter publish=3000 | xargs -r docker rm -f
+docker ps -q --filter publish=14040 | xargs -r docker rm -f
 ```
 
 Then run the workflow again or `docker compose -f docker-compose.one.yml up -d`.
+
+### `failed to bind host port` for **4040** or **14040** (`address already in use`)
+
+The stack maps the **in-container** ngrok web UI (**`:4040`**) to **`:14040` on the host** so it does not fight with a **standalone ngrok** on the Mac (often **`:4040`**). Open **http://localhost:14040** for the dashboard. If **14040** is still busy, free it with the `publish=14040` line above or change the port in `docker-compose.one.yml` and set **`NGROK_LOCAL_API_URL`** for CI scripts (see `scripts/wait-ngrok-tunnels.py`).
 
 ### `docker compose pull` / `auth.docker.io` timeout on the Mac
 
@@ -237,7 +256,7 @@ They are **not contradictory**:
 
 **Common causes**
 
-1. **Old URL** — On **ngrok free**, each time the in-container ngrok agent **restarts**, you often get a **new** random subdomain. A bookmark to **`merle-…-palma.ngrok-free.dev`** stays dead after the tunnel moved. **Open the current URL** from the runner: **http://localhost:4040** (ngrok API; port mapped in `docker-compose.one.yml`).
+1. **Old URL** — On **ngrok free**, each time the in-container ngrok agent **restarts**, you often get a **new** random subdomain. A bookmark to **`merle-…-palma.ngrok-free.dev`** stays dead after the tunnel moved. **Open the current URL** from the runner: **http://localhost:14040** (ngrok API; host port in `docker-compose.one.yml`).
 2. **No token** — If **`NGROK_AUTHTOKEN`** is not set for the container, ngrok may not start; localhost still works, public URL never comes up.
 3. **ngrok crashed** after deploy — Check **`docker logs cargohub`** (look for ngrok) and restart: `docker compose -f docker-compose.one.yml up -d --force-recreate`.
 4. **CORS** — After the URL changes, update **`CORS__PORTAL_ORIGIN`** (compose / `~/.cargohub.env`) to the **new** `https://…` origin.

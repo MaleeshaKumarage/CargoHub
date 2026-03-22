@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CargoHub.Infrastructure.Persistence;
 
-public sealed class BookingRepository : IBookingRepository
+public sealed partial class BookingRepository : IBookingRepository
 {
     private readonly ApplicationDbContext _db;
 
@@ -185,61 +185,4 @@ public sealed class BookingRepository : IBookingRepository
         return result;
     }
 
-    public async Task<DashboardBookingStatsDto> GetDashboardStatsAsync(string? customerId, CancellationToken cancellationToken = default)
-    {
-        var now = DateTime.UtcNow;
-        var startOfToday = DateOnly.FromDateTime(now).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var startOfYear = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        var baseQuery = string.IsNullOrEmpty(customerId)
-            ? _db.Bookings.AsNoTracking().Where(b => !b.IsDraft)
-            : _db.Bookings.AsNoTracking().Where(b => b.CustomerId == customerId && !b.IsDraft);
-
-        var countToday = await baseQuery.CountAsync(b => b.CreatedAtUtc >= startOfToday, cancellationToken);
-        var countMonth = await baseQuery.CountAsync(b => b.CreatedAtUtc >= startOfMonth, cancellationToken);
-        var countYear = await baseQuery.CountAsync(b => b.CreatedAtUtc >= startOfYear, cancellationToken);
-
-        var rows = await baseQuery
-            .Select(b => new
-            {
-                CarrierId = b.Shipment.CarrierId,
-                PostalService = b.Header.PostalService,
-                PickUpCity = b.PickUpAddress.City,
-                ShipperCity = b.Shipper.City,
-                DeliveryCity = b.DeliveryPoint.City,
-                ReceiverCity = b.Receiver.City
-            })
-            .ToListAsync(cancellationToken);
-
-        static string Norm(string? s) => string.IsNullOrWhiteSpace(s) ? "(Not set)" : s.Trim();
-
-        var byCourier = rows
-            .GroupBy(r => Norm(r.CarrierId ?? r.PostalService))
-            .Select(g => new CountByKeyDto { Key = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count)
-            .ToList();
-
-        var fromCities = rows
-            .GroupBy(r => Norm(r.PickUpCity ?? r.ShipperCity))
-            .Select(g => new CountByKeyDto { Key = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count)
-            .ToList();
-
-        var toCities = rows
-            .GroupBy(r => Norm(r.DeliveryCity ?? r.ReceiverCity))
-            .Select(g => new CountByKeyDto { Key = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count)
-            .ToList();
-
-        return new DashboardBookingStatsDto
-        {
-            CountToday = countToday,
-            CountMonth = countMonth,
-            CountYear = countYear,
-            ByCourier = byCourier,
-            FromCities = fromCities,
-            ToCities = toCities
-        };
-    }
 }

@@ -23,6 +23,8 @@ vi.mock("next-intl", () => ({
 vi.mock("@/lib/api", () => ({
   bookingList: vi.fn(),
   draftList: vi.fn(),
+  bookingsExportDownload: vi.fn(),
+  bookingsImport: vi.fn(),
 }));
 
 const bookingList = await import("@/lib/api").then((m) => m.bookingList);
@@ -182,7 +184,7 @@ describe("BookingsPage", () => {
       },
     ]);
     render(<BookingsPage />);
-    await expect(screen.findByText("Disabled")).resolves.toBeInTheDocument();
+    await expect(screen.findByText("filterDisabled")).resolves.toBeInTheDocument();
   });
 
   it("uses id slice when shipmentNumber is null", async () => {

@@ -1,5 +1,7 @@
 # Verifies Dockerfile.all-in-one builds (no registry push).
 # Run automatically on PRs; run manually: Actions → Docker validate (all-in-one) → Run workflow.
+#
+# Single job: build (no push) — see .github/workflows/README.md
 
 name: Docker validate (all-in-one)
 

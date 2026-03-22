@@ -21,11 +21,11 @@ public class GetDashboardStatsQueryHandlerTests
             ToCities = new List<CountByKeyDto>()
         };
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.GetDashboardStatsAsync("cust-1", It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetDashboardStatsAsync("cust-1", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
         var handler = new GetDashboardStatsQueryHandler(repo.Object);
-        var result = await handler.Handle(new GetDashboardStatsQuery("cust-1"), default);
+        var result = await handler.Handle(new GetDashboardStatsQuery("cust-1", null), default);
 
         Assert.Equal(5, result.CountToday);
         Assert.Equal(20, result.CountMonth);
@@ -39,11 +39,11 @@ public class GetDashboardStatsQueryHandlerTests
     {
         var expected = new DashboardBookingStatsDto { CountToday = 0, CountMonth = 0, CountYear = 0 };
         var repo = new Mock<IBookingRepository>();
-        repo.Setup(r => r.GetDashboardStatsAsync(null, It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetDashboardStatsAsync(null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
         var handler = new GetDashboardStatsQueryHandler(repo.Object);
-        var result = await handler.Handle(new GetDashboardStatsQuery(null), default);
+        var result = await handler.Handle(new GetDashboardStatsQuery(null, null), default);
 
         Assert.Equal(0, result.CountToday);
     }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DotNetEnv;
 using CargoHub.Api.Options;
+using CargoHub.Api.Services;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Handlers;
 using CargoHub.Application.Bookings;
@@ -187,6 +188,8 @@ builder.Services.AddCors(options =>
 // Branding: app name, logo, colors, waybill footer (single-tenant per deployment).
 builder.Services.Configure<BrandingOptions>(builder.Configuration.GetSection(BrandingOptions.SectionName));
 builder.Services.AddSingleton<CargoHub.Api.Services.WaybillPdfGenerator>();
+builder.Services.AddSingleton<BookingImportService>();
+builder.Services.AddSingleton<BookingExportService>();
 
 // Register controllers; routes will later mirror the existing Node.js API surface.
 builder.Services.AddControllers();

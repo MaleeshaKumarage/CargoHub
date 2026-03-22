@@ -4,11 +4,17 @@ import { useAuth } from "@/context/AuthContext";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
-import { bookingList, draftList, type BookingListItem } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  bookingList,
+  bookingsExportDownload,
+  bookingsImport,
+  draftList,
+  type BookingListItem,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookingMilestoneBar } from "@/components/BookingMilestoneBar";
+import { BookingsDataTable } from "@/components/BookingsDataTable";
 
 type Tab = "completed" | "drafts";
 
@@ -16,10 +22,14 @@ export default function BookingsPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const t = useTranslations("bookings");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>("completed");
   const [list, setList] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
 
   useEffect(() => {
@@ -40,15 +50,76 @@ export default function BookingsPage() {
   if (!isAuthenticated || isLoading) return null;
 
   const isDrafts = tab === "drafts";
+  const showImportExport = !isSuperAdmin && !isDrafts;
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    if (!token) return;
+    setExportLoading(true);
+    setError(null);
+    try {
+      await bookingsExportDownload(token, format);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleImportPick = () => fileInputRef.current?.click();
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !token) return;
+    setImportLoading(true);
+    setError(null);
+    setImportNotice(null);
+    try {
+      const result = await bookingsImport(token, file);
+      const parts = [t("importSummary", { created: result.createdCount, drafts: result.draftCount })];
+      if (result.errors.length > 0) {
+        parts.push(`${t("importErrors")} ${result.errors.slice(0, 5).join("; ")}`);
+        if (result.errors.length > 5) parts.push(`… (+${result.errors.length - 5} more)`);
+      }
+      setImportNotice(parts.join(" "));
+      setLoading(true);
+      bookingList(token)
+        .then(setList)
+        .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+        .finally(() => setLoading(false));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        className="hidden"
+        aria-hidden
+        onChange={handleImportFile}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
         {!isSuperAdmin && (
-          <Link href="/bookings/create">
-            <Button>{t("createTitle")}</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {showImportExport && (
+              <>
+                <Button type="button" variant="outline" disabled={importLoading} onClick={handleImportPick}>
+                  {importLoading ? t("importing") : t("import")}
+                </Button>
+                <p className="text-xs text-muted-foreground max-w-[220px] hidden sm:block">{t("importHint")}</p>
+              </>
+            )}
+            <Link href="/bookings/create">
+              <Button>{t("createTitle")}</Button>
+            </Link>
+          </div>
         )}
       </div>
       <div className="flex gap-2 border-b">
@@ -77,6 +148,11 @@ export default function BookingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {importNotice && (
+            <p className="text-sm text-muted-foreground mb-4" role="status">
+              {importNotice}
+            </p>
+          )}
           {error && (
             <p className="text-sm text-destructive mb-4" role="alert">
               {error}
@@ -96,60 +172,13 @@ export default function BookingsPage() {
               )}
             </>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="p-3 text-left font-medium">Reference / Shipment</th>
-                    <th className="p-3 text-left font-medium">Customer</th>
-                    <th className="p-3 text-left font-medium">Created</th>
-                    <th className="p-3 text-left font-medium min-w-[200px]">Milestone</th>
-                    {!isDrafts && <th className="p-3 text-left font-medium">Status</th>}
-                    <th className="p-3 text-left font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((b) => (
-                    <tr key={b.id} className="border-b last:border-0 align-top">
-                      <td className="p-3">{b.shipmentNumber || b.id.slice(0, 8)}</td>
-                      <td className="p-3">{b.customerName ?? "—"}</td>
-                      <td className="p-3">
-                        {new Date(b.createdAtUtc).toLocaleDateString()}
-                      </td>
-                      <td className="p-3">
-                        <BookingMilestoneBar item={b} className="max-w-[200px]" />
-                      </td>
-                      {!isDrafts && (
-                        <td className="p-3">{b.enabled ? "Active" : "Disabled"}</td>
-                      )}
-                      <td className="p-3">
-                        {isDrafts ? (
-                          isSuperAdmin ? (
-                            <Link href={`/bookings/draft/${b.id}`}>
-                              <Button variant="ghost" size="sm">
-                                View
-                              </Button>
-                            </Link>
-                          ) : (
-                            <Link href={`/bookings/draft/${b.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Edit / Confirm
-                              </Button>
-                            </Link>
-                          )
-                        ) : (
-                          <Link href={`/bookings/${b.id}`}>
-                            <Button variant="ghost" size="sm">
-                              View
-                            </Button>
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <BookingsDataTable
+              data={list}
+              isDrafts={isDrafts}
+              isSuperAdmin={isSuperAdmin}
+              exportLoading={exportLoading}
+              onExport={handleExport}
+            />
           )}
         </CardContent>
       </Card>
