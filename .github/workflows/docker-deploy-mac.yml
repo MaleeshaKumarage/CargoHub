@@ -17,6 +17,13 @@ on:
   workflow_run:
     workflows: ["Docker — build & push image"]
     types: [completed]
+    branches: [main, master, development]
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Optional note (manual deploy after a successful Docker build on main/master/development)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -31,14 +38,16 @@ jobs:
   deploy-mac:
     name: Deploy on Mac (pull, compose, smoke, ngrok)
     runs-on: self-hosted
+    # Auto: only after a successful build on main/master/development. Manual: Actions → Run workflow (same branch you select).
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      contains(fromJSON('["main","master","development"]'), github.event.workflow_run.head_branch)
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["main","master","development"]'), github.event.workflow_run.head_branch))
     timeout-minutes: 60
     env:
       COMPOSE_HTTP_TIMEOUT: "600"
-      TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
-      TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      TRIGGER_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      TRIGGER_BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
 
     steps:
       # ----- §1 Trigger & checkout -----
@@ -52,10 +61,10 @@ jobs:
           echo "hostname=$(hostname 2>/dev/null || echo n/a)"
           uname -a 2>/dev/null || true
 
-      - name: "§1 · Checkout repository (same commit as build)"
+      - name: "§1 · Checkout repository (same commit as build, or branch tip for manual)"
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       # ----- §2 Compose env & registry -----
       - name: "§2 · Set Compose command (optional ~/.cargohub.env)"
@@ -194,5 +203,5 @@ jobs:
               body,
             });
         env:
-          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+          TRIGGER_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
