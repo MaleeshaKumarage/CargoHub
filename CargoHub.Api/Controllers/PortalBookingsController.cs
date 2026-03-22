@@ -216,7 +216,7 @@ public class PortalBookingsController : ControllerBase
     /// <summary>Import bookings from CSV or Excel. Headers must match export format.</summary>
     [HttpPost("import")]
     [RequestSizeLimit(25_000_000)]
-    public async Task<ActionResult<ImportBookingsResult>> ImportBookings(IFormFile? file)
+    public async Task<ActionResult<ImportBookingsResult>> ImportBookings([FromForm] IFormFile? file)
     {
         var customerId = CustomerId;
         if (string.IsNullOrEmpty(customerId))

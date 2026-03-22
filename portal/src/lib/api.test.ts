@@ -26,6 +26,8 @@ import {
   draftUpdate,
   draftConfirm,
   getDashboardStats,
+  bookingsImport,
+  bookingsExportDownload,
   type RegisterBody,
 } from "./api";
 
@@ -784,6 +786,62 @@ describe("api", () => {
       const result = await login("u@example.com", "pass");
       expect(result.data?.jwtToken).toBe("jwt-xyz");
       expect(result.data?.roles).toEqual(["User"]);
+    });
+  });
+
+  describe("bookingsImport", () => {
+    it("returns counts when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ createdCount: 2, draftCount: 1, errors: ["row 2"] }),
+      });
+      const file = new File(["a"], "t.csv", { type: "text/csv" });
+      const r = await bookingsImport("tok", file);
+      expect(r.createdCount).toBe(2);
+      expect(r.draftCount).toBe(1);
+      expect(r.errors).toEqual(["row 2"]);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/import"),
+        expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+      );
+    });
+
+    it("throws with message when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "bad header" }),
+      });
+      const file = new File(["a"], "t.csv", { type: "text/csv" });
+      await expect(bookingsImport("tok", file)).rejects.toThrow("bad header");
+    });
+  });
+
+  describe("bookingsExportDownload", () => {
+    it("fetches export and triggers download", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        blob: async () => new Blob(["x"], { type: "text/csv" }),
+      });
+      const createObjectURL = vi.fn(() => "blob:mock");
+      vi.stubGlobal("URL", { ...globalThis.URL, createObjectURL, revokeObjectURL: vi.fn() });
+      const anchor = { click: vi.fn(), href: "", download: "" };
+      const ce = vi.spyOn(document, "createElement").mockReturnValue(anchor as unknown as HTMLElement);
+      await bookingsExportDownload("tok", "csv");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/export?format=csv"),
+        expect.objectContaining({ headers: { Authorization: "Bearer tok" } }),
+      );
+      expect(anchor.click).toHaveBeenCalled();
+      expect(createObjectURL).toHaveBeenCalled();
+      ce.mockRestore();
+    });
+
+    it("throws when export fails", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "no rows" }),
+      });
+      await expect(bookingsExportDownload("tok", "xlsx")).rejects.toThrow("no rows");
     });
   });
 });
