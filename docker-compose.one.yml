@@ -13,8 +13,9 @@ services:
       - "8888:8888"
       - "3000:3000"
       - "8080:8080"
-      # ngrok local API / dashboard (only when NGROK_AUTHTOKEN is set — see Dockerfile.all-in-one)
-      - "4040:4040"
+      # ngrok local API / dashboard inside container is :4040; map to 14040 on host to avoid
+      # "address already in use" when host ngrok or another tool already binds :4040.
+      - "14040:4040"
     volumes:
       - cargohub_data:/var/lib/postgresql/data
     environment:

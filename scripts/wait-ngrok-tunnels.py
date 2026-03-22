@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Poll ngrok /api/tunnels until at least one tunnel exists or timeout. Prints final JSON to stdout."""
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 
-URL = "http://127.0.0.1:4040/api/tunnels"
+# Host port must match docker-compose.one.yml (14040 -> container 4040).
+_DEFAULT_TUNNELS = "http://127.0.0.1:14040/api/tunnels"
+URL = os.environ.get("NGROK_LOCAL_API_URL", _DEFAULT_TUNNELS)
 # Total wait up to ~2 minutes (60 * 2s)
 ATTEMPTS = 60
 INTERVAL = 2.0

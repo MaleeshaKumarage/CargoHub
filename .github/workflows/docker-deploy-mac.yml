@@ -69,12 +69,12 @@ jobs:
             echo "::warning::DOCKERHUB_* missing for login"
           fi
 
-      - name: Stop stack & free ports (8888, 8080, 3000, 4040)
+      - name: Stop stack & free ports (8888, 8080, 3000, 14040)
         run: |
           set -e
           $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
           docker rm -f cargohub 2>/dev/null || true
-          for port in 8888 8080 3000 4040; do
+          for port in 8888 8080 3000 14040; do
             for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
               docker rm -f "$id" || true
             done
