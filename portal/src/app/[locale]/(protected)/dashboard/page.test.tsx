@@ -34,6 +34,10 @@ vi.mock("@/lib/api", () => ({
   getDashboardStats: (...args: unknown[]) => mockGetDashboardStats(...args),
 }));
 
+vi.mock("@/components/charts/ThemedECharts", () => ({
+  ThemedECharts: () => <div data-testid="themed-echarts-stub" />,
+}));
+
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
