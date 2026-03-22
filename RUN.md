@@ -169,6 +169,13 @@ Anonymous pulls from Docker Hub are **rate-limited** and often **slow**; `Client
 - Ensure those **same repo secrets** exist and are available to the self-hosted runner job.
 - **Manual pull on the Mac:** `docker login` then `docker compose -f docker-compose.one.yml pull`.
 
+### DNS / network errors pulling from `registry-1.docker.io` (self-hosted runner)
+
+If the deploy job fails on **Pull image** with messages like **`lookup registry-1.docker.io ... i/o timeout`**, **`context deadline exceeded`**, or **`network is unreachable`** (often on IPv6), the runner’s **network or DNS** is flaky — not the app repo.
+
+- **Re-run** the failed **Docker — deploy on Mac** workflow once connectivity is stable (`gh run rerun <run-id>` or Actions → **Re-run jobs**).
+- On the runner host: fix **DNS** (e.g. use reliable resolvers in **`/etc/resolv.conf`** or Docker **`daemon.json`** `dns`), ensure **outbound HTTPS** to Docker Hub, and if IPv6 is broken either fix routing or **prefer IPv4** for Docker/registry (runner/OS-specific).
+
 ### Deploy ran but `docker ps` looks unchanged
 
 - **Same image tag:** `latest` was updated on the registry, but Compose reused the old container. The repo uses `pull_policy: always` and `docker compose up -d --force-recreate` so the next deploy recreates the container. To fix manually:  
