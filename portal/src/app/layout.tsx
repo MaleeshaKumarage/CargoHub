@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" data-theme="minimalism" suppressHydrationWarning>
       <body
         data-slot="body"
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen w-full antialiased bg-background text-foreground`}
         suppressHydrationWarning
       >
         {children}
