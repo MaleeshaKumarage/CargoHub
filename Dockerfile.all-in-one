@@ -21,7 +21,8 @@ ARG BUILD_REF=local
 ENV NEXT_PUBLIC_BUILD_REF=$BUILD_REF
 # Same-origin API via nginx + single ngrok URL (browser uses window.location.origin)
 ENV NEXT_PUBLIC_API_URL=__SAME_ORIGIN__
-COPY portal/package.json portal/package-lock.json* ./
+# .npmrc (e.g. legacy-peer-deps) must be present before npm ci — same as local portal installs
+COPY portal/package.json portal/package-lock.json* portal/.npmrc ./
 RUN npm ci
 COPY portal/ .
 RUN npm run build
