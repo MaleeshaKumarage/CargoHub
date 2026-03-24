@@ -8,8 +8,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   bookingList,
   bookingsExportDownload,
+  bookingsImportAnalyze,
+  bookingsImportApplyMapping,
   bookingsImportConfirm,
-  bookingsImportPreview,
   bookingsWaybillsBulkDownload,
   draftList,
   type BookingImportPreview,
@@ -17,6 +18,7 @@ import {
   type BookingListItem,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingsDataTable } from "@/components/BookingsDataTable";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -24,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 type Tab = "completed" | "drafts";
 
-type ImportDialogStep = "preview" | "summary";
+type ImportDialogStep = "mapping" | "preview" | "summary";
 
 export default function BookingsPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
@@ -40,6 +42,10 @@ export default function BookingsPage() {
   const [waybillPdfLoading, setWaybillPdfLoading] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importStep, setImportStep] = useState<ImportDialogStep>("preview");
+  const [mappingSessionId, setMappingSessionId] = useState<string | null>(null);
+  const [mappingFileHeaders, setMappingFileHeaders] = useState<string[]>([]);
+  const [mappingBookingFields, setMappingBookingFields] = useState<string[]>([]);
+  const [columnSelections, setColumnSelections] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<BookingImportPreview | null>(null);
   const [confirmCompleted, setConfirmCompleted] = useState(false);
   const [confirmDrafts, setConfirmDrafts] = useState(false);
@@ -85,6 +91,10 @@ export default function BookingsPage() {
     setPreview(null);
     setImportResult(null);
     setImportStep("preview");
+    setMappingSessionId(null);
+    setMappingFileHeaders([]);
+    setMappingBookingFields([]);
+    setColumnSelections({});
     setConfirmCompleted(false);
     setConfirmDrafts(false);
   };
@@ -122,6 +132,39 @@ export default function BookingsPage() {
   const canSubmitImport =
     !!preview &&
     ((confirmCompleted && preview.completedCount > 0) || (confirmDrafts && preview.draftCount > 0));
+
+  const handleApplyColumnMapping = async () => {
+    if (!token || !mappingSessionId) return;
+    setImportLoading(true);
+    setError(null);
+    try {
+      const columnMap: Record<string, string | null> = {};
+      for (const f of mappingBookingFields) {
+        const v = columnSelections[f]?.trim();
+        columnMap[f] = v ? v : null;
+      }
+      const p = await bookingsImportApplyMapping(token, {
+        sessionId: mappingSessionId,
+        columnMap,
+      });
+      if (p.totalDataRows === 0) {
+        setError(t("importNoDataRows"));
+        return;
+      }
+      setPreview(p);
+      setMappingSessionId(null);
+      setMappingFileHeaders([]);
+      setMappingBookingFields([]);
+      setColumnSelections({});
+      setConfirmCompleted(false);
+      setConfirmDrafts(false);
+      setImportStep("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   const handleConfirmImport = async () => {
     if (!token || !preview || !canSubmitImport) return;
@@ -186,12 +229,59 @@ export default function BookingsPage() {
           >
             <div className="flex flex-col gap-1.5">
               <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight">
-                {importStep === "preview" ? t("importDialogTitle") : t("importSummaryTitle")}
+                {importStep === "summary"
+                  ? t("importSummaryTitle")
+                  : importStep === "mapping"
+                    ? t("importMappingTitle")
+                    : t("importDialogTitle")}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="text-sm text-muted-foreground">
-                {importStep === "preview" ? t("importDialogDescription") : t("importSummaryDescription")}
+                {importStep === "summary"
+                  ? t("importSummaryDescription")
+                  : importStep === "mapping"
+                    ? t("importMappingDescription")
+                    : t("importDialogDescription")}
               </DialogPrimitive.Description>
             </div>
+
+            {importStep === "mapping" && mappingSessionId && (
+              <div className="space-y-3 text-sm">
+                <div className="max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto pr-1">
+                  {mappingBookingFields.map((field) => (
+                    <div key={field} className="grid gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center">
+                      <Label htmlFor={`import-map-${field}`} className="text-xs font-medium leading-tight sm:pt-0">
+                        {field}
+                      </Label>
+                      <select
+                        id={`import-map-${field}`}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm"
+                        value={columnSelections[field] ?? ""}
+                        onChange={(e) =>
+                          setColumnSelections((prev) => ({ ...prev, [field]: e.target.value }))
+                        }
+                      >
+                        <option value="">{t("importMappingNoColumn")}</option>
+                        {mappingFileHeaders.map((h) => (
+                          <option key={h} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                  <DialogPrimitive.Close asChild>
+                    <Button type="button" variant="outline">
+                      {t("importCancel")}
+                    </Button>
+                  </DialogPrimitive.Close>
+                  <Button type="button" disabled={importLoading} onClick={() => void handleApplyColumnMapping()}>
+                    {importLoading ? t("importing") : t("importMappingContinue")}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {importStep === "preview" && preview && (
               <div className="space-y-4 text-sm">

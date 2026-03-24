@@ -17,8 +17,47 @@ public class BookingImportServiceTests
 
         Assert.NotNull(error);
         Assert.Equal(0, skipped);
-        Assert.Contains("Header", error);
+        Assert.Contains("export template", error, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(rows);
+    }
+
+    [Fact]
+    public void AnalyzeImport_WhenHeadersMismatch_ReturnsRawRows()
+    {
+        var csv = "WrongHeader1,WrongHeader2\nval1,val2";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
+        var analysis = _service.AnalyzeImport(stream, "test.csv");
+
+        Assert.Null(analysis.Error);
+        Assert.True(analysis.NeedsMapping);
+        Assert.NotNull(analysis.RawRows);
+        Assert.Single(analysis.RawRows);
+        Assert.NotNull(analysis.FileHeaders);
+        Assert.Equal(2, analysis.FileHeaders.Count);
+    }
+
+    [Fact]
+    public void ParseFromMappedRows_WhenColumnRenamed_MapsToCanonicalField()
+    {
+        var header = BuildCsvHeader().Replace("ReferenceNumber", "Ref", StringComparison.Ordinal);
+        var csv = header + "\n" + BuildCompleteRow();
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(csv));
+        var analysis = _service.AnalyzeImport(stream, "test.csv");
+
+        Assert.Null(analysis.Error);
+        Assert.True(analysis.NeedsMapping);
+        Assert.NotNull(analysis.RawRows);
+        Assert.NotNull(analysis.FileHeaders);
+
+        var map = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var h in BookingImportService.BookingImportFieldNames)
+            map[h] = h == "ReferenceNumber" ? "Ref" : h;
+
+        var error = _service.ParseFromMappedRows(analysis.RawRows, map, analysis.FileHeaders, out var rows);
+        Assert.Null(error);
+        Assert.Single(rows);
+        Assert.True(rows[0].IsComplete);
+        Assert.Equal("REF1", rows[0].Request.ReferenceNumber);
     }
 
     [Fact]
