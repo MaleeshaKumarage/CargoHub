@@ -11,6 +11,7 @@ import {
   bookingsImportAnalyze,
   bookingsImportApplyMapping,
   bookingsImportConfirm,
+  bookingsImportPreview,
   bookingsWaybillsBulkDownload,
   draftList,
   type BookingImportPreview,
