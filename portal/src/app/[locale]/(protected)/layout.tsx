@@ -34,9 +34,14 @@ export default function ProtectedLayout({
   }
 
   return (
-    <div data-slot="layout" className="min-h-screen bg-background">
+    <div data-slot="layout" className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main data-slot="main" className="container py-6 px-4">{children}</main>
+      <main
+        data-slot="main"
+        className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-8"
+      >
+        {children}
+      </main>
     </div>
   );
 }
