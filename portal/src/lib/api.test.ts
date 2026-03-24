@@ -28,6 +28,8 @@ import {
   getDashboardStats,
   bookingsImport,
   bookingsImportPreview,
+  bookingsImportAnalyze,
+  bookingsImportApplyMapping,
   bookingsImportConfirm,
   bookingsWaybillsBulkDownload,
   bookingsExportDownload,
@@ -824,6 +826,76 @@ describe("api", () => {
       });
       const file = new File(["a"], "t.csv", { type: "text/csv" });
       await expect(bookingsImport("tok", file)).rejects.toThrow("bad header");
+    });
+  });
+
+  describe("bookingsImportAnalyze", () => {
+    it("returns analyze payload when headers match", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          needsMapping: false,
+          sessionId: "sess-a",
+          completedCount: 1,
+          draftCount: 0,
+          skippedEmptyRows: 0,
+          totalDataRows: 1,
+        }),
+      });
+      const file = new File(["a"], "t.csv", { type: "text/csv" });
+      const r = await bookingsImportAnalyze("tok", file);
+      expect(r.needsMapping).toBe(false);
+      expect(r.sessionId).toBe("sess-a");
+      expect(r.totalDataRows).toBe(1);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/import/analyze"),
+        expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
+      );
+    });
+
+    it("returns mapping metadata when needsMapping", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          needsMapping: true,
+          sessionId: "sess-m",
+          fileHeaders: ["A", "B"],
+          bookingFields: ["X"],
+        }),
+      });
+      const file = new File(["a"], "t.csv", { type: "text/csv" });
+      const r = await bookingsImportAnalyze("tok", file);
+      expect(r.needsMapping).toBe(true);
+      expect(r.fileHeaders).toEqual(["A", "B"]);
+      expect(r.bookingFields).toEqual(["X"]);
+    });
+  });
+
+  describe("bookingsImportApplyMapping", () => {
+    it("returns preview-shaped payload", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          sessionId: "sess-m",
+          completedCount: 0,
+          draftCount: 1,
+          skippedEmptyRows: 0,
+          totalDataRows: 1,
+        }),
+      });
+      const r = await bookingsImportApplyMapping("tok", {
+        sessionId: "sess-m",
+        columnMap: { ReferenceNumber: "Ref" },
+      });
+      expect(r.sessionId).toBe("sess-m");
+      expect(r.totalDataRows).toBe(1);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/bookings/import/apply-mapping"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"sessionId":"sess-m"'),
+        }),
+      );
     });
   });
 

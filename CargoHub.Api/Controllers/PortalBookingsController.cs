@@ -265,6 +265,98 @@ public class PortalBookingsController : ControllerBase
             $"bookings-export-{stamp}.xlsx");
     }
 
+    /// <summary>Analyze upload: if headers match export (trim + BOM), same as preview; otherwise store raw rows for <see cref="ImportApplyMapping"/>.</summary>
+    [HttpPost("import/analyze")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<ActionResult<ImportAnalyzeResponseDto>> ImportAnalyze([FromForm] IFormFile? file)
+    {
+        var customerId = CustomerId;
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+        await using var stream = file.OpenReadStream();
+        var analysis = _bookingImportService.AnalyzeImport(stream, file.FileName);
+        if (analysis.Error != null)
+            return BadRequest(new { message = analysis.Error });
+        var sessionId = Guid.NewGuid();
+        if (!analysis.NeedsMapping)
+        {
+            var parsed = analysis.ParsedRows!;
+            var importRows = parsed.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
+            var key = ImportSessionCacheKey(customerId, sessionId);
+            _importSessionCache.Set(key, importRows, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
+            var completed = importRows.Count(r => r.IsComplete);
+            var drafts = importRows.Count - completed;
+            return Ok(new ImportAnalyzeResponseDto
+            {
+                NeedsMapping = false,
+                SessionId = sessionId,
+                CompletedCount = completed,
+                DraftCount = drafts,
+                SkippedEmptyRows = analysis.SkippedEmptyRows,
+                TotalDataRows = importRows.Count,
+            });
+        }
+
+        if (analysis.RawRows!.Count == 0)
+            return BadRequest(new { message = "No data rows in file." });
+
+        var rawKey = ImportRawSessionCacheKey(customerId, sessionId);
+        var state = new ImportRawSessionState
+        {
+            Rows = analysis.RawRows,
+            FileHeaders = analysis.FileHeaders!,
+            SkippedEmptyRows = analysis.SkippedEmptyRows,
+        };
+        _importSessionCache.Set(rawKey, state, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
+        return Ok(new ImportAnalyzeResponseDto
+        {
+            NeedsMapping = true,
+            SessionId = sessionId,
+            FileHeaders = analysis.FileHeaders,
+            BookingFields = BookingImportService.BookingImportFieldNames.ToList(),
+        });
+    }
+
+    /// <summary>Apply column mapping for a raw import session; returns the same shape as import/preview for confirm.</summary>
+    [HttpPost("import/apply-mapping")]
+    public ActionResult<ImportPreviewResponseDto> ImportApplyMapping([FromBody] ImportApplyMappingRequestDto? body)
+    {
+        var customerId = CustomerId;
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+        if (body == null)
+            return BadRequest(new { message = "Request body is required." });
+        var rawKey = ImportRawSessionCacheKey(customerId, body.SessionId);
+        if (!_importSessionCache.TryGetValue(rawKey, out ImportRawSessionState? raw) || raw == null)
+            return BadRequest(new { message = "Import session expired or invalid. Upload the file again." });
+
+        var merged = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var h in BookingImportService.BookingImportFieldNames)
+            merged[h] = null;
+        if (body.ColumnMap != null)
+        {
+            foreach (var kv in body.ColumnMap)
+            {
+                if (merged.ContainsKey(kv.Key))
+                    merged[kv.Key] = string.IsNullOrWhiteSpace(kv.Value) ? null : kv.Value;
+            }
+        }
+
+        var parseError = _bookingImportService.ParseFromMappedRows(raw.Rows, merged, raw.FileHeaders, out var rows);
+        if (parseError != null)
+            return BadRequest(new { message = parseError });
+
+        _importSessionCache.Remove(rawKey);
+        var importRows = rows.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
+        var parsedKey = ImportSessionCacheKey(customerId, body.SessionId);
+        _importSessionCache.Set(parsedKey, importRows, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
+        var completed = importRows.Count(r => r.IsComplete);
+        var drafts = importRows.Count - completed;
+        return Ok(new ImportPreviewResponseDto(body.SessionId, completed, drafts, raw.SkippedEmptyRows, importRows.Count));
+    }
+
     /// <summary>Parse upload and return counts; stores rows in server cache for <see cref="ImportConfirm"/>.</summary>
     [HttpPost("import/preview")]
     [RequestSizeLimit(25_000_000)]
@@ -346,6 +438,9 @@ public class PortalBookingsController : ControllerBase
 
     private static string ImportSessionCacheKey(string customerId, Guid sessionId) =>
         $"booking-import:{customerId}:{sessionId:N}";
+
+    private static string ImportRawSessionCacheKey(string customerId, Guid sessionId) =>
+        $"booking-import-raw:{customerId}:{sessionId:N}";
 
     /// <summary>Returns (CompanyId, _) for the current user's company. CompanyId is null if user has no company.</summary>
     private async Task<(Guid? CompanyId, IReadOnlySet<string>?)> GetCompanyIdAndAllowedSlotsAsync(CancellationToken cancellationToken)

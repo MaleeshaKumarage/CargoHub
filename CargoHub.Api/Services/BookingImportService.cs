@@ -8,12 +8,11 @@ using ClosedXML.Excel;
 namespace CargoHub.Api.Services;
 
 /// <summary>
-/// Imports bookings from CSV or Excel. Headers must match export format exactly.
-/// Rows with all required data → completed booking; any missing → draft.
+/// Imports bookings from CSV or Excel. Exact template match (after trim + BOM) skips column mapping.
 /// </summary>
 public sealed class BookingImportService
 {
-    /// <summary>Expected column names (case-sensitive). Must match export format.</summary>
+    /// <summary>Expected column names (case-sensitive). Must match export format when unmapped.</summary>
     private static readonly string[] ExpectedHeaders =
     {
         "CreatedAtUtc", "CustomerName", "Enabled", "FreightPayer", "GrossVolume", "GrossWeight", "Id",
@@ -23,6 +22,11 @@ public sealed class BookingImportService
         "ShipperAddress", "ShipperCity", "ShipperCountry", "ShipperEmail", "ShipperName", "ShipperPhone",
         "ShipperPostalCode", "ShipmentNumber", "WaybillNumber",
     };
+
+    /// <summary>Canonical booking/import field names (same order as export).</summary>
+    public static IReadOnlyList<string> BookingImportFieldNames => ExpectedHeaders;
+
+    private static readonly HashSet<string> ExpectedSet = new(ExpectedHeaders, StringComparer.Ordinal);
 
     /// <summary>Fields required for a row to be imported as completed (not draft).</summary>
     private static readonly HashSet<string> RequiredForComplete = new(StringComparer.Ordinal)
@@ -35,27 +39,80 @@ public sealed class BookingImportService
     };
 
     /// <summary>
-    /// Parse a file and return import rows. Validates headers match exactly.
+    /// Single pass: exact header match → parsed rows; otherwise raw rows + disambiguated file headers for mapping UI.
     /// </summary>
-    /// <param name="stream">File stream (CSV or Excel).</param>
-    /// <param name="fileName">Original filename (used to detect format).</param>
-    /// <param name="skippedEmptyRows">Rows with no cells filled (skipped).</param>
-    /// <returns>Error message if validation fails; null on success.</returns>
-    public string? Parse(Stream stream, string fileName, out List<ImportRow> rows, out int skippedEmptyRows)
+    public ImportAnalysisResult AnalyzeImport(Stream stream, string fileName)
     {
-        rows = new List<ImportRow>();
-        skippedEmptyRows = 0;
         var isExcel = fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                     fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
-
-        if (isExcel)
-            return ParseExcel(stream, out rows, ref skippedEmptyRows);
-        return ParseCsv(stream, out rows, ref skippedEmptyRows);
+                      fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
+        return isExcel ? AnalyzeExcel(stream) : AnalyzeCsv(stream);
     }
 
-    private string? ParseCsv(Stream stream, out List<ImportRow> rows, ref int skippedEmptyRows)
+    /// <summary>
+    /// Build <see cref="ImportRow"/> list from raw file rows using a map: canonical field → disambiguated file column (or null).
+    /// </summary>
+    public string? ParseFromMappedRows(
+        IReadOnlyList<Dictionary<string, string?>> rawRows,
+        IReadOnlyDictionary<string, string?> columnMap,
+        IReadOnlyList<string> allowedFileHeaders,
+        out List<ImportRow> rows)
     {
         rows = new List<ImportRow>();
+        var allowed = new HashSet<string>(allowedFileHeaders, StringComparer.Ordinal);
+        foreach (var (canonical, fileCol) in columnMap)
+        {
+            if (!ExpectedSet.Contains(canonical))
+                return $"Unknown booking field: '{canonical}'.";
+            if (!string.IsNullOrEmpty(fileCol) && !allowed.Contains(fileCol!))
+                return $"Mapped column '{fileCol}' is not in this file.";
+        }
+
+        foreach (var raw in rawRows)
+        {
+            var canonRow = new Dictionary<string, string?>(StringComparer.Ordinal);
+            foreach (var h in ExpectedHeaders)
+            {
+                if (!columnMap.TryGetValue(h, out var fileColumn) || string.IsNullOrEmpty(fileColumn))
+                {
+                    canonRow[h] = null;
+                    continue;
+                }
+
+                canonRow[h] = raw.TryGetValue(fileColumn!, out var v) ? v : null;
+            }
+
+            var (request, isComplete) = MapToRequest(canonRow);
+            rows.Add(new ImportRow(request, isComplete));
+        }
+
+        return null;
+    }
+
+    /// <summary>Parse when file headers match export (after normalization).</summary>
+    public string? Parse(Stream stream, string fileName, out List<ImportRow> rows, out int skippedEmptyRows)
+    {
+        var analysis = AnalyzeImport(stream, fileName);
+        if (analysis.Error != null)
+        {
+            rows = new List<ImportRow>();
+            skippedEmptyRows = 0;
+            return analysis.Error;
+        }
+
+        if (analysis.NeedsMapping)
+        {
+            rows = new List<ImportRow>();
+            skippedEmptyRows = 0;
+            return "File columns do not match the export template. Use column mapping in the portal or fix headers.";
+        }
+
+        rows = analysis.ParsedRows!;
+        skippedEmptyRows = analysis.SkippedEmptyRows;
+        return null;
+    }
+
+    private ImportAnalysisResult AnalyzeCsv(Stream stream)
+    {
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -65,81 +122,163 @@ public sealed class BookingImportService
             BadDataFound = null,
         };
         using var csv = new CsvReader(reader, config);
-        csv.Read();
+        if (!csv.Read())
+            return ImportAnalysisResult.Fail("File has no data.");
         csv.ReadHeader();
-        var headers = csv.HeaderRecord;
-        if (headers == null || headers.Length == 0)
-            return "File has no header row.";
-        var validationError = ValidateHeaders(headers);
-        if (validationError != null)
-            return validationError;
-        var headerIndex = BuildHeaderIndex(headers);
+        var rawHeaders = csv.HeaderRecord;
+        if (rawHeaders == null || rawHeaders.Length == 0)
+            return ImportAnalysisResult.Fail("File has no header row.");
+
+        var normalized = NormalizeHeaderRow(rawHeaders);
+        var disambiguated = BuildDisambiguatedLabels(normalized);
+        var headerIndex = BuildHeaderIndex(disambiguated);
+        var exact = HeadersMatchExport(normalized);
+
+        var parsedRows = new List<ImportRow>();
+        var rawRows = new List<Dictionary<string, string?>>();
+        var skipped = 0;
         while (csv.Read())
         {
             var row = ReadCsvRow(csv, headerIndex);
             if (row == null)
             {
-                skippedEmptyRows++;
+                skipped++;
                 continue;
             }
-            var (request, isComplete) = MapToRequest(row);
-            rows.Add(new ImportRow(request, isComplete));
+
+            if (exact)
+            {
+                var (req, complete) = MapToRequest(row);
+                parsedRows.Add(new ImportRow(req, complete));
+            }
+            else
+                rawRows.Add(row);
         }
-        return null;
+
+        return exact
+            ? ImportAnalysisResult.Parsed(parsedRows, skipped)
+            : ImportAnalysisResult.Raw(disambiguated.ToList(), rawRows, skipped);
     }
 
-    private string? ParseExcel(Stream stream, out List<ImportRow> rows, ref int skippedEmptyRows)
+    private static ImportAnalysisResult AnalyzeExcel(Stream stream)
     {
-        rows = new List<ImportRow>();
         using var workbook = new XLWorkbook(stream);
         var worksheet = workbook.Worksheets.FirstOrDefault(w => w.Name == "Bookings") ?? workbook.Worksheet(1);
         var firstRow = worksheet.FirstRowUsed();
         if (firstRow == null)
-            return "File has no data.";
-        var headers = new List<string>();
+            return ImportAnalysisResult.Fail("File has no data.");
+
+        var rawList = new List<string>();
         var col = 1;
         while (true)
         {
             var cell = worksheet.Cell(firstRow.RowNumber(), col);
             var val = cell.GetString().Trim();
             if (string.IsNullOrEmpty(val)) break;
-            headers.Add(val);
+            rawList.Add(val);
             col++;
         }
-        if (headers.Count == 0)
-            return "File has no header row.";
-        var validationError = ValidateHeaders(headers.ToArray());
-        if (validationError != null)
-            return validationError;
-        var headerIndex = BuildHeaderIndex(headers.ToArray());
+
+        if (rawList.Count == 0)
+            return ImportAnalysisResult.Fail("File has no header row.");
+
+        var normalized = NormalizeHeaderRow(rawList.ToArray());
+        var disambiguated = BuildDisambiguatedLabels(normalized);
+        var headerIndex = BuildHeaderIndex(disambiguated);
         var dataStartRow = firstRow.RowNumber() + 1;
         var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? dataStartRow - 1;
-        for (var r = dataStartRow; r <= lastRow; r++)
+
+        if (HeadersMatchExport(normalized))
         {
-            var row = ReadExcelRow(worksheet, r, headerIndex);
-            if (row == null)
+            var rows = new List<ImportRow>();
+            var skipped = 0;
+            for (var r = dataStartRow; r <= lastRow; r++)
             {
-                skippedEmptyRows++;
-                continue;
+                var row = ReadExcelRow(worksheet, r, headerIndex);
+                if (row == null)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var (req, complete) = MapToRequest(row);
+                rows.Add(new ImportRow(req, complete));
             }
-            var (request, isComplete) = MapToRequest(row);
-            rows.Add(new ImportRow(request, isComplete));
+
+            return ImportAnalysisResult.Parsed(rows, skipped);
         }
-        return null;
+
+        {
+            var rawRows = new List<Dictionary<string, string?>>();
+            var skipped = 0;
+            for (var r = dataStartRow; r <= lastRow; r++)
+            {
+                var row = ReadExcelRow(worksheet, r, headerIndex);
+                if (row == null)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                rawRows.Add(row);
+            }
+
+            return ImportAnalysisResult.Raw(disambiguated.ToList(), rawRows, skipped);
+        }
     }
 
-    private static string? ValidateHeaders(string[] headers)
+    private static string[] NormalizeHeaderRow(string[] headers)
     {
-        var expected = new HashSet<string>(ExpectedHeaders, StringComparer.Ordinal);
-        var actual = new HashSet<string>(headers, StringComparer.Ordinal);
-        if (actual.Count != expected.Count)
-            return $"Header column count mismatch. Expected {expected.Count} columns: {string.Join(", ", ExpectedHeaders)}.";
-        foreach (var h in expected)
+        var result = new string[headers.Length];
+        for (var i = 0; i < headers.Length; i++)
+        {
+            var s = headers[i]?.Trim() ?? "";
+            if (i == 0)
+                s = s.TrimStart('\uFEFF');
+            result[i] = s;
+        }
+
+        return result;
+    }
+
+    private static bool HeadersMatchExport(string[] normalizedHeaders)
+    {
+        if (normalizedHeaders.Length != ExpectedHeaders.Length)
+            return false;
+        var actual = new HashSet<string>(normalizedHeaders, StringComparer.Ordinal);
+        if (actual.Count != ExpectedHeaders.Length)
+            return false;
+        foreach (var h in ExpectedHeaders)
         {
             if (!actual.Contains(h))
-                return $"Missing column: '{h}'. Headers must match export format exactly (case-sensitive).";
+                return false;
         }
-        return null;
+
+        return true;
+    }
+
+    /// <summary>First occurrence keeps base name; duplicates become "Name (2)", "Name (3)", …</summary>
+    private static string[] BuildDisambiguatedLabels(string[] normalizedHeaders)
+    {
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        var result = new string[normalizedHeaders.Length];
+        for (var i = 0; i < normalizedHeaders.Length; i++)
+        {
+            var h = normalizedHeaders[i];
+            if (!seen.TryGetValue(h, out var n))
+            {
+                seen[h] = 1;
+                result[i] = h;
+            }
+            else
+            {
+                n++;
+                seen[h] = n;
+                result[i] = $"{h} ({n})";
+            }
+        }
+
+        return result;
     }
 
     private static Dictionary<string, int> BuildHeaderIndex(string[] headers)
@@ -160,6 +299,7 @@ public sealed class BookingImportService
             row[name] = string.IsNullOrEmpty(val) ? null : val;
             if (!string.IsNullOrEmpty(val)) hasAny = true;
         }
+
         return hasAny ? row : null;
     }
 
@@ -173,6 +313,7 @@ public sealed class BookingImportService
             row[name] = string.IsNullOrEmpty(val) ? null : val;
             if (!string.IsNullOrEmpty(val)) hasAny = true;
         }
+
         return hasAny ? row : null;
     }
 
@@ -272,8 +413,37 @@ public sealed class BookingImportService
                 hgt = parts[2] == "—" ? null : parts[2];
             }
         }
+
         return (Get("PackageWeight"), Get("PackageVolume"), Get("PackageDescription"), (len, wid, hgt));
     }
 
     public sealed record ImportRow(CreateBookingRequest Request, bool IsComplete);
+}
+
+/// <summary>Outcome of <see cref="BookingImportService.AnalyzeImport"/>.</summary>
+public sealed class ImportAnalysisResult
+{
+    public string? Error { get; private init; }
+    public bool NeedsMapping { get; private init; }
+    public List<BookingImportService.ImportRow>? ParsedRows { get; private init; }
+    public List<Dictionary<string, string?>>? RawRows { get; private init; }
+    public List<string>? FileHeaders { get; private init; }
+    public int SkippedEmptyRows { get; private init; }
+
+    public static ImportAnalysisResult Fail(string message) => new() { Error = message };
+
+    public static ImportAnalysisResult Parsed(List<BookingImportService.ImportRow> rows, int skipped) => new()
+    {
+        NeedsMapping = false,
+        ParsedRows = rows,
+        SkippedEmptyRows = skipped,
+    };
+
+    public static ImportAnalysisResult Raw(List<string> fileHeaders, List<Dictionary<string, string?>> rawRows, int skipped) => new()
+    {
+        NeedsMapping = true,
+        FileHeaders = fileHeaders,
+        RawRows = rawRows,
+        SkippedEmptyRows = skipped,
+    };
 }

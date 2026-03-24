@@ -698,6 +698,79 @@ export type BookingImportPreview = {
   totalDataRows: number;
 };
 
+export type BookingImportAnalyze = {
+  needsMapping: boolean;
+  sessionId: string;
+  completedCount: number;
+  draftCount: number;
+  skippedEmptyRows: number;
+  totalDataRows: number;
+  fileHeaders: string[];
+  bookingFields: string[];
+};
+
+/** Analyze file: exact template → counts + session; otherwise session + headers for column mapping. */
+export async function bookingsImportAnalyze(token: string, file: File): Promise<BookingImportAnalyze> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${portalBase()}/bookings/import/analyze`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.title === "string" && data.title) ||
+      "Import analyze failed";
+    throw new Error(msg);
+  }
+  return {
+    needsMapping: Boolean(data.needsMapping),
+    sessionId: String(data.sessionId ?? ""),
+    completedCount: Number(data.completedCount ?? 0),
+    draftCount: Number(data.draftCount ?? 0),
+    skippedEmptyRows: Number(data.skippedEmptyRows ?? 0),
+    totalDataRows: Number(data.totalDataRows ?? 0),
+    fileHeaders: Array.isArray(data.fileHeaders) ? data.fileHeaders.map((x) => String(x)) : [],
+    bookingFields: Array.isArray(data.bookingFields) ? data.bookingFields.map((x) => String(x)) : [],
+  };
+}
+
+/** Apply column mapping after analyze (needsMapping); returns same shape as preview for confirm. */
+export async function bookingsImportApplyMapping(
+  token: string,
+  body: { sessionId: string; columnMap: Record<string, string | null> },
+): Promise<BookingImportPreview> {
+  const res = await fetch(`${portalBase()}/bookings/import/apply-mapping`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId: body.sessionId,
+      columnMap: body.columnMap,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.title === "string" && data.title) ||
+      "Import mapping failed";
+    throw new Error(msg);
+  }
+  return {
+    sessionId: String(data.sessionId ?? ""),
+    completedCount: Number(data.completedCount ?? 0),
+    draftCount: Number(data.draftCount ?? 0),
+    skippedEmptyRows: Number(data.skippedEmptyRows ?? 0),
+    totalDataRows: Number(data.totalDataRows ?? 0),
+  };
+}
+
 /** Parse file and return counts; server holds rows until confirm. */
 export async function bookingsImportPreview(token: string, file: File): Promise<BookingImportPreview> {
   const form = new FormData();

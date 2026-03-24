@@ -24,7 +24,8 @@ vi.mock("@/lib/api", () => ({
   bookingList: vi.fn(),
   draftList: vi.fn(),
   bookingsExportDownload: vi.fn(),
-  bookingsImportPreview: vi.fn(),
+  bookingsImportAnalyze: vi.fn(),
+  bookingsImportApplyMapping: vi.fn(),
   bookingsImportConfirm: vi.fn(),
   bookingsWaybillsBulkDownload: vi.fn(),
 }));
