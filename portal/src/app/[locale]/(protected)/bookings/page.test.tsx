@@ -27,11 +27,17 @@ vi.mock("@/lib/api", () => ({
   bookingsImportAnalyze: vi.fn(),
   bookingsImportApplyMapping: vi.fn(),
   bookingsImportConfirm: vi.fn(),
+  bookingsImportPreview: vi.fn(),
   bookingsWaybillsBulkDownload: vi.fn(),
 }));
 
 const bookingList = await import("@/lib/api").then((m) => m.bookingList);
 const draftList = await import("@/lib/api").then((m) => m.draftList);
+const bookingsImportPreview = await import("@/lib/api").then((m) => m.bookingsImportPreview);
+const bookingsImportConfirm = await import("@/lib/api").then((m) => m.bookingsImportConfirm);
+const bookingsWaybillsBulkDownload = await import("@/lib/api").then(
+  (m) => m.bookingsWaybillsBulkDownload,
+);
 
 describe("BookingsPage", () => {
   beforeEach(() => {
@@ -222,5 +228,122 @@ describe("BookingsPage", () => {
     ]);
     render(<BookingsPage />);
     await expect(screen.findByText("—")).resolves.toBeInTheDocument();
+  });
+
+  it("import with zero data rows sets importNoDataRows error", async () => {
+    vi.mocked(bookingsImportPreview).mockResolvedValue({
+      sessionId: "s0",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv", { type: "text/csv" })] } });
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("importNoDataRows");
+    });
+  });
+
+  it("import preview failure shows error on alert", async () => {
+    vi.mocked(bookingsImportPreview).mockRejectedValue(new Error("preview failed"));
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("preview failed");
+    });
+  });
+
+  it("import opens dialog and can confirm completed rows", async () => {
+    vi.mocked(bookingsImportPreview).mockResolvedValue({
+      sessionId: "s1",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+    });
+    vi.mocked(bookingsImportConfirm).mockResolvedValue({
+      createdCount: 1,
+      draftCount: 0,
+      errors: [],
+      createdBookingIds: ["bid1"],
+      draftBookingIds: [],
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await expect(screen.findByRole("dialog")).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /^importRun$/i }));
+    await vi.waitFor(() => {
+      expect(bookingsImportConfirm).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          sessionId: "s1",
+          importCompleted: true,
+          importDrafts: false,
+        }),
+      );
+    });
+    await expect(screen.findByText("importSummaryLine")).resolves.toBeInTheDocument();
+  });
+
+  it("import summary shows errors list and bulk waybill action", async () => {
+    vi.mocked(bookingsImportPreview).mockResolvedValue({
+      sessionId: "s2",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+    });
+    const errors = Array.from({ length: 9 }, (_, i) => `err-${i}`);
+    vi.mocked(bookingsImportConfirm).mockResolvedValue({
+      createdCount: 1,
+      draftCount: 0,
+      errors,
+      createdBookingIds: ["b1"],
+      draftBookingIds: [],
+    });
+    vi.mocked(bookingsWaybillsBulkDownload).mockResolvedValue(undefined);
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /^importRun$/i }));
+    await expect(screen.findByText("importErrors")).resolves.toBeInTheDocument();
+    expect(screen.getByText("err-0")).toBeInTheDocument();
+    expect(screen.getByText(/\(\+1 more\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^importDownloadWaybills$/i }));
+    await vi.waitFor(() => {
+      expect(bookingsWaybillsBulkDownload).toHaveBeenCalledWith("token", ["b1"]);
+    });
+  });
+
+  it("import confirm failure shows alert", async () => {
+    vi.mocked(bookingsImportPreview).mockResolvedValue({
+      sessionId: "s3",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+    });
+    vi.mocked(bookingsImportConfirm).mockRejectedValue(new Error("confirm failed"));
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /^importRun$/i }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("confirm failed");
+    });
   });
 });
