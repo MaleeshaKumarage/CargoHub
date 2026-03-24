@@ -27,13 +27,12 @@ vi.mock("@/lib/api", () => ({
   bookingsImportAnalyze: vi.fn(),
   bookingsImportApplyMapping: vi.fn(),
   bookingsImportConfirm: vi.fn(),
-  bookingsImportPreview: vi.fn(),
   bookingsWaybillsBulkDownload: vi.fn(),
 }));
 
 const bookingList = await import("@/lib/api").then((m) => m.bookingList);
 const draftList = await import("@/lib/api").then((m) => m.draftList);
-const bookingsImportPreview = await import("@/lib/api").then((m) => m.bookingsImportPreview);
+const bookingsImportAnalyze = await import("@/lib/api").then((m) => m.bookingsImportAnalyze);
 const bookingsImportConfirm = await import("@/lib/api").then((m) => m.bookingsImportConfirm);
 const bookingsWaybillsBulkDownload = await import("@/lib/api").then(
   (m) => m.bookingsWaybillsBulkDownload,
@@ -231,12 +230,15 @@ describe("BookingsPage", () => {
   });
 
   it("import with zero data rows sets importNoDataRows error", async () => {
-    vi.mocked(bookingsImportPreview).mockResolvedValue({
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
       sessionId: "s0",
       completedCount: 0,
       draftCount: 0,
       skippedEmptyRows: 0,
       totalDataRows: 0,
+      fileHeaders: [],
+      bookingFields: [],
     });
     render(<BookingsPage />);
     fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
@@ -248,7 +250,7 @@ describe("BookingsPage", () => {
   });
 
   it("import preview failure shows error on alert", async () => {
-    vi.mocked(bookingsImportPreview).mockRejectedValue(new Error("preview failed"));
+    vi.mocked(bookingsImportAnalyze).mockRejectedValue(new Error("preview failed"));
     render(<BookingsPage />);
     fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -259,12 +261,15 @@ describe("BookingsPage", () => {
   });
 
   it("import opens dialog and can confirm completed rows", async () => {
-    vi.mocked(bookingsImportPreview).mockResolvedValue({
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
       sessionId: "s1",
       completedCount: 1,
       draftCount: 0,
       skippedEmptyRows: 0,
       totalDataRows: 1,
+      fileHeaders: [],
+      bookingFields: [],
     });
     vi.mocked(bookingsImportConfirm).mockResolvedValue({
       createdCount: 1,
@@ -294,12 +299,15 @@ describe("BookingsPage", () => {
   });
 
   it("import summary shows errors list and bulk waybill action", async () => {
-    vi.mocked(bookingsImportPreview).mockResolvedValue({
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
       sessionId: "s2",
       completedCount: 1,
       draftCount: 0,
       skippedEmptyRows: 0,
       totalDataRows: 1,
+      fileHeaders: [],
+      bookingFields: [],
     });
     const errors = Array.from({ length: 9 }, (_, i) => `err-${i}`);
     vi.mocked(bookingsImportConfirm).mockResolvedValue({
@@ -327,12 +335,15 @@ describe("BookingsPage", () => {
   });
 
   it("import confirm failure shows alert", async () => {
-    vi.mocked(bookingsImportPreview).mockResolvedValue({
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
       sessionId: "s3",
       completedCount: 1,
       draftCount: 0,
       skippedEmptyRows: 0,
       totalDataRows: 1,
+      fileHeaders: [],
+      bookingFields: [],
     });
     vi.mocked(bookingsImportConfirm).mockRejectedValue(new Error("confirm failed"));
     render(<BookingsPage />);

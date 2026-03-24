@@ -11,7 +11,6 @@ import {
   bookingsImportAnalyze,
   bookingsImportApplyMapping,
   bookingsImportConfirm,
-  bookingsImportPreview,
   bookingsWaybillsBulkDownload,
   draftList,
   type BookingImportPreview,
@@ -112,16 +111,34 @@ export default function BookingsPage() {
     setImportLoading(true);
     setError(null);
     try {
-      const p = await bookingsImportPreview(token, file);
-      if (p.totalDataRows === 0) {
-        setError(t("importNoDataRows"));
-        return;
+      const a = await bookingsImportAnalyze(token, file);
+      setImportResult(null);
+      if (!a.needsMapping) {
+        if (a.totalDataRows === 0) {
+          setError(t("importNoDataRows"));
+          return;
+        }
+        setPreview({
+          sessionId: a.sessionId,
+          completedCount: a.completedCount,
+          draftCount: a.draftCount,
+          skippedEmptyRows: a.skippedEmptyRows,
+          totalDataRows: a.totalDataRows,
+        });
+        setImportStep("preview");
+      } else {
+        setMappingSessionId(a.sessionId);
+        setMappingFileHeaders(a.fileHeaders);
+        setMappingBookingFields(a.bookingFields);
+        const initial: Record<string, string> = {};
+        for (const f of a.bookingFields) {
+          initial[f] = a.fileHeaders.includes(f) ? f : "";
+        }
+        setColumnSelections(initial);
+        setImportStep("mapping");
       }
-      setPreview(p);
       setConfirmCompleted(false);
       setConfirmDrafts(false);
-      setImportResult(null);
-      setImportStep("preview");
       setImportDialogOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
