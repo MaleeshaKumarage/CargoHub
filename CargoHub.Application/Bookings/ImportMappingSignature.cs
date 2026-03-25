@@ -8,7 +8,10 @@ public static class ImportMappingSignature
     {
         if (string.IsNullOrWhiteSpace(fileName))
             return string.Empty;
-        var name = Path.GetFileName(fileName.Trim());
+        // Normalize '\' so basename extraction matches Windows-style paths on Linux/macOS CI and servers.
+        var trimmed = fileName.Trim();
+        var normalized = trimmed.Replace('\\', '/');
+        var name = Path.GetFileName(normalized);
         return name.ToLowerInvariant();
     }
 
