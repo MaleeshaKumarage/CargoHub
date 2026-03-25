@@ -42,8 +42,8 @@ flowchart LR
 The Mac workflow is **one job** (must stay on the same machine as Docker). Steps are grouped in the YAML as:
 
 1. **Trigger & repo** — context, checkout at build SHA  
-2. **Registry & host prep** — compose env, Docker Hub login, stop old stack / free ports  
-3. **Image & stack** — `compose pull` (retry), `compose up`  
+2. **Registry & host prep** — compose env, Docker Hub login  
+3. **Image & stack** — `compose pull` (retry) **while the old stack may still be running**, then stop / free ports, then `compose up` (minimizes downtime vs pull-after-down)  
 4. **Smoke checks** — API :8080, portal :3000, nginx :8888  
 5. **Report** — job summary, optional ngrok public URLs  
 
