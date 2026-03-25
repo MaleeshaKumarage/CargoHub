@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,12 +11,7 @@ namespace CargoHub.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Theme",
-                schema: "auth",
-                table: "AspNetUsers",
-                type: "text",
-                nullable: true);
+            // Theme is added by migration 20260317053643_AddUserThemePreference; do not duplicate (breaks deploy on DBs that already have the column).
 
             migrationBuilder.CreateTable(
                 name: "BookingImportFileMappings",
@@ -57,11 +52,6 @@ namespace CargoHub.Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "BookingImportFileMappings",
                 schema: "companies");
-
-            migrationBuilder.DropColumn(
-                name: "Theme",
-                schema: "auth",
-                table: "AspNetUsers");
         }
     }
 }
