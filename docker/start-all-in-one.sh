@@ -34,8 +34,20 @@ export Jwt__SigningKey="${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}"
 cd /app/api && dotnet CargoHub.Api.dll &
 APIPID=$!
 
-# Give API time to start and run migrations
-sleep 5
+echo "Waiting for API on :8080 (migrations may run on first start)..."
+i=0
+while [ "$i" -lt 180 ]; do
+  if curl -sfS "http://127.0.0.1:8080/api/v1/health_" >/dev/null 2>&1; then
+    echo "API is up."
+    break
+  fi
+  i=$((i + 1))
+  sleep 1
+done
+if [ "$i" -ge 180 ]; then
+  echo "ERROR: API did not become ready on :8080 within 180s"
+  exit 1
+fi
 
 # Next.js on :3000 (nginx will expose :8888 to the internet via ngrok)
 cd /app/portal
@@ -46,7 +58,18 @@ npm run start &
 NEXT_PID=$!
 
 echo "Waiting for Next.js on :3000..."
-sleep 12
+i=0
+while [ "$i" -lt 120 ]; do
+  if curl -sfS -o /dev/null "http://127.0.0.1:3000/" 2>/dev/null; then
+    echo "Next.js is up."
+    break
+  fi
+  i=$((i + 1))
+  sleep 1
+done
+if [ "$i" -ge 120 ]; then
+  echo "WARNING: Next.js did not respond on :3000 within 120s; continuing to start nginx"
+fi
 
 # Reverse proxy: one public port — /api -> ASP.NET :8080, / -> Next :3000
 if nginx -t 2>/dev/null; then
