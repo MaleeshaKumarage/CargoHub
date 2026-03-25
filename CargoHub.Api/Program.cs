@@ -99,6 +99,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IImportFileMappingRepository, ImportFileMappingRepository>();
 builder.Services.AddCourierClients(builder.Configuration);
 builder.Services.AddSingleton<IPasswordResetTokenStore, PasswordResetTokenStore>();
 builder.Services.AddSingleton<IVerificationCodeStore, VerificationCodeStore>();

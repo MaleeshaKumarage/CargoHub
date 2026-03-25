@@ -33,6 +33,7 @@ vi.mock("@/lib/api", () => ({
 const bookingList = await import("@/lib/api").then((m) => m.bookingList);
 const draftList = await import("@/lib/api").then((m) => m.draftList);
 const bookingsImportAnalyze = await import("@/lib/api").then((m) => m.bookingsImportAnalyze);
+const bookingsImportApplyMapping = await import("@/lib/api").then((m) => m.bookingsImportApplyMapping);
 const bookingsImportConfirm = await import("@/lib/api").then((m) => m.bookingsImportConfirm);
 const bookingsWaybillsBulkDownload = await import("@/lib/api").then(
   (m) => m.bookingsWaybillsBulkDownload,
@@ -239,6 +240,8 @@ describe("BookingsPage", () => {
       totalDataRows: 0,
       fileHeaders: [],
       bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
     });
     render(<BookingsPage />);
     fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
@@ -270,6 +273,8 @@ describe("BookingsPage", () => {
       totalDataRows: 1,
       fileHeaders: [],
       bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
     });
     vi.mocked(bookingsImportConfirm).mockResolvedValue({
       createdCount: 1,
@@ -308,6 +313,8 @@ describe("BookingsPage", () => {
       totalDataRows: 1,
       fileHeaders: [],
       bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
     });
     const errors = Array.from({ length: 9 }, (_, i) => `err-${i}`);
     vi.mocked(bookingsImportConfirm).mockResolvedValue({
@@ -344,6 +351,8 @@ describe("BookingsPage", () => {
       totalDataRows: 1,
       fileHeaders: [],
       bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
     });
     vi.mocked(bookingsImportConfirm).mockRejectedValue(new Error("confirm failed"));
     render(<BookingsPage />);
@@ -356,5 +365,44 @@ describe("BookingsPage", () => {
     await vi.waitFor(() => {
       expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("confirm failed");
     });
+  });
+
+  it("import with saved mapping shows choice and can apply saved map", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: true,
+      sessionId: "sm1",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+      fileHeaders: ["Ref"],
+      bookingFields: ["ReferenceNumber"],
+      hasSavedMapping: true,
+      savedColumnMap: { ReferenceNumber: "Ref" },
+    });
+    vi.mocked(bookingsImportApplyMapping).mockResolvedValue({
+      sessionId: "sm1",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await expect(screen.findByText("importSavedMappingTitle")).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^importSavedMappingUseSaved$/i }));
+    await vi.waitFor(() => {
+      expect(bookingsImportApplyMapping).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          sessionId: "sm1",
+          saveMappingForCompany: false,
+          columnMap: expect.objectContaining({ ReferenceNumber: "Ref" }),
+        }),
+      );
+    });
+    await expect(screen.findByText("importCountCompleted")).resolves.toBeInTheDocument();
   });
 });

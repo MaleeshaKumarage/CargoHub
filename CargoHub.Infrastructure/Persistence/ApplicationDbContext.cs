@@ -28,6 +28,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     /// </summary>
     public DbSet<Company> Companies => Set<Company>();
 
+    /// <summary>Saved booking import column maps per company and file layout.</summary>
+    public DbSet<BookingImportFileMapping> BookingImportFileMappings => Set<BookingImportFileMapping>();
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
@@ -174,6 +177,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 agreement.HasKey("Id");
             });
 
+        });
+
+        builder.Entity<BookingImportFileMapping>(entity =>
+        {
+            entity.ToTable("BookingImportFileMappings", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FileNameKey).IsRequired().HasMaxLength(512);
+            entity.Property(x => x.HeaderSignature).IsRequired().HasMaxLength(8000);
+            entity.Property(x => x.ColumnMapJson).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => new { x.CompanyId, x.FileNameKey, x.HeaderSignature })
+                .IsUnique()
+                .HasDatabaseName("IX_BookingImportFileMappings_Company_File_Headers");
+            entity.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

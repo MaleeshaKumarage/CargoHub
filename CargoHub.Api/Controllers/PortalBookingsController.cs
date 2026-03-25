@@ -34,6 +34,7 @@ public class PortalBookingsController : ControllerBase
     private readonly WaybillPdfGenerator _waybillPdfGenerator;
     private readonly BookingImportService _bookingImportService;
     private readonly BookingExportService _bookingExportService;
+    private readonly IImportFileMappingRepository _importFileMappingRepository;
     private readonly IMemoryCache _importSessionCache;
 
     private const int BulkWaybillMaxIds = 50;
@@ -48,6 +49,7 @@ public class PortalBookingsController : ControllerBase
         WaybillPdfGenerator waybillPdfGenerator,
         BookingImportService bookingImportService,
         BookingExportService bookingExportService,
+        IImportFileMappingRepository importFileMappingRepository,
         IMemoryCache memoryCache)
     {
         _mediator = mediator;
@@ -58,6 +60,7 @@ public class PortalBookingsController : ControllerBase
         _waybillPdfGenerator = waybillPdfGenerator;
         _bookingImportService = bookingImportService;
         _bookingExportService = bookingExportService;
+        _importFileMappingRepository = importFileMappingRepository;
         _importSessionCache = memoryCache;
     }
 
@@ -302,12 +305,25 @@ public class PortalBookingsController : ControllerBase
         if (analysis.RawRows!.Count == 0)
             return BadRequest(new { message = "No data rows in file." });
 
+        var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var fileNameKey = ImportMappingSignature.NormalizeFileNameKey(file.FileName);
+        var headerSignature = ImportMappingSignature.BuildHeaderSignature(analysis.FileHeaders!);
+        Dictionary<string, string?>? savedColumnMap = null;
+        if (companyId is { } cid)
+        {
+            var saved = await _importFileMappingRepository.GetColumnMapAsync(cid, fileNameKey, headerSignature, HttpContext.RequestAborted);
+            if (saved is { Count: > 0 })
+                savedColumnMap = new Dictionary<string, string?>(saved, StringComparer.Ordinal);
+        }
+
         var rawKey = ImportRawSessionCacheKey(customerId, sessionId);
         var state = new ImportRawSessionState
         {
             Rows = analysis.RawRows,
             FileHeaders = analysis.FileHeaders!,
             SkippedEmptyRows = analysis.SkippedEmptyRows,
+            FileNameKey = fileNameKey,
+            HeaderSignature = headerSignature,
         };
         _importSessionCache.Set(rawKey, state, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
         return Ok(new ImportAnalyzeResponseDto
@@ -316,12 +332,14 @@ public class PortalBookingsController : ControllerBase
             SessionId = sessionId,
             FileHeaders = analysis.FileHeaders,
             BookingFields = BookingImportService.BookingImportFieldNames.ToList(),
+            HasSavedMapping = savedColumnMap is { Count: > 0 },
+            SavedColumnMap = savedColumnMap,
         });
     }
 
     /// <summary>Apply column mapping for a raw import session; returns the same shape as import/preview for confirm.</summary>
     [HttpPost("import/apply-mapping")]
-    public ActionResult<ImportPreviewResponseDto> ImportApplyMapping([FromBody] ImportApplyMappingRequestDto? body)
+    public async Task<ActionResult<ImportPreviewResponseDto>> ImportApplyMapping([FromBody] ImportApplyMappingRequestDto? body)
     {
         var customerId = CustomerId;
         if (string.IsNullOrEmpty(customerId))
@@ -354,6 +372,23 @@ public class PortalBookingsController : ControllerBase
         _importSessionCache.Set(parsedKey, importRows, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ImportSessionTtl });
         var completed = importRows.Count(r => r.IsComplete);
         var drafts = importRows.Count - completed;
+
+        if (body.SaveMappingForCompany)
+        {
+            var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+            if (companyId is { } saveCid
+                && !string.IsNullOrEmpty(raw.FileNameKey)
+                && !string.IsNullOrEmpty(raw.HeaderSignature))
+            {
+                await _importFileMappingRepository.UpsertAsync(
+                    saveCid,
+                    raw.FileNameKey,
+                    raw.HeaderSignature,
+                    merged,
+                    HttpContext.RequestAborted);
+            }
+        }
+
         return Ok(new ImportPreviewResponseDto(body.SessionId, completed, drafts, raw.SkippedEmptyRows, importRows.Count));
     }
 
