@@ -707,6 +707,8 @@ export type BookingImportAnalyze = {
   totalDataRows: number;
   fileHeaders: string[];
   bookingFields: string[];
+  hasSavedMapping: boolean;
+  savedColumnMap: Record<string, string | null> | null;
 };
 
 /** Analyze file: exact template → counts + session; otherwise session + headers for column mapping. */
@@ -726,6 +728,16 @@ export async function bookingsImportAnalyze(token: string, file: File): Promise<
       "Import analyze failed";
     throw new Error(msg);
   }
+  let savedColumnMap: Record<string, string | null> | null = null;
+  const rawSaved = data.savedColumnMap;
+  if (rawSaved && typeof rawSaved === "object" && !Array.isArray(rawSaved)) {
+    savedColumnMap = {};
+    for (const [k, v] of Object.entries(rawSaved as Record<string, unknown>)) {
+      if (v === null || v === undefined || v === "") savedColumnMap[k] = null;
+      else savedColumnMap[k] = String(v);
+    }
+  }
+
   return {
     needsMapping: Boolean(data.needsMapping),
     sessionId: String(data.sessionId ?? ""),
@@ -735,13 +747,19 @@ export async function bookingsImportAnalyze(token: string, file: File): Promise<
     totalDataRows: Number(data.totalDataRows ?? 0),
     fileHeaders: Array.isArray(data.fileHeaders) ? data.fileHeaders.map((x) => String(x)) : [],
     bookingFields: Array.isArray(data.bookingFields) ? data.bookingFields.map((x) => String(x)) : [],
+    hasSavedMapping: Boolean(data.hasSavedMapping),
+    savedColumnMap,
   };
 }
 
 /** Apply column mapping after analyze (needsMapping); returns same shape as preview for confirm. */
 export async function bookingsImportApplyMapping(
   token: string,
-  body: { sessionId: string; columnMap: Record<string, string | null> },
+  body: {
+    sessionId: string;
+    columnMap: Record<string, string | null>;
+    saveMappingForCompany?: boolean;
+  },
 ): Promise<BookingImportPreview> {
   const res = await fetch(`${portalBase()}/bookings/import/apply-mapping`, {
     method: "POST",
@@ -752,6 +770,7 @@ export async function bookingsImportApplyMapping(
     body: JSON.stringify({
       sessionId: body.sessionId,
       columnMap: body.columnMap,
+      saveMappingForCompany: Boolean(body.saveMappingForCompany),
     }),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;

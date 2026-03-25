@@ -26,7 +26,22 @@ import { cn } from "@/lib/utils";
 
 type Tab = "completed" | "drafts";
 
-type ImportDialogStep = "mapping" | "preview" | "summary";
+type ImportDialogStep = "savedMappingChoice" | "mapping" | "preview" | "summary";
+
+function buildInitialColumnSelections(
+  bookingFields: string[],
+  fileHeaders: string[],
+  saved?: Record<string, string | null> | null,
+): Record<string, string> {
+  const initial: Record<string, string> = {};
+  for (const f of bookingFields) {
+    const s = saved?.[f];
+    if (s && fileHeaders.includes(s)) initial[f] = s;
+    else if (fileHeaders.includes(f)) initial[f] = f;
+    else initial[f] = "";
+  }
+  return initial;
+}
 
 export default function BookingsPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
@@ -46,6 +61,8 @@ export default function BookingsPage() {
   const [mappingFileHeaders, setMappingFileHeaders] = useState<string[]>([]);
   const [mappingBookingFields, setMappingBookingFields] = useState<string[]>([]);
   const [columnSelections, setColumnSelections] = useState<Record<string, string>>({});
+  const [pendingSavedColumnMap, setPendingSavedColumnMap] = useState<Record<string, string | null> | null>(null);
+  const [saveMappingForCompany, setSaveMappingForCompany] = useState(false);
   const [preview, setPreview] = useState<BookingImportPreview | null>(null);
   const [confirmCompleted, setConfirmCompleted] = useState(false);
   const [confirmDrafts, setConfirmDrafts] = useState(false);
@@ -95,6 +112,8 @@ export default function BookingsPage() {
     setMappingFileHeaders([]);
     setMappingBookingFields([]);
     setColumnSelections({});
+    setPendingSavedColumnMap(null);
+    setSaveMappingForCompany(false);
     setConfirmCompleted(false);
     setConfirmDrafts(false);
   };
@@ -130,12 +149,19 @@ export default function BookingsPage() {
         setMappingSessionId(a.sessionId);
         setMappingFileHeaders(a.fileHeaders);
         setMappingBookingFields(a.bookingFields);
-        const initial: Record<string, string> = {};
-        for (const f of a.bookingFields) {
-          initial[f] = a.fileHeaders.includes(f) ? f : "";
+        setSaveMappingForCompany(false);
+        const hasSaved =
+          a.hasSavedMapping &&
+          a.savedColumnMap != null &&
+          Object.keys(a.savedColumnMap).length > 0;
+        if (hasSaved) {
+          setPendingSavedColumnMap(a.savedColumnMap);
+          setImportStep("savedMappingChoice");
+        } else {
+          setPendingSavedColumnMap(null);
+          setColumnSelections(buildInitialColumnSelections(a.bookingFields, a.fileHeaders, null));
+          setImportStep("mapping");
         }
-        setColumnSelections(initial);
-        setImportStep("mapping");
       }
       setConfirmCompleted(false);
       setConfirmDrafts(false);
@@ -151,6 +177,45 @@ export default function BookingsPage() {
     !!preview &&
     ((confirmCompleted && preview.completedCount > 0) || (confirmDrafts && preview.draftCount > 0));
 
+  const handleApplySavedColumnMapping = async () => {
+    if (!token || !mappingSessionId || !pendingSavedColumnMap) return;
+    setImportLoading(true);
+    setError(null);
+    try {
+      const p = await bookingsImportApplyMapping(token, {
+        sessionId: mappingSessionId,
+        columnMap: pendingSavedColumnMap,
+        saveMappingForCompany: false,
+      });
+      if (p.totalDataRows === 0) {
+        setError(t("importNoDataRows"));
+        return;
+      }
+      setPreview(p);
+      setPendingSavedColumnMap(null);
+      setMappingSessionId(null);
+      setMappingFileHeaders([]);
+      setMappingBookingFields([]);
+      setColumnSelections({});
+      setSaveMappingForCompany(false);
+      setConfirmCompleted(false);
+      setConfirmDrafts(false);
+      setImportStep("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleChooseAdjustSavedMapping = () => {
+    setColumnSelections(
+      buildInitialColumnSelections(mappingBookingFields, mappingFileHeaders, pendingSavedColumnMap),
+    );
+    setPendingSavedColumnMap(null);
+    setImportStep("mapping");
+  };
+
   const handleApplyColumnMapping = async () => {
     if (!token || !mappingSessionId) return;
     setImportLoading(true);
@@ -164,16 +229,19 @@ export default function BookingsPage() {
       const p = await bookingsImportApplyMapping(token, {
         sessionId: mappingSessionId,
         columnMap,
+        saveMappingForCompany: saveMappingForCompany,
       });
       if (p.totalDataRows === 0) {
         setError(t("importNoDataRows"));
         return;
       }
       setPreview(p);
+      setPendingSavedColumnMap(null);
       setMappingSessionId(null);
       setMappingFileHeaders([]);
       setMappingBookingFields([]);
       setColumnSelections({});
+      setSaveMappingForCompany(false);
       setConfirmCompleted(false);
       setConfirmDrafts(false);
       setImportStep("preview");
@@ -249,18 +317,41 @@ export default function BookingsPage() {
               <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight">
                 {importStep === "summary"
                   ? t("importSummaryTitle")
-                  : importStep === "mapping"
-                    ? t("importMappingTitle")
-                    : t("importDialogTitle")}
+                  : importStep === "savedMappingChoice"
+                    ? t("importSavedMappingTitle")
+                    : importStep === "mapping"
+                      ? t("importMappingTitle")
+                      : t("importDialogTitle")}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="text-sm text-muted-foreground">
                 {importStep === "summary"
                   ? t("importSummaryDescription")
-                  : importStep === "mapping"
-                    ? t("importMappingDescription")
-                    : t("importDialogDescription")}
+                  : importStep === "savedMappingChoice"
+                    ? t("importSavedMappingDescription")
+                    : importStep === "mapping"
+                      ? t("importMappingDescription")
+                      : t("importDialogDescription")}
               </DialogPrimitive.Description>
             </div>
+
+            {importStep === "savedMappingChoice" && mappingSessionId && pendingSavedColumnMap && (
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground">{t("importSavedMappingHint")}</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                  <DialogPrimitive.Close asChild>
+                    <Button type="button" variant="outline">
+                      {t("importCancel")}
+                    </Button>
+                  </DialogPrimitive.Close>
+                  <Button type="button" variant="outline" disabled={importLoading} onClick={handleChooseAdjustSavedMapping}>
+                    {t("importSavedMappingAdjust")}
+                  </Button>
+                  <Button type="button" disabled={importLoading} onClick={() => void handleApplySavedColumnMapping()}>
+                    {importLoading ? t("importing") : t("importSavedMappingUseSaved")}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {importStep === "mapping" && mappingSessionId && (
               <div className="space-y-3 text-sm">
@@ -288,6 +379,15 @@ export default function BookingsPage() {
                     </div>
                   ))}
                 </div>
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 shrink-0 rounded border-input"
+                    checked={saveMappingForCompany}
+                    onChange={(e) => setSaveMappingForCompany(e.target.checked)}
+                  />
+                  <span>{t("importSaveMappingForCompany")}</span>
+                </label>
                 <div className="flex flex-wrap justify-end gap-2 pt-2">
                   <DialogPrimitive.Close asChild>
                     <Button type="button" variant="outline">

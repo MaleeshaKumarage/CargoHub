@@ -840,6 +840,7 @@ describe("api", () => {
           draftCount: 0,
           skippedEmptyRows: 0,
           totalDataRows: 1,
+          hasSavedMapping: false,
         }),
       });
       const file = new File(["a"], "t.csv", { type: "text/csv" });
@@ -847,6 +848,8 @@ describe("api", () => {
       expect(r.needsMapping).toBe(false);
       expect(r.sessionId).toBe("sess-a");
       expect(r.totalDataRows).toBe(1);
+      expect(r.hasSavedMapping).toBe(false);
+      expect(r.savedColumnMap).toBeNull();
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining("/bookings/import/analyze"),
         expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
@@ -861,6 +864,8 @@ describe("api", () => {
           sessionId: "sess-m",
           fileHeaders: ["A", "B"],
           bookingFields: ["X"],
+          hasSavedMapping: true,
+          savedColumnMap: { X: "A" },
         }),
       });
       const file = new File(["a"], "t.csv", { type: "text/csv" });
@@ -868,6 +873,8 @@ describe("api", () => {
       expect(r.needsMapping).toBe(true);
       expect(r.fileHeaders).toEqual(["A", "B"]);
       expect(r.bookingFields).toEqual(["X"]);
+      expect(r.hasSavedMapping).toBe(true);
+      expect(r.savedColumnMap).toEqual({ X: "A" });
     });
   });
 
@@ -886,6 +893,7 @@ describe("api", () => {
       const r = await bookingsImportApplyMapping("tok", {
         sessionId: "sess-m",
         columnMap: { ReferenceNumber: "Ref" },
+        saveMappingForCompany: true,
       });
       expect(r.sessionId).toBe("sess-m");
       expect(r.totalDataRows).toBe(1);
@@ -893,7 +901,7 @@ describe("api", () => {
         expect.stringContaining("/bookings/import/apply-mapping"),
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining('"sessionId":"sess-m"'),
+          body: expect.stringMatching(/"saveMappingForCompany":true/),
         }),
       );
     });
