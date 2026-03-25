@@ -1,0 +1,13 @@
+---
+description: Git workflow — no direct pushes to main/master; use PRs from development
+alwaysApply: true
+---
+
+# Git branches and releases
+
+- **Never push directly to `main` or `master`** (no `git push origin main`, no `git push origin master` for integrating work).
+- **Integrate work via Pull Request**: open PRs **into `development`** from feature/fix branches. Merge only after review/CI as your team requires.
+- **Promote to production branches via PR only**: merge **`development` → `main`** and **`development` → `master`** (or your documented release PR), not by pushing local merges to those branches.
+- **Do not commit directly on `main`, `master`, or `development`** for feature work; use a branch, then PR into `development`.
+
+When the user asks to “update main/master” or “sync branches”, describe or perform the **PR-based** steps (open merge PRs on GitHub), not direct pushes.
