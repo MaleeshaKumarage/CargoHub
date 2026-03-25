@@ -6,7 +6,7 @@
 # Sections (single job = same machine as Docker; see .github/workflows/README.md):
 #   §1 Trigger & checkout
 #   §2 Compose env & registry login
-#   §3 Stop old stack & pull image
+#   §3 Pull image while old stack still serves traffic, then stop & start (minimize downtime)
 #   §4 Start stack (compose up)
 #   §5 Smoke tests
 #   §6 Deploy summary & ngrok URLs
@@ -88,7 +88,21 @@ jobs:
             echo "::warning::DOCKERHUB_* missing for login"
           fi
 
-      # ----- §3 Clean host & pull image -----
+      # ----- §3 Pull while old stack is up, then stop (downtime = stop+start only, not pull) -----
+      - name: "§3 · Pull new image (retry, stack may still be running)"
+        run: |
+          set -e
+          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
+          n=1
+          max=6
+          while [ "$n" -le "$max" ]; do
+            echo "compose pull attempt $n/$max (old container still serving if present)..."
+            if $COMPOSE_CMD pull; then break; fi
+            if [ "$n" -eq "$max" ]; then echo "::error::pull failed"; exit 1; fi
+            sleep $((n * 20))
+            n=$((n+1))
+          done
+
       - name: "§3 · Stop stack & free ports (8888, 8080, 3000, 14040)"
         run: |
           set -e
@@ -98,20 +112,6 @@ jobs:
             for id in $(docker ps -q --filter "publish=$port" 2>/dev/null); do
               docker rm -f "$id" || true
             done
-          done
-
-      - name: "§3 · Pull image (retry)"
-        run: |
-          set -e
-          export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
-          n=1
-          max=6
-          while [ "$n" -le "$max" ]; do
-            echo "compose pull attempt $n/$max..."
-            if $COMPOSE_CMD pull; then break; fi
-            if [ "$n" -eq "$max" ]; then echo "::error::pull failed"; exit 1; fi
-            sleep $((n * 20))
-            n=$((n+1))
           done
 
       # ----- §4 Start stack -----
@@ -129,8 +129,9 @@ jobs:
       - name: "§4 · Prune dangling images"
         run: docker image prune -f || true
 
-      - name: "§4 · Wait for stack boot"
-        run: sleep 25
+      # Smoke steps retry aggressively; only a short pause so Postgres/API begin binding.
+      - name: "§4 · Brief settle after container start"
+        run: sleep 5
 
       # ----- §5 Smoke tests -----
       - name: "§5 · Smoke — API :8080"
