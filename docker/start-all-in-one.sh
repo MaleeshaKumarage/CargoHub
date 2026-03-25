@@ -34,9 +34,11 @@ export Jwt__SigningKey="${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}"
 cd /app/api && dotnet CargoHub.Api.dll &
 APIPID=$!
 
-echo "Waiting for API on :8080 (migrations may run on first start)..."
+# EF migrations on a slow disk (e.g. self-hosted Mac) can exceed 3m; exiting here stops the container and breaks host smokes.
+API_WAIT_MAX="${CARGOHUB_API_WAIT_MAX:-600}"
+echo "Waiting for API on :8080 (migrations may run on first start, max ${API_WAIT_MAX}s)..."
 i=0
-while [ "$i" -lt 180 ]; do
+while [ "$i" -lt "$API_WAIT_MAX" ]; do
   if curl -sfS "http://127.0.0.1:8080/api/v1/health_" >/dev/null 2>&1; then
     echo "API is up."
     break
@@ -44,8 +46,8 @@ while [ "$i" -lt 180 ]; do
   i=$((i + 1))
   sleep 1
 done
-if [ "$i" -ge 180 ]; then
-  echo "ERROR: API did not become ready on :8080 within 180s"
+if [ "$i" -ge "$API_WAIT_MAX" ]; then
+  echo "ERROR: API did not become ready on :8080 within ${API_WAIT_MAX}s"
   exit 1
 fi
 
@@ -57,18 +59,19 @@ export HOSTNAME=0.0.0.0
 npm run start &
 NEXT_PID=$!
 
-echo "Waiting for Next.js on :3000..."
+NEXT_WAIT_MAX="${CARGOHUB_NEXT_WAIT_MAX:-240}"
+echo "Waiting for Next.js on :3000 (locale routes use /en/...)..."
 i=0
-while [ "$i" -lt 120 ]; do
-  if curl -sfS -o /dev/null "http://127.0.0.1:3000/" 2>/dev/null; then
+while [ "$i" -lt "$NEXT_WAIT_MAX" ]; do
+  if curl -sfS -o /dev/null "http://127.0.0.1:3000/en/" 2>/dev/null; then
     echo "Next.js is up."
     break
   fi
   i=$((i + 1))
   sleep 1
 done
-if [ "$i" -ge 120 ]; then
-  echo "WARNING: Next.js did not respond on :3000 within 120s; continuing to start nginx"
+if [ "$i" -ge "$NEXT_WAIT_MAX" ]; then
+  echo "WARNING: Next.js did not respond on :3000 within ${NEXT_WAIT_MAX}s; continuing to start nginx"
 fi
 
 # Reverse proxy: one public port — /api -> ASP.NET :8080, / -> Next :3000
