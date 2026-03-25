@@ -34,8 +34,8 @@ export Jwt__SigningKey="${Jwt__SigningKey:-DemoJwtKey-ChangeMe-AtLeast32Chars}"
 cd /app/api && dotnet CargoHub.Api.dll &
 APIPID=$!
 
-# EF migrations on a slow disk (e.g. self-hosted Mac) can exceed 3m; exiting here stops the container and breaks host smokes.
-API_WAIT_MAX="${CARGOHUB_API_WAIT_MAX:-600}"
+# Program.cs runs Migrate() before Kestrel listens; on slow IO this can exceed 10m. Match host smoke retries (~15m).
+API_WAIT_MAX="${CARGOHUB_API_WAIT_MAX:-900}"
 echo "Waiting for API on :8080 (migrations may run on first start, max ${API_WAIT_MAX}s)..."
 i=0
 while [ "$i" -lt "$API_WAIT_MAX" ]; do
