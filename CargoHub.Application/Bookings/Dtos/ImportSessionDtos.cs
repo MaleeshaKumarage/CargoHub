@@ -21,6 +21,10 @@ public sealed class ImportAnalyzeResponseDto
     public int? TotalDataRows { get; init; }
     public IReadOnlyList<string>? FileHeaders { get; init; }
     public IReadOnlyList<string>? BookingFields { get; init; }
+    /// <summary>True when a company-scoped saved map exists for this file name and header layout.</summary>
+    public bool HasSavedMapping { get; init; }
+    /// <summary>Suggested column map from DB (same shape as apply-mapping body).</summary>
+    public Dictionary<string, string?>? SavedColumnMap { get; init; }
 }
 
 /// <summary>Raw table held in server cache until the user applies column mapping.</summary>
@@ -29,6 +33,8 @@ public sealed class ImportRawSessionState
     public required List<Dictionary<string, string?>> Rows { get; init; }
     public required List<string> FileHeaders { get; init; }
     public int SkippedEmptyRows { get; init; }
+    public string FileNameKey { get; init; } = string.Empty;
+    public string HeaderSignature { get; init; } = string.Empty;
 }
 
 /// <summary>Body for POST import/apply-mapping (JSON camelCase).</summary>
@@ -36,6 +42,7 @@ public sealed class ImportApplyMappingRequestDto
 {
     public Guid SessionId { get; set; }
     public Dictionary<string, string?>? ColumnMap { get; set; }
+    public bool SaveMappingForCompany { get; set; }
 }
 
 /// <summary>Body for POST import/confirm (JSON camelCase).</summary>
