@@ -129,26 +129,33 @@ jobs:
       - name: "§4 · Prune dangling images"
         run: docker image prune -f || true
 
-      # Smoke steps retry aggressively; only a short pause so Postgres/API begin binding.
+      # Entrypoint can take minutes (Postgres + EF migrate + Next). Short sleep alone is not enough; smokes retry below.
       - name: "§4 · Brief settle after container start"
-        run: sleep 5
+        run: sleep 15
 
       # ----- §5 Smoke tests -----
       - name: "§5 · Smoke — API :8080"
         run: |
           set -e
-          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
+          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
 
       - name: "§5 · Smoke — Portal :3000"
         run: |
           set -e
-          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/"
+          # next-intl localePrefix: always — bare / may 404
+          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/en/"
 
       - name: "§5 · Smoke — nginx :8888"
         run: |
           set -e
-          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
-          curl -sfS --retry 25 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
+          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
+          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
+
+      - name: "§5 · Diagnose on smoke failure (container logs)"
+        if: failure()
+        run: |
+          docker ps -a || true
+          docker logs cargohub --tail 500 2>&1 || true
 
       # ----- §6 Report -----
       - name: "§6 · Set IMAGE_DIGEST for summary"
