@@ -114,6 +114,11 @@ docker compose up -d
 
 ## Development Workflow
 
+### Git branches (required)
+
+- **Do not push directly to `main` or `master`.** Land changes with **Pull Requests into `development`**, then promote with **PRs from `development` → `main` / `master`** (never `git push origin main` or `master` to ship work).
+- Use feature/fix branches; avoid committing feature work directly on `development`, `main`, or `master`.
+
 ### Running Locally
 
 **Option 1: Visual Studio (Recommended)**
