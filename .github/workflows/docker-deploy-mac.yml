@@ -129,7 +129,8 @@ jobs:
       - name: "§4 · Prune dangling images"
         run: docker image prune -f || true
 
-      # Entrypoint can take minutes (Postgres + EF migrate + Next). Short sleep alone is not enough; smokes retry below.
+      # API does not listen until after EF Migrate() + role seed in Program.cs (blocks before app.Run).
+      # Postgres recovery after unclean deploy stop can add more delay. Allow ~15+ min before failing smokes.
       - name: "§4 · Brief settle after container start"
         run: sleep 15
 
@@ -137,19 +138,19 @@ jobs:
       - name: "§5 · Smoke — API :8080"
         run: |
           set -e
-          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
+          curl -sfS --retry 120 --retry-delay 5 --retry-all-errors "http://localhost:8080/api/v1/health_"
 
       - name: "§5 · Smoke — Portal :3000"
         run: |
           set -e
-          # next-intl localePrefix: always — bare / may 404
-          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/en/"
+          # next-intl localePrefix: always — bare / may 404; starts after API wait inside container
+          curl -sfS --retry 120 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:3000/en/"
 
       - name: "§5 · Smoke — nginx :8888"
         run: |
           set -e
-          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
-          curl -sfS --retry 40 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
+          curl -sfS --retry 120 --retry-delay 5 --retry-all-errors "http://localhost:8888/api/v1/health_"
+          curl -sfS --retry 120 --retry-delay 5 --retry-all-errors -o /dev/null "http://localhost:8888/en/"
 
       - name: "§5 · Diagnose on smoke failure (container logs)"
         if: failure()
