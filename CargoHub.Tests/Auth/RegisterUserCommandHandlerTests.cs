@@ -85,4 +85,85 @@ public class RegisterUserCommandHandlerTests
         Assert.Equal("jwt-token", result.Data.JwtToken);
         Assert.Equal("cust-1", result.Data.CustomerMappingId);
     }
+
+    [Fact]
+    public async Task Handle_WhenCreateUserThrowsInvalidOperation_ReturnsRegistrationFailedWithMessage()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme" };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService
+            .Setup(r => r.CreateUserAsync("dup@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Failed to register user: Email 'dup@b.com' is already taken."));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+
+        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "dup@b.com",
+            Password = "P@ss1",
+            UserName = "Dup",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("RegistrationFailed", result.ErrorCode);
+        Assert.Equal("Email 'dup@b.com' is already taken.", result.Message);
+        jwtFactory.Verify(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<Claim>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCreateUserThrowsInvalidOperation_WithoutKnownPrefix_ReturnsMessageAsIs()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme" };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService
+            .Setup(r => r.CreateUserAsync("x@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Password does not meet requirements."));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+
+        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "x@b.com",
+            Password = "P@ss1",
+            UserName = "X",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Password does not meet requirements.", result.Message);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCreateUserThrowsInvalidOperation_WhitespaceMessage_ReturnsRegistrationFailed()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme" };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService
+            .Setup(r => r.CreateUserAsync("y@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("   "));
+
+        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, new Mock<IJwtTokenFactory>().Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "y@b.com",
+            Password = "P@ss1",
+            UserName = "Y",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Registration failed.", result.Message);
+    }
 }

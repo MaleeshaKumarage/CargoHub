@@ -100,6 +100,9 @@ builder.Services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IImportFileMappingRepository, ImportFileMappingRepository>();
+builder.Services.AddSingleton<BookingImportService>();
+builder.Services.AddSingleton<BookingExportService>();
+builder.Services.AddMemoryCache();
 builder.Services.AddCourierClients(builder.Configuration);
 builder.Services.AddSingleton<IPasswordResetTokenStore, PasswordResetTokenStore>();
 builder.Services.AddSingleton<IVerificationCodeStore, VerificationCodeStore>();
@@ -188,10 +191,12 @@ builder.Services.AddCors(options =>
 
 // Branding: app name, logo, colors, waybill footer (single-tenant per deployment).
 builder.Services.Configure<BrandingOptions>(builder.Configuration.GetSection(BrandingOptions.SectionName));
-builder.Services.AddSingleton<CargoHub.Api.Services.WaybillPdfGenerator>();
-builder.Services.AddSingleton<BookingImportService>();
-builder.Services.AddSingleton<BookingExportService>();
-builder.Services.AddMemoryCache();
+builder.Services.Configure<DailyDigestOptions>(builder.Configuration.GetSection(DailyDigestOptions.SectionName));
+builder.Services.AddSingleton<WaybillPdfGenerator>();
+builder.Services.AddSingleton<DailyBookingsDigestPdfGenerator>();
+builder.Services.AddScoped<IDailyDigestSendLogRepository, DailyDigestSendLogRepository>();
+builder.Services.AddScoped<IDailyBookingDigestOrchestrator, DailyBookingDigestOrchestrator>();
+builder.Services.AddHostedService<DailyBookingDigestBackgroundService>();
 
 // Register controllers; routes will later mirror the existing Node.js API surface.
 builder.Services.AddControllers();
