@@ -85,12 +85,40 @@ export async function register(body: RegisterBody): Promise<LoginResult> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) {
-    return { success: false, errorCode: data.errorCode ?? 'Error', message: data.message ?? data.title ?? 'Registration failed' };
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    if (!res.ok) {
+      return {
+        success: false,
+        errorCode: 'Error',
+        message: res.statusText?.trim() ? res.statusText : 'Registration failed',
+      };
+    }
+    return { success: false, message: 'Invalid response' };
   }
-  if (data.userId && data.jwtToken) {
-    return { success: true, data: data as LoginResponse };
+  if (!res.ok) {
+    return {
+      success: false,
+      errorCode: (data.errorCode as string) ?? 'Error',
+      message: (data.message as string) ?? (data.title as string) ?? 'Registration failed',
+    };
+  }
+  const userId = (data.userId ?? data.UserId) as string | undefined;
+  const jwtToken = (data.jwtToken ?? data.JwtToken ?? '') as string;
+  if (userId && jwtToken) {
+    const rawRoles = data.roles ?? data.Roles;
+    const normalizedData: LoginResponse = {
+      userId,
+      email: (data.email as string) ?? '',
+      displayName: (data.displayName as string) ?? '',
+      businessId: (data.businessId ?? data.BusinessId ?? null) as string | null,
+      customerMappingId: (data.customerMappingId ?? data.CustomerMappingId ?? null) as string | null,
+      jwtToken,
+      roles: Array.isArray(rawRoles) ? (rawRoles as string[]) : [],
+    };
+    return { success: true, data: normalizedData };
   }
   return { success: false, message: 'Invalid response' };
 }

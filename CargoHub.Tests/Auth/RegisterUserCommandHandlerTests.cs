@@ -85,4 +85,33 @@ public class RegisterUserCommandHandlerTests
         Assert.Equal("jwt-token", result.Data.JwtToken);
         Assert.Equal("cust-1", result.Data.CustomerMappingId);
     }
+
+    [Fact]
+    public async Task Handle_WhenCreateUserThrowsInvalidOperation_ReturnsRegistrationFailedWithMessage()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme" };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService
+            .Setup(r => r.CreateUserAsync("dup@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Failed to register user: Email 'dup@b.com' is already taken."));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+
+        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "dup@b.com",
+            Password = "P@ss1",
+            UserName = "Dup",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("RegistrationFailed", result.ErrorCode);
+        Assert.Equal("Email 'dup@b.com' is already taken.", result.Message);
+        jwtFactory.Verify(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<Claim>>()), Times.Never);
+    }
 }

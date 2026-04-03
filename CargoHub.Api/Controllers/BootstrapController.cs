@@ -85,6 +85,35 @@ public class BootstrapController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Removes all SuperAdmin role assignments (or deletes those users) so bootstrap can run again.
+    /// Requires the same header <c>X-Bootstrap-Secret</c> as <see cref="BootstrapSuperAdmin"/>.
+    /// Use <see cref="ResetBootstrapRequest.DeleteSuperAdminUsers"/> to delete accounts and free the email for a new bootstrap.
+    /// </summary>
+    [HttpPost("reset-bootstrap-superadmin")]
+    public async Task<ActionResult<ResetBootstrapResponse>> ResetBootstrapSuperAdmin([FromBody] ResetBootstrapRequest? request, CancellationToken cancellationToken)
+    {
+        var secret = _configuration["Bootstrap:Secret"];
+        if (string.IsNullOrEmpty(secret))
+            return StatusCode(500, new { message = "Bootstrap is not configured (Bootstrap:Secret)." });
+
+        var providedSecret = Request.Headers["X-Bootstrap-Secret"].FirstOrDefault();
+        if (providedSecret != secret)
+            return Forbid();
+
+        var deleteUsers = request?.DeleteSuperAdminUsers ?? false;
+        var (cleared, deleted) = await BootstrapSuperAdminReset.ExecuteAsync(_userManager, deleteUsers, cancellationToken);
+
+        return Ok(new ResetBootstrapResponse
+        {
+            SuperAdminsCleared = cleared,
+            SuperAdminUsersDeleted = deleted,
+            Message = deleteUsers
+                ? "SuperAdmin users processed. Deleted accounts where possible; you can run bootstrap-superadmin again (reuse email if delete succeeded)."
+                : "SuperAdmin role removed from all matching users. Run bootstrap-superadmin to create a new SuperAdmin. Use deleteSuperAdminUsers: true if the same email must be reused."
+        });
+    }
+
     public sealed class BootstrapRequest
     {
         [Required]
@@ -100,6 +129,19 @@ public class BootstrapController : ControllerBase
         public string UserId { get; set; } = "";
         public string Email { get; set; } = "";
         public string DisplayName { get; set; } = "";
+        public string Message { get; set; } = "";
+    }
+
+    public sealed class ResetBootstrapRequest
+    {
+        /// <summary>When true, deletes each user that had SuperAdmin (so bootstrap can reuse the same email).</summary>
+        public bool DeleteSuperAdminUsers { get; set; }
+    }
+
+    public sealed class ResetBootstrapResponse
+    {
+        public int SuperAdminsCleared { get; set; }
+        public int SuperAdminUsersDeleted { get; set; }
         public string Message { get; set; } = "";
     }
 }

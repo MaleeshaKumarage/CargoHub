@@ -31,6 +31,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Saved booking import column maps per company and file layout.</summary>
     public DbSet<BookingImportFileMapping> BookingImportFileMappings => Set<BookingImportFileMapping>();
 
+    /// <summary>Idempotency for daily per-company booking digest emails.</summary>
+    public DbSet<DailyDigestSendLog> DailyDigestSendLogs => Set<DailyDigestSendLog>();
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
@@ -191,6 +194,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => new { x.CompanyId, x.FileNameKey, x.HeaderSignature })
                 .IsUnique()
                 .HasDatabaseName("IX_BookingImportFileMappings_Company_File_Headers");
+            entity.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DailyDigestSendLog>(entity =>
+        {
+            entity.ToTable("DailyDigestSendLogs", DbSchemas.Bookings);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TimeZoneId).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.DigestDateLocal).HasColumnType("date");
+            entity.Property(x => x.SentAtUtc).IsRequired();
+            entity.HasIndex(x => new { x.CompanyId, x.DigestDateLocal, x.TimeZoneId })
+                .IsUnique()
+                .HasDatabaseName("IX_DailyDigestSendLogs_Company_Date_Tz");
             entity.HasOne<Company>()
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)
