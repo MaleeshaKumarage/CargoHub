@@ -14,15 +14,18 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
     private readonly ICompanyRepository _companyRepository;
     private readonly IUserRegistrationService _userRegistrationService;
     private readonly IJwtTokenFactory _jwtTokenFactory;
+    private readonly ICompanyUserMetrics _companyUserMetrics;
 
     public RegisterUserCommandHandler(
         ICompanyRepository companyRepository,
         IUserRegistrationService userRegistrationService,
-        IJwtTokenFactory jwtTokenFactory)
+        IJwtTokenFactory jwtTokenFactory,
+        ICompanyUserMetrics companyUserMetrics)
     {
         _companyRepository = companyRepository;
         _userRegistrationService = userRegistrationService;
         _jwtTokenFactory = jwtTokenFactory;
+        _companyUserMetrics = companyUserMetrics;
     }
 
     public async Task<RegisterResult> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
@@ -36,6 +39,21 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         var company = await _companyRepository.GetByBusinessIdAsync(companyId, cancellationToken);
         if (company == null)
             return new RegisterResult { Success = false, ErrorCode = "CompanyNotFound", Message = "No company found with this Company ID. The company must be created by an administrator first." };
+
+        var bid = company.BusinessId?.Trim() ?? companyId;
+        if (company.MaxUserAccounts is { } cap)
+        {
+            var active = await _companyUserMetrics.CountActiveUsersForBusinessIdAsync(bid, cancellationToken);
+            if (active >= cap)
+            {
+                return new RegisterResult
+                {
+                    Success = false,
+                    ErrorCode = "CompanyUserLimitReached",
+                    Message = "This company has reached its user account limit. Contact your company administrator."
+                };
+            }
+        }
 
         try
         {

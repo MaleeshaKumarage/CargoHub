@@ -1,6 +1,7 @@
 using CargoHub.Domain.Bookings;
 using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Identity;
+using CompanyEntity = CargoHub.Domain.Companies.Company;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>
     /// Company configuration and address book entries.
     /// </summary>
-    public DbSet<Company> Companies => Set<Company>();
+    public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
+
+    /// <summary>Pending company admin invitations (email link + token).</summary>
+    public DbSet<CompanyAdminInvite> CompanyAdminInvites => Set<CompanyAdminInvite>();
 
     /// <summary>Saved booking import column maps per company and file layout.</summary>
     public DbSet<BookingImportFileMapping> BookingImportFileMappings => Set<BookingImportFileMapping>();
@@ -92,7 +96,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(b => b.CompanyId);
             entity.HasIndex(b => new { b.CompanyId, b.CreatedAtUtc })
                   .HasDatabaseName("IX_Bookings_CompanyId_CreatedAtUtc");
-            entity.HasOne<Company>()
+            entity.HasOne<CompanyEntity>()
                   .WithMany()
                   .HasForeignKey(b => b.CompanyId)
                   .IsRequired(false)
@@ -131,7 +135,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => new { x.BookingId, x.Status }).HasDatabaseName("IX_BookingStatusHistory_BookingId_Status");
         });
 
-        builder.Entity<Company>(entity =>
+        builder.Entity<CompanyEntity>(entity =>
         {
             entity.ToTable("Companies", DbSchemas.Companies);
             entity.HasKey(c => c.Id);
@@ -180,6 +184,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 agreement.HasKey("Id");
             });
 
+            entity.Property(c => c.MaxUserAccounts);
+            entity.Property(c => c.MaxAdminAccounts);
+            entity.Property(c => c.InitialAdminInviteEmail).HasMaxLength(256);
+        });
+
+        builder.Entity<CompanyAdminInvite>(entity =>
+        {
+            entity.ToTable("CompanyAdminInvites", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.NormalizedEmail).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.ExpiresAt).IsRequired();
+            entity.Property(x => x.CreatedAt).IsRequired();
+            entity.HasIndex(x => x.TokenHash).IsUnique().HasDatabaseName("IX_CompanyAdminInvites_TokenHash");
+            entity.HasIndex(x => x.CompanyId).HasDatabaseName("IX_CompanyAdminInvites_CompanyId");
+            entity.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<BookingImportFileMapping>(entity =>
@@ -194,10 +218,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => new { x.CompanyId, x.FileNameKey, x.HeaderSignature })
                 .IsUnique()
                 .HasDatabaseName("IX_BookingImportFileMappings_Company_File_Headers");
-            entity.HasOne<Company>()
-                .WithMany()
-                .HasForeignKey(x => x.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CompanyEntity>()
+                  .WithMany()
+                  .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<DailyDigestSendLog>(entity =>
@@ -210,10 +234,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => new { x.CompanyId, x.DigestDateLocal, x.TimeZoneId })
                 .IsUnique()
                 .HasDatabaseName("IX_DailyDigestSendLogs_Company_Date_Tz");
-            entity.HasOne<Company>()
-                .WithMany()
-                .HasForeignKey(x => x.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CompanyEntity>()
+                  .WithMany()
+                  .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

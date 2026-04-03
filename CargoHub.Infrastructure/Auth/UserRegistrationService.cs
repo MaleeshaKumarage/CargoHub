@@ -17,14 +17,27 @@ public sealed class UserRegistrationService : IUserRegistrationService
         _userManager = userManager;
     }
 
+    public Task<(string userId, string email, string displayName, string? businessId, string? customerMappingId)> CreateUserAsync(
+        string email,
+        string password,
+        string userName,
+        string? businessId,
+        string? gsOne,
+        CancellationToken cancellationToken = default) =>
+        CreateUserAsync(email, password, userName, businessId, gsOne, Application.Auth.RoleNames.User, cancellationToken);
+
     public async Task<(string userId, string email, string displayName, string? businessId, string? customerMappingId)> CreateUserAsync(
         string email,
         string password,
         string userName,
         string? businessId,
         string? gsOne,
+        string portalRole,
         CancellationToken cancellationToken = default)
     {
+        if (portalRole != Application.Auth.RoleNames.User && portalRole != Application.Auth.RoleNames.Admin)
+            throw new InvalidOperationException($"Invalid portal role: {portalRole}");
+
         // Store both email and userName so login works with either (account = email or userName)
         var user = new ApplicationUser
         {
@@ -46,8 +59,7 @@ public sealed class UserRegistrationService : IUserRegistrationService
         user.CustomerMappingId = user.Id;
         await _userManager.UpdateAsync(user);
 
-        // Assign default role for portal users (super admin is created via bootstrap only)
-        await _userManager.AddToRoleAsync(user, Application.Auth.RoleNames.User);
+        await _userManager.AddToRoleAsync(user, portalRole);
 
         return (user.Id, user.Email ?? string.Empty, user.DisplayName, user.BusinessId, user.CustomerMappingId);
     }

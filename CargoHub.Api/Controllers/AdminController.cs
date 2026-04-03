@@ -1,6 +1,8 @@
+using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Auth;
 using CargoHub.Application.Company;
 using CargoHub.Infrastructure.Identity;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,17 +19,23 @@ namespace CargoHub.Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly RoleManager<IdentityRole> _roleManager;
     private readonly ICompanyRepository _companyRepository;
+    private readonly ICompanyUserMetrics _companyUserMetrics;
+    private readonly AdminCompanyUserPolicy _companyUserPolicy;
+    private readonly IMediator _mediator;
 
     public AdminController(
         UserManager<ApplicationUser> userManager,
-        RoleManager<IdentityRole> roleManager,
-        ICompanyRepository companyRepository)
+        ICompanyRepository companyRepository,
+        ICompanyUserMetrics companyUserMetrics,
+        AdminCompanyUserPolicy companyUserPolicy,
+        IMediator mediator)
     {
         _userManager = userManager;
-        _roleManager = roleManager;
         _companyRepository = companyRepository;
+        _companyUserMetrics = companyUserMetrics;
+        _companyUserPolicy = companyUserPolicy;
+        _mediator = mediator;
     }
 
     /// <summary>
@@ -38,16 +46,52 @@ public class AdminController : ControllerBase
     {
         // Return companies from Company table so super admin sees which companies exist and can list users per company.
         var companies = await _companyRepository.GetAllAsync(cancellationToken);
-        var list = companies
-            .Select(c => new CompanySummaryDto
+        var list = new List<CompanySummaryDto>();
+        foreach (var c in companies)
+        {
+            var bid = c.BusinessId ?? "";
+            var users = string.IsNullOrEmpty(bid) ? 0 : await _companyUserMetrics.CountActiveUsersForBusinessIdAsync(bid, cancellationToken);
+            var admins = string.IsNullOrEmpty(bid) ? 0 : await _companyUserMetrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
+            list.Add(new CompanySummaryDto
             {
                 Id = c.Id,
                 Name = c.Name,
                 BusinessId = c.BusinessId,
-                CompanyId = c.CompanyId
-            })
-            .ToList();
+                CompanyId = c.CompanyId,
+                MaxUserAccounts = c.MaxUserAccounts,
+                MaxAdminAccounts = c.MaxAdminAccounts,
+                InitialAdminInviteEmail = c.InitialAdminInviteEmail,
+                ActiveUserCount = users,
+                AdminCount = admins
+            });
+        }
+
         return Ok(list);
+    }
+
+    /// <summary>Create a company with limits and send initial admin invite (explicit or fallback email).</summary>
+    [HttpPost("companies")]
+    public async Task<ActionResult<AdminCompanyDetailDto>> CreateCompany([FromBody] CreateAdminCompanyRequest body, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(
+            new CreateAdminCompanyCommand(body.Name, body.BusinessId, body.MaxUserAccounts, body.MaxAdminAccounts, body.InitialAdminEmail),
+            cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        var created = result.Company!;
+        return Created($"/api/v1/admin/companies/{created.Id}", created);
+    }
+
+    /// <summary>Update company limits and optionally resend admin invite when there is still no admin.</summary>
+    [HttpPatch("companies/{id:guid}")]
+    public async Task<ActionResult<AdminCompanyDetailDto>> PatchCompany(Guid id, [FromBody] PatchAdminCompanyRequest body, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(
+            new UpdateAdminCompanyCommand(id, body.MaxUserAccounts, body.MaxAdminAccounts, body.ResendAdminInvite),
+            cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return Ok(result.Company);
     }
 
     /// <summary>
@@ -91,22 +135,30 @@ public class AdminController : ControllerBase
         if (user == null)
             return NotFound(new { message = "User not found." });
 
-        if (request.IsActive.HasValue)
-        {
-            user.IsActive = request.IsActive.Value;
-            await _userManager.UpdateAsync(user);
-        }
-
         if (request.Role != null)
         {
             var role = request.Role.Trim();
             var validRoles = new[] { RoleNames.SuperAdmin, RoleNames.Admin, RoleNames.User };
             if (!validRoles.Contains(role))
                 return BadRequest(new { message = "Invalid role. Use SuperAdmin, Admin, or User." });
+        }
 
+        var policyError = await _companyUserPolicy.ValidatePatchAsync(user, request.Role?.Trim(), request.IsActive, cancellationToken);
+        if (policyError != null)
+            return BadRequest(new { message = policyError });
+
+        if (request.Role != null)
+        {
+            var role = request.Role!.Trim();
             var currentRoles = await _userManager.GetRolesAsync(user);
             await _userManager.RemoveFromRolesAsync(user, currentRoles);
             await _userManager.AddToRoleAsync(user, role);
+        }
+
+        if (request.IsActive.HasValue)
+        {
+            user.IsActive = request.IsActive.Value;
+            await _userManager.UpdateAsync(user);
         }
 
         return NoContent();
@@ -118,6 +170,27 @@ public class AdminController : ControllerBase
         public string? Name { get; set; }
         public string? BusinessId { get; set; }
         public string CompanyId { get; set; } = "";
+        public int? MaxUserAccounts { get; set; }
+        public int? MaxAdminAccounts { get; set; }
+        public string? InitialAdminInviteEmail { get; set; }
+        public int ActiveUserCount { get; set; }
+        public int AdminCount { get; set; }
+    }
+
+    public sealed class CreateAdminCompanyRequest
+    {
+        public string Name { get; set; } = "";
+        public string BusinessId { get; set; } = "";
+        public int? MaxUserAccounts { get; set; }
+        public int? MaxAdminAccounts { get; set; }
+        public string? InitialAdminEmail { get; set; }
+    }
+
+    public sealed class PatchAdminCompanyRequest
+    {
+        public int? MaxUserAccounts { get; set; }
+        public int? MaxAdminAccounts { get; set; }
+        public bool ResendAdminInvite { get; set; }
     }
 
     public sealed class AdminUserDto
