@@ -25,4 +25,14 @@ public interface IUserRegistrationService
         string? businessId,
         string? gsOne,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Creates a user and assigns <paramref name="portalRole"/> (Admin or User).</summary>
+    Task<(string userId, string email, string displayName, string? businessId, string? customerMappingId)> CreateUserAsync(
+        string email,
+        string password,
+        string userName,
+        string? businessId,
+        string? gsOne,
+        string portalRole,
+        CancellationToken cancellationToken = default);
 }

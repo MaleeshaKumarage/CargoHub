@@ -48,6 +48,21 @@ public class Company
     public int Counter { get; set; } = 1;
 
     /// <summary>
+    /// Maximum active portal users linked to this company (same <see cref="BusinessId"/>). Null = no limit.
+    /// </summary>
+    public int? MaxUserAccounts { get; set; }
+
+    /// <summary>
+    /// Maximum users with Admin role for this company. Null = no limit.
+    /// </summary>
+    public int? MaxAdminAccounts { get; set; }
+
+    /// <summary>
+    /// When set, the initial admin invite targeted this explicit email. Null if only the fallback address was used.
+    /// </summary>
+    public string? InitialAdminInviteEmail { get; set; }
+
+    /// <summary>
     /// Default shipper address used when booking does not override it.
     /// </summary>
     public CompanyAddress? DefaultShipperAddress { get; set; }

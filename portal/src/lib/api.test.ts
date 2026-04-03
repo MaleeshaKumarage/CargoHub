@@ -451,7 +451,7 @@ describe("api", () => {
     it("returns companies when API returns 200", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
-        json: async () => [{ id: "1", name: "Co" }],
+        json: async () => [{ id: "1", name: "Co", companyId: "cid" }],
       });
       const list = await adminGetCompanies("token");
       expect(list).toHaveLength(1);

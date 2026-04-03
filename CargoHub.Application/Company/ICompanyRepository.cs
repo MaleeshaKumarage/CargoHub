@@ -10,6 +10,9 @@ public interface ICompanyRepository
 {
     Task<CompanyEntity> CreateAsync(CompanyEntity company, CancellationToken cancellationToken = default);
     Task<CompanyEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Tracked entity for updates.</summary>
+    Task<CompanyEntity?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CompanyEntity> UpdateAsync(CompanyEntity company, CancellationToken cancellationToken = default);
     /// <summary>Get company by government/business ID (e.g. Y-tunnus). Used to validate registration.</summary>
     Task<CompanyEntity?> GetByBusinessIdAsync(string businessId, CancellationToken cancellationToken = default);
     /// <summary>Get company by business ID with SenderAddressBook and AddressBook loaded (for Actions address book).</summary>

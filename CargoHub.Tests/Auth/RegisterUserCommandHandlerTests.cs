@@ -13,6 +13,20 @@ namespace CargoHub.Tests.Auth;
 
 public class RegisterUserCommandHandlerTests
 {
+    private static RegisterUserCommandHandler CreateHandler(
+        ICompanyRepository companyRepo,
+        IUserRegistrationService regService,
+        IJwtTokenFactory jwtFactory,
+        ICompanyUserMetrics? metrics = null)
+    {
+        if (metrics != null)
+            return new RegisterUserCommandHandler(companyRepo, regService, jwtFactory, metrics);
+        var mm = new Mock<ICompanyUserMetrics>();
+        mm.Setup(x => x.CountActiveUsersForBusinessIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        return new RegisterUserCommandHandler(companyRepo, regService, jwtFactory, mm.Object);
+    }
+
     [Fact]
     public async Task Handle_WhenBusinessIdWhitespace_ReturnsCompanyIdRequired()
     {
@@ -20,7 +34,7 @@ public class RegisterUserCommandHandlerTests
         var regService = new Mock<IUserRegistrationService>();
         var jwtFactory = new Mock<IJwtTokenFactory>();
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest { BusinessId = "   " }), default);
 
         Assert.False(result.Success);
@@ -34,7 +48,7 @@ public class RegisterUserCommandHandlerTests
         var regService = new Mock<IUserRegistrationService>();
         var jwtFactory = new Mock<IJwtTokenFactory>();
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest { BusinessId = "" }), default);
 
         Assert.False(result.Success);
@@ -50,7 +64,7 @@ public class RegisterUserCommandHandlerTests
         var regService = new Mock<IUserRegistrationService>();
         var jwtFactory = new Mock<IJwtTokenFactory>();
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest { BusinessId = "1234567-8", Email = "a@b.com", Password = "P@ss1" }), default);
 
         Assert.False(result.Success);
@@ -72,7 +86,7 @@ public class RegisterUserCommandHandlerTests
         jwtFactory.Setup(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<Claim>>()))
             .Returns("jwt-token");
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
         {
             BusinessId = "1234567-8",
@@ -100,7 +114,7 @@ public class RegisterUserCommandHandlerTests
 
         var jwtFactory = new Mock<IJwtTokenFactory>();
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
         {
             BusinessId = "1234567-8",
@@ -129,7 +143,7 @@ public class RegisterUserCommandHandlerTests
 
         var jwtFactory = new Mock<IJwtTokenFactory>();
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
         {
             BusinessId = "1234567-8",
@@ -154,7 +168,7 @@ public class RegisterUserCommandHandlerTests
             .Setup(r => r.CreateUserAsync("y@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("   "));
 
-        var handler = new RegisterUserCommandHandler(companyRepo.Object, regService.Object, new Mock<IJwtTokenFactory>().Object);
+        var handler = CreateHandler(companyRepo.Object, regService.Object, new Mock<IJwtTokenFactory>().Object);
         var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
         {
             BusinessId = "1234567-8",
@@ -165,5 +179,29 @@ public class RegisterUserCommandHandlerTests
 
         Assert.False(result.Success);
         Assert.Equal("Registration failed.", result.Message);
+    }
+
+    [Fact]
+    public async Task Handle_WhenUserCapReached_ReturnsCompanyUserLimitReached()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme", MaxUserAccounts = 5 };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var metrics = new Mock<ICompanyUserMetrics>();
+        metrics.Setup(m => m.CountActiveUsersForBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(5);
+
+        var handler = CreateHandler(companyRepo.Object, new Mock<IUserRegistrationService>().Object, new Mock<IJwtTokenFactory>().Object, metrics.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "new@b.com",
+            Password = "P@ss1",
+            UserName = "N",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("CompanyUserLimitReached", result.ErrorCode);
     }
 }

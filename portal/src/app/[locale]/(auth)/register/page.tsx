@@ -44,6 +44,7 @@ export default function RegisterPage() {
       }
       if (result.errorCode === "CompanyIdRequired") setError(t("companyIdRequired"));
       else if (result.errorCode === "CompanyNotFound") setError(t("companyNotFound"));
+      else if (result.errorCode === "CompanyUserLimitReached") setError(t("userLimitReached"));
       else setError(result.message ?? t("registrationFailed"));
     } catch {
       setError(t("networkError"));

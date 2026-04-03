@@ -7,8 +7,10 @@ using CargoHub.Application.Auth.Handlers;
 using CargoHub.Application.Bookings;
 using CargoHub.Application.Company;
 using CargoHub.Infrastructure.Auth;
+using CargoHub.Infrastructure.Company;
 using CargoHub.Infrastructure.Couriers;
 using CargoHub.Infrastructure.Identity;
+using CargoHub.Infrastructure.Options;
 using CargoHub.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -97,7 +99,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Register infrastructure services that are shared across the application.
 builder.Services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
+builder.Services.Configure<PortalPublicOptions>(builder.Configuration.GetSection(PortalPublicOptions.SectionName));
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<ICompanyAdminInviteRepository, CompanyAdminInviteRepository>();
+builder.Services.AddScoped<ICompanyUserMetrics, CompanyUserMetrics>();
+builder.Services.AddScoped<ICompanyAdminInviteIssuer, CompanyAdminInviteIssuer>();
+builder.Services.AddScoped<IAcceptCompanyAdminInviteRunner, AcceptCompanyAdminInviteRunner>();
+builder.Services.AddScoped<AdminCompanyUserPolicy>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IImportFileMappingRepository, ImportFileMappingRepository>();
 builder.Services.AddSingleton<BookingImportService>();
