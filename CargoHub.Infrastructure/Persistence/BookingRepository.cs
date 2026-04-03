@@ -62,6 +62,15 @@ public sealed partial class BookingRepository : IBookingRepository
         return query;
     }
 
+    public async Task<List<Booking>> ListByCompanyCreatedUtcRangeAsync(Guid companyId, DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+    {
+        return await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.CompanyId == companyId && !b.IsTestBooking && b.CreatedAtUtc >= fromUtc && b.CreatedAtUtc < toUtc)
+            .OrderBy(b => b.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<Booking>> ListDraftsByCustomerIdAsync(string customerId, int skip = 0, int take = 100, CancellationToken cancellationToken = default)
     {
         return await _db.Bookings
@@ -184,5 +193,4 @@ public sealed partial class BookingRepository : IBookingRepository
         }
         return result;
     }
-
 }

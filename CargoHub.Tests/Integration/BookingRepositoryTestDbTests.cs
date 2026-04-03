@@ -196,7 +196,7 @@ public class BookingRepositoryTestDbTests : IDisposable
         };
         await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
-        var stats = await repo.GetDashboardStatsAsync(customerId, null, default);
+        var stats = await repo.GetDashboardStatsAsync(customerId, default);
         Assert.True(stats.CountToday >= 1);
         Assert.True(stats.CountMonth >= 1);
         Assert.True(stats.CountYear >= 1);
@@ -218,7 +218,7 @@ public class BookingRepositoryTestDbTests : IDisposable
         };
         await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
-        var stats = await repo.GetDashboardStatsAsync(null, null, default);
+        var stats = await repo.GetDashboardStatsAsync(null, default);
         Assert.True(stats.CountToday >= 1);
     }
 
@@ -285,6 +285,41 @@ public class BookingRepositoryTestDbTests : IDisposable
         var disabledOnly = await repo.ListByCustomerIdAsync(customerId, 0, 10, new BookingListFilter(Enabled: false), default);
         Assert.Empty(enabledOnly);
         Assert.Single(disabledOnly);
+    }
+
+    [Fact]
+    public async Task ListByCompanyCreatedUtcRange_IncludesDrafts_ExcludesTestsAndRespectsHalfOpenInterval()
+    {
+        var companyId = Guid.NewGuid();
+        var customerId = "cust-digest-range";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, companyId), default);
+        var completed = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
+        Assert.NotNull(completed);
+
+        var testBooking = await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
+        Assert.NotNull(testBooking);
+        var tb = await repo.GetByIdWithTrackingAsync(testBooking.Id, customerId, default);
+        Assert.NotNull(tb);
+        tb.IsTestBooking = true;
+        await repo.UpdateAsync(tb, default);
+
+        var from = DateTime.UtcNow.AddHours(-2);
+        var to = DateTime.UtcNow.AddHours(2);
+        var list = await repo.ListByCompanyCreatedUtcRangeAsync(companyId, from, to, default);
+        Assert.Equal(2, list.Count);
+        Assert.Contains(list, b => b.IsDraft);
+        Assert.Contains(list, b => !b.IsDraft && !b.IsTestBooking);
+        Assert.DoesNotContain(list, b => b.IsTestBooking);
     }
 
     [Fact]

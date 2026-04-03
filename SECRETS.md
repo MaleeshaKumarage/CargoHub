@@ -64,10 +64,8 @@ This runs `gh secret set --env-file .env`, which creates/updates one GitHub secr
 | `Jwt__SigningKey` | JWT token signing (32+ chars) |
 | `Jwt__Issuer` | JWT issuer claim |
 | `Jwt__Audience` | JWT audience claim |
-| `NEXT_PUBLIC_API_URL` | Portal → API URL (local/Vercel). Docker all-in-one image uses `__SAME_ORIGIN__` at build time |
-| `Cors__PortalOrigin` | CORS allowed origin (e.g. `http://localhost:3000`) |
-| `CORS__PORTAL_ORIGIN` | Same as above when using `docker-compose.one.yml` / Mac runner `.env` — set to **HTTPS ngrok origin** for remote demos |
-| `NGROK_AUTHTOKEN` | Optional: in-container ngrok in `Dockerfile.all-in-one` (tunnel to nginx **:8888**) |
+| `NEXT_PUBLIC_API_URL` | Portal → API URL (Vercel build) |
+| `Cors__PortalOrigin` | CORS allowed origin |
 | `Cors__PortalOrigins__0`, `__1`, … | Multiple CORS origins |
 | `Smtp__Host` | SMTP server |
 | `Smtp__Port` | SMTP port |

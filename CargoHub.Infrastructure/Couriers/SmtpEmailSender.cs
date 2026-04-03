@@ -17,7 +17,10 @@ public sealed class SmtpEmailSender : IEmailSender
         _options = options?.Value ?? new SmtpOptions();
     }
 
-    public async Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
+    public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default) =>
+        SendAsync(to, subject, htmlBody, Array.Empty<EmailAttachment>(), cancellationToken);
+
+    public async Task SendAsync(string to, string subject, string htmlBody, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_options.Host))
             throw new InvalidOperationException("SmtpOptions.Host is not configured.");
@@ -31,6 +34,13 @@ public sealed class SmtpEmailSender : IEmailSender
         if (string.IsNullOrEmpty(from))
             throw new InvalidOperationException("SmtpOptions.FromAddress is not configured. Set Smtp:FromAddress in appsettings or environment.");
         using var message = new MailMessage(from, to, subject, htmlBody) { IsBodyHtml = true };
+        foreach (var a in attachments)
+        {
+            if (a.Content.Length == 0) continue;
+            var stream = new MemoryStream(a.Content);
+            message.Attachments.Add(new Attachment(stream, a.FileName, a.ContentType));
+        }
+
         await client.SendMailAsync(message, cancellationToken);
     }
 }

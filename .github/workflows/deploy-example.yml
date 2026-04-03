@@ -1,10 +1,15 @@
-# Legacy example (ubuntu-latest + custom deploy step).
-# For Mac Mini + Docker + ngrok, use: docker-build-push.yml + docker-deploy-mac.yml.
+# Example: Deploy using GitHub Secrets
+# Rename to deploy.yml and configure when ready.
+#
+# Sync secrets before deploy: ./scripts/sync-secrets-to-github.ps1
+# Secrets are synced from .env (see .env.example for full list).
 
 name: Deploy (Example)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger; change to push: branches: [main] for auto-deploy
+  # push:
+  #   branches: [main]
 
 jobs:
   deploy-api:
@@ -23,4 +28,5 @@ jobs:
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           Cors__PortalOrigin: ${{ secrets.CORS__PORTAL_ORIGIN }}
         run: |
-          echo "Replace with your cloud deploy, or use docker-build-push.yml + docker-deploy-mac.yml for Docker + ngrok on your own machine."
+          echo "Add your deployment step here (e.g. push to registry, deploy to Render/Azure)"
+          # Example: docker push your-registry/cargohub-api

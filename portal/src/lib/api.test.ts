@@ -193,6 +193,72 @@ describe("api", () => {
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe("CompanyNotFound");
     });
+
+    it("returns failure with RegistrationFailed when API returns duplicate email", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          errorCode: "RegistrationFailed",
+          message: "Email 'x@x.com' is already taken.",
+        }),
+      });
+
+      const result = await register({
+        email: "x@x.com",
+        password: "pass",
+        userName: "X",
+        businessId: "1234567-8",
+      } as RegisterBody);
+
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe("RegistrationFailed");
+      expect(result.message).toContain("already taken");
+    });
+
+    it("returns failure without throwing when response body is not JSON", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        statusText: "Internal Server Error",
+        json: async () => {
+          throw new SyntaxError("Unexpected token");
+        },
+      });
+
+      const result = await register({
+        email: "x@x.com",
+        password: "pass",
+        userName: "X",
+        businessId: "1234567-8",
+      } as RegisterBody);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe("Internal Server Error");
+    });
+
+    it("normalizes PascalCase success payload", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          UserId: "u2",
+          Email: "new@example.com",
+          DisplayName: "New",
+          JwtToken: "jwt-789",
+          Roles: ["User"],
+        }),
+      });
+
+      const result = await register({
+        email: "new@example.com",
+        password: "secret",
+        userName: "New",
+        businessId: "1234567-8",
+      } as RegisterBody);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.userId).toBe("u2");
+      expect(result.data?.jwtToken).toBe("jwt-789");
+      expect(result.data?.roles).toEqual(["User"]);
+    });
   });
 
   describe("getMe", () => {
