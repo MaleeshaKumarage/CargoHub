@@ -68,6 +68,17 @@ public class PortalController : ControllerBase
         });
     }
 
+    /// <summary>Accept company admin invitation (from email link). Creates account as Admin or promotes existing user.</summary>
+    [HttpPost("accept-company-admin-invite")]
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> AcceptCompanyAdminInvite([FromBody] AcceptCompanyAdminInviteRequest request)
+    {
+        var result = await _mediator.Send(new AcceptCompanyAdminInviteCommand(request), HttpContext.RequestAborted);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return Ok(result.Data);
+    }
+
     /// <summary>
     /// Register a new user. Company ID (government business ID) is required and must match an existing company created by an administrator.
     /// </summary>

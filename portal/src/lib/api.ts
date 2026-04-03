@@ -238,6 +238,25 @@ export type AdminCompany = {
   name?: string | null;
   businessId?: string | null;
   companyId: string;
+  maxUserAccounts?: number | null;
+  maxAdminAccounts?: number | null;
+  initialAdminInviteEmail?: string | null;
+  activeUserCount?: number;
+  adminCount?: number;
+};
+
+export type AdminCreateCompanyBody = {
+  name: string;
+  businessId: string;
+  maxUserAccounts?: number | null;
+  maxAdminAccounts?: number | null;
+  initialAdminEmail?: string | null;
+};
+
+export type AdminPatchCompanyBody = {
+  maxUserAccounts?: number | null;
+  maxAdminAccounts?: number | null;
+  resendAdminInvite?: boolean;
 };
 export type AdminUser = {
   userId: string;
@@ -258,6 +277,82 @@ export async function adminGetCompanies(token: string): Promise<AdminCompany[]> 
     throw new Error(`Failed to load companies (${res.status}): ${msg}`);
   }
   return res.json();
+}
+
+export async function adminCreateCompany(token: string, body: AdminCreateCompanyBody): Promise<AdminCompany> {
+  const res = await fetch(`${adminBase()}/companies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
+    throw new Error(msg || `Create failed (${res.status})`);
+  }
+  return data as AdminCompany;
+}
+
+export async function adminPatchCompany(
+  token: string,
+  companyId: string,
+  body: AdminPatchCompanyBody
+): Promise<AdminCompany> {
+  const res = await fetch(`${adminBase()}/companies/${encodeURIComponent(companyId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
+    throw new Error(msg || `Update failed (${res.status})`);
+  }
+  return data as AdminCompany;
+}
+
+/** Anonymous: accept Super Admin–sent company admin invite (returns JWT like register). */
+export async function acceptCompanyAdminInvite(body: {
+  token: string;
+  password: string;
+  userName: string;
+}): Promise<LoginResult> {
+  const res = await fetch(`${portalBase()}/accept-company-admin-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    return { success: false, message: 'Invalid response' };
+  }
+  if (!res.ok) {
+    return {
+      success: false,
+      errorCode: (data.errorCode as string) ?? 'Error',
+      message: (data.message as string) ?? 'Request failed',
+    };
+  }
+  const userId = (data.userId ?? data.UserId) as string | undefined;
+  const jwtToken = (data.jwtToken ?? data.JwtToken ?? '') as string;
+  if (userId && jwtToken) {
+    const rawRoles = data.roles ?? data.Roles;
+    const normalizedData: LoginResponse = {
+      userId,
+      email: (data.email as string) ?? '',
+      displayName: (data.displayName as string) ?? '',
+      businessId: (data.businessId ?? data.BusinessId ?? null) as string | null,
+      customerMappingId: (data.customerMappingId ?? data.CustomerMappingId ?? null) as string | null,
+      jwtToken,
+      roles: Array.isArray(rawRoles) ? (rawRoles as string[]) : [],
+    };
+    return { success: true, data: normalizedData };
+  }
+  return { success: false, message: 'Invalid response' };
 }
 
 export async function adminGetUsers(token: string, businessId?: string | null): Promise<AdminUser[]> {

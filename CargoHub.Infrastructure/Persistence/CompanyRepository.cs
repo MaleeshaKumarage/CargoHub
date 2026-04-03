@@ -1,6 +1,7 @@
 using CargoHub.Application.Company;
 using CargoHub.Domain.Companies;
 using Microsoft.EntityFrameworkCore;
+using CompanyEntity = CargoHub.Domain.Companies.Company;
 
 namespace CargoHub.Infrastructure.Persistence;
 
@@ -13,31 +14,43 @@ public sealed class CompanyRepository : ICompanyRepository
         _db = db;
     }
 
-    public async Task<Company> CreateAsync(Company company, CancellationToken cancellationToken = default)
+    public async Task<CompanyEntity> CreateAsync(CompanyEntity company, CancellationToken cancellationToken = default)
     {
         _db.Companies.Add(company);
         await _db.SaveChangesAsync(cancellationToken);
         return company;
     }
 
-    public Task<Company?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<CompanyEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _db.Companies
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
-    public Task<Company?> GetByBusinessIdAsync(string businessId, CancellationToken cancellationToken = default)
+    public Task<CompanyEntity?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(businessId)) return Task.FromResult<Company?>(null);
+        return _db.Companies.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task<CompanyEntity> UpdateAsync(CompanyEntity company, CancellationToken cancellationToken = default)
+    {
+        _db.Companies.Update(company);
+        await _db.SaveChangesAsync(cancellationToken);
+        return company;
+    }
+
+    public Task<CompanyEntity?> GetByBusinessIdAsync(string businessId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(businessId)) return Task.FromResult<CompanyEntity?>(null);
         return _db.Companies
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.BusinessId != null && c.BusinessId.Trim().ToLower() == businessId.Trim().ToLower(), cancellationToken);
     }
 
-    public Task<Company?> GetByBusinessIdWithAddressBooksAsync(string businessId, CancellationToken cancellationToken = default)
+    public Task<CompanyEntity?> GetByBusinessIdWithAddressBooksAsync(string businessId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(businessId)) return Task.FromResult<Company?>(null);
+        if (string.IsNullOrWhiteSpace(businessId)) return Task.FromResult<CompanyEntity?>(null);
         return _db.Companies
             .AsNoTracking()
             .Include(c => c.SenderAddressBook)
@@ -45,7 +58,7 @@ public sealed class CompanyRepository : ICompanyRepository
             .FirstOrDefaultAsync(c => c.BusinessId != null && c.BusinessId.Trim().ToLower() == businessId.Trim().ToLower(), cancellationToken);
     }
 
-    public Task<Company?> GetByIdWithAddressBooksAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<CompanyEntity?> GetByIdWithAddressBooksAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _db.Companies
             .AsNoTracking()
@@ -54,7 +67,7 @@ public sealed class CompanyRepository : ICompanyRepository
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
-    public async Task<List<Company>> GetAllWithAddressBooksAsync(CancellationToken cancellationToken = default)
+    public async Task<List<CompanyEntity>> GetAllWithAddressBooksAsync(CancellationToken cancellationToken = default)
     {
         return await _db.Companies
             .AsNoTracking()
@@ -64,7 +77,7 @@ public sealed class CompanyRepository : ICompanyRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<List<Company>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<List<CompanyEntity>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _db.Companies.AsNoTracking().ToListAsync(cancellationToken);
     }

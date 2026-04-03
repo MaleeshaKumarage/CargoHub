@@ -87,6 +87,14 @@ public sealed class ResetPasswordRequest
     public string NewPassword { get; set; } = string.Empty;
 }
 
+/// <summary>Request for POST /api/v1/portal/accept-company-admin-invite. Body: { token, password, userName }.</summary>
+public sealed class AcceptCompanyAdminInviteRequest
+{
+    public string Token { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+}
+
 /// <summary>Request for portal verify. Body: { code }.</summary>
 public sealed class VerifyRequest
 {
