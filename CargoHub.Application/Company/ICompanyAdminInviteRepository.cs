@@ -16,4 +16,7 @@ public interface ICompanyAdminInviteRepository
 
     /// <summary>Invalidate pending invites for this company (e.g. before issuing a new one).</summary>
     Task RevokePendingForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    /// <summary>Invalidate pending invite for this company and email only (allows multiple concurrent invites per company).</summary>
+    Task RevokePendingForCompanyAndEmailAsync(Guid companyId, string normalizedEmail, CancellationToken cancellationToken = default);
 }

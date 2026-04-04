@@ -18,6 +18,7 @@ public sealed class AdminCompanyDetailDto
     public int? MaxUserAccounts { get; init; }
     public int? MaxAdminAccounts { get; init; }
     public string? InitialAdminInviteEmail { get; init; }
+    public IReadOnlyList<string>? InitialAdminInviteEmails { get; init; }
     public int ActiveUserCount { get; init; }
     public int AdminCount { get; init; }
 }

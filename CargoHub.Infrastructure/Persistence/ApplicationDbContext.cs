@@ -187,6 +187,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(c => c.MaxUserAccounts);
             entity.Property(c => c.MaxAdminAccounts);
             entity.Property(c => c.InitialAdminInviteEmail).HasMaxLength(256);
+            entity.Property(c => c.InitialAdminInviteEmailsJson);
         });
 
         builder.Entity<CompanyAdminInvite>(entity =>

@@ -62,6 +62,9 @@ public class Company
     /// </summary>
     public string? InitialAdminInviteEmail { get; set; }
 
+    /// <summary>JSON array of explicit admin invite emails (e.g. <c>["a@x.com","b@x.com"]</c>). Null when only fallback or legacy single field.</summary>
+    public string? InitialAdminInviteEmailsJson { get; set; }
+
     /// <summary>
     /// Default shipper address used when booking does not override it.
     /// </summary>

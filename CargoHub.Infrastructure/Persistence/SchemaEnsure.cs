@@ -18,6 +18,7 @@ public static class SchemaEnsure
         EnsureBookingsIsDraft(db);
         EnsureBookingsCompanyId(db);
         EnsureCompaniesName(db);
+        EnsureCompaniesInitialAdminInviteEmailsJson(db);
         EnsureDropBookingCustomFields(db);
     }
 
@@ -32,6 +33,22 @@ public static class SchemaEnsure
                 WHERE table_schema = 'companies' AND table_name = 'Companies' AND column_name = 'Name'
               ) THEN
                 ALTER TABLE companies."Companies" ADD COLUMN "Name" text NULL;
+              END IF;
+            END $$;
+            """);
+    }
+
+    /// <summary>Adds JSON list column for multiple admin invite emails. Idempotent.</summary>
+    private static void EnsureCompaniesInitialAdminInviteEmailsJson(ApplicationDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'companies' AND table_name = 'Companies' AND column_name = 'InitialAdminInviteEmailsJson'
+              ) THEN
+                ALTER TABLE companies."Companies" ADD COLUMN "InitialAdminInviteEmailsJson" text NULL;
               END IF;
             END $$;
             """);

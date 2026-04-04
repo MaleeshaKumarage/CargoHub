@@ -48,4 +48,17 @@ public sealed class CompanyAdminInviteRepository : ICompanyAdminInviteRepository
         if (pending.Count > 0)
             await _db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task RevokePendingForCompanyAndEmailAsync(Guid companyId, string normalizedEmail, CancellationToken cancellationToken = default)
+    {
+        var norm = normalizedEmail.Trim().ToUpperInvariant();
+        var pending = await _db.CompanyAdminInvites
+            .Where(i => i.CompanyId == companyId && i.ConsumedAt == null && i.NormalizedEmail == norm)
+            .ToListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var i in pending)
+            i.ConsumedAt = now;
+        if (pending.Count > 0)
+            await _db.SaveChangesAsync(cancellationToken);
+    }
 }

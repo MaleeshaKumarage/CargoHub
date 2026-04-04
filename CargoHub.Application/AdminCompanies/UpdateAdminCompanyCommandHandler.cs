@@ -43,9 +43,16 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
             if (string.IsNullOrEmpty(businessIdForInvite))
                 return Fail("BusinessIdRequired", "Company has no Business ID; cannot resend invite.");
 
-            var admins = await _metrics.CountAdminsForBusinessIdAsync(businessIdForInvite, cancellationToken);
-            if (admins == 0)
-                await _inviteIssuer.TryIssueInitialAdminInviteAsync(company.Id, businessIdForInvite, company.InitialAdminInviteEmail, cancellationToken);
+            var adminsNow = await _metrics.CountAdminsForBusinessIdAsync(businessIdForInvite, cancellationToken);
+            if (adminsNow > 0)
+                return Fail("AlreadyHasAdmin", "Cannot resend invite: company already has an administrator.");
+
+            var targets = CompanyAdminInviteEmailsHelper.GetExplicitTargets(company.InitialAdminInviteEmailsJson, company.InitialAdminInviteEmail);
+            await _inviteIssuer.TryIssueInitialAdminInvitesAsync(
+                company.Id,
+                businessIdForInvite,
+                targets.Count > 0 ? targets.ToList() : null,
+                cancellationToken);
         }
 
         var c = await _companies.GetByIdAsync(request.CompanyId, cancellationToken);
@@ -55,6 +62,8 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
         var bid = c.BusinessId ?? "";
         var users = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountActiveUsersForBusinessIdAsync(bid, cancellationToken);
         var adminCount = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
+
+        var inviteList = CompanyAdminInviteEmailsHelper.GetExplicitTargets(c.InitialAdminInviteEmailsJson, c.InitialAdminInviteEmail);
 
         return new AdminCompanyMutationResult
         {
@@ -68,6 +77,7 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
                 MaxUserAccounts = c.MaxUserAccounts,
                 MaxAdminAccounts = c.MaxAdminAccounts,
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
+                InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
                 AdminCount = adminCount
             }

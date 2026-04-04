@@ -241,6 +241,7 @@ export type AdminCompany = {
   maxUserAccounts?: number | null;
   maxAdminAccounts?: number | null;
   initialAdminInviteEmail?: string | null;
+  initialAdminInviteEmails?: string[] | null;
   activeUserCount?: number;
   adminCount?: number;
 };
@@ -250,7 +251,9 @@ export type AdminCreateCompanyBody = {
   businessId: string;
   maxUserAccounts?: number | null;
   maxAdminAccounts?: number | null;
+  /** Legacy single field; ignored when initialAdminEmails is non-empty. */
   initialAdminEmail?: string | null;
+  initialAdminEmails?: string[] | null;
 };
 
 export type AdminPatchCompanyBody = {
@@ -292,6 +295,22 @@ export async function adminCreateCompany(token: string, body: AdminCreateCompany
     throw new Error(msg || `Create failed (${res.status})`);
   }
   return data as AdminCompany;
+}
+
+/** Super Admin: send a test message to verify SMTP configuration. */
+export async function adminSendTestEmail(token: string, to: string): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch(`${adminBase()}/email/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ to }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
+    throw new Error(msg || `Test email failed (${res.status})`);
+  }
+  return data as { ok: boolean; message?: string };
 }
 
 export async function adminPatchCompany(
