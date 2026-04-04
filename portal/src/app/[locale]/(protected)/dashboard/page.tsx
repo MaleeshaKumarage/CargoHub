@@ -3,8 +3,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDashboardStats,
   type DashboardScope,
@@ -15,18 +15,52 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ThemedECharts } from "@/components/charts/ThemedECharts";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import {
+  aggregateCouriersForPie,
   buildPeriodBarOption,
   buildSankeyOption,
   buildDailyVolumeLineOption,
   buildDeliveryBoxplotOption,
   buildDayHourHeatmapOption,
-  buildMonthCalendarHeatmapOption,
+  buildLast7DaysGroupedBarOption,
+  buildCourierPieOption,
 } from "@/lib/dashboard-echarts";
 import { buildWordCloudOption } from "@/lib/dashboard-wordcloud";
+import { cn } from "@/lib/utils";
+import { BookingCalendarHeatmapGrid } from "@/components/dashboard/BookingCalendarHeatmap";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+function ChartPanel({
+  title,
+  children,
+  className,
+  headerRight,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+  headerRight?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-border/70 bg-card/95 p-4 shadow-sm",
+        "dark:border-blue-500/20 dark:bg-gradient-to-br dark:from-card/95 dark:to-blue-950/20 dark:shadow-[0_0_36px_-14px_rgba(59,130,246,0.45)]",
+        className,
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2 gap-y-2">
+        <h3 className="min-w-0 flex-1 text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+        {headerRight}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations("dashboard");
   const tStats = useTranslations("dashboard.stats");
   const tCards = useTranslations("dashboard.cards");
@@ -34,6 +68,10 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [scope, setScope] = useState<DashboardScope>("all");
+  const [heatmapUtc, setHeatmapUtc] = useState(() => {
+    const d = new Date();
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+  });
   const [avgMode, setAvgMode] = useState<"roll30" | "month" | "year">("roll30");
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
   const chartTheme = useChartTheme();
@@ -146,15 +184,57 @@ export default function DashboardPage() {
     );
   }, [stats, themeSlice, tStats]);
 
-  const calendarHeatmapOption = useMemo(() => {
-    if (!stats?.bookingsPerDayCurrentMonth?.length) return null;
-    return buildMonthCalendarHeatmapOption(
-      stats.bookingsPerDayCurrentMonth,
-      themeSlice,
-      tStats("bookings"),
-      mondayFirstDowLabels,
-    );
-  }, [stats, themeSlice, tStats, mondayFirstDowLabels]);
+  const heatmapMonthLabel = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(locale, {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    return fmt.format(new Date(Date.UTC(heatmapUtc.year, heatmapUtc.month - 1, 1)));
+  }, [locale, heatmapUtc.year, heatmapUtc.month]);
+
+  const heatmapNavNow = (() => {
+    const d = new Date();
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+  })();
+
+  const canHeatmapGoNext =
+    heatmapUtc.year < heatmapNavNow.year ||
+    (heatmapUtc.year === heatmapNavNow.year && heatmapUtc.month < heatmapNavNow.month);
+
+  const goHeatmapPrevMonth = useCallback(() => {
+    setHeatmapUtc(({ year, month }) => {
+      let m = month - 1;
+      let y = year;
+      if (m < 1) {
+        m = 12;
+        y -= 1;
+      }
+      return { year: y, month: m };
+    });
+  }, []);
+
+  const goHeatmapNextMonth = useCallback(() => {
+    setHeatmapUtc(({ year, month }) => {
+      let m = month + 1;
+      let y = year;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+      const d = new Date();
+      const ny = d.getUTCFullYear();
+      const nm = d.getUTCMonth() + 1;
+      if (y > ny || (y === ny && m > nm)) return { year: ny, month: nm };
+      return { year: y, month: m };
+    });
+  }, []);
+
+  const setScopeAndResetHeatmap = useCallback((next: DashboardScope) => {
+    setScope(next);
+    const d = new Date();
+    setHeatmapUtc({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 });
+  }, []);
 
   const exceptionHeatmapOption = useMemo(() => {
     if (!stats?.exceptionSignalsHeatmap?.cells?.length) return null;
@@ -166,6 +246,27 @@ export default function DashboardPage() {
     );
   }, [stats, themeSlice, dayLabels]);
 
+  const last7GroupedOption = useMemo(() => {
+    if (!stats?.bookingsPerDayLast30?.length) return null;
+    const benchColor = chartTheme.chart[2] ?? chartTheme.chart[1];
+    return buildLast7DaysGroupedBarOption(
+      stats.bookingsPerDayLast30,
+      themeSlice,
+      tStats("bookings"),
+      tStats("benchmarkAvg30"),
+      chartTheme.chart[0],
+      benchColor,
+      dayLabels,
+    );
+  }, [stats, themeSlice, chartTheme.chart, tStats, dayLabels]);
+
+  const courierPieOption = useMemo(() => {
+    if (!stats?.byCourier.length) return null;
+    const rows = aggregateCouriersForPie(stats.byCourier, 5, tStats("otherCouriers"));
+    if (!rows.length) return null;
+    return buildCourierPieOption(rows, [...chartTheme.chart], themeSlice, tStats("bookings"));
+  }, [stats, chartTheme.chart, themeSlice, tStats]);
+
   const stuckAlert =
     stats &&
     scope === "all" &&
@@ -173,13 +274,8 @@ export default function DashboardPage() {
     stats.countMonth > 0 &&
     stats.kpi.possiblyStuckCount / stats.countMonth >= 0.1;
 
-  const loadStats = useCallback(() => {
-    if (!token) return;
-    setStatsError(null);
-    getDashboardStats(token, scope === "all" ? null : scope)
-      .then(setStats)
-      .catch((e) => setStatsError(e instanceof Error ? e.message : "Failed to load stats"));
-  }, [token, scope]);
+  /** Monotonic id so an older /dashboard/stats response cannot overwrite a newer one (e.g. April finishing after March). */
+  const statsRequestSeqRef = useRef(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -187,8 +283,24 @@ export default function DashboardPage() {
       return;
     }
     if (!token) return;
-    loadStats();
-  }, [token, isAuthenticated, isLoading, router, loadStats]);
+
+    const id = ++statsRequestSeqRef.current;
+    const ac = new AbortController();
+    setStatsError(null);
+
+    getDashboardStats(token, scope === "all" ? null : scope, heatmapUtc, ac.signal)
+      .then((data) => {
+        if (id !== statsRequestSeqRef.current) return;
+        setStats(data);
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (id !== statsRequestSeqRef.current) return;
+        setStatsError(e instanceof Error ? e.message : "Failed to load stats");
+      });
+
+    return () => ac.abort();
+  }, [token, isAuthenticated, isLoading, router, scope, heatmapUtc]);
 
   if (!isAuthenticated || isLoading) return null;
 
@@ -200,7 +312,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Company booking stats */}
-      <Card>
+      <Card className="overflow-hidden rounded-3xl border-border/70 shadow-md dark:border-blue-500/20">
         <CardHeader>
           <CardTitle>{tStats("title")}</CardTitle>
           <CardDescription>
@@ -234,7 +346,7 @@ export default function DashboardPage() {
                     type="button"
                     size="sm"
                     variant={scope === "all" ? "default" : "outline"}
-                    onClick={() => setScope("all")}
+                    onClick={() => setScopeAndResetHeatmap("all")}
                   >
                     {tStats("scopeAll")}
                   </Button>
@@ -242,31 +354,31 @@ export default function DashboardPage() {
                     type="button"
                     size="sm"
                     variant={scope === "drafts" ? "default" : "outline"}
-                    onClick={() => setScope("drafts")}
+                    onClick={() => setScopeAndResetHeatmap("drafts")}
                   >
                     {tStats("scopeDrafts")}
                   </Button>
                 </div>
               </div>
 
-              {/* KPI row: period totals match charts; averages in one box */}
+              {/* KPI row — card tiles with stronger radius / depth (admin-style dashboard) */}
               <div
                 className={`grid gap-4 sm:grid-cols-2 ${scope === "all" ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
               >
-                <div className="rounded-lg border bg-muted/30 p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.countToday}</p>
-                  <p className="text-sm text-muted-foreground">{tStats("today")}</p>
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-muted/50 to-muted/15 p-5 text-center shadow-sm dark:border-blue-500/25 dark:from-blue-950/40 dark:to-card/60">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tStats("today")}</p>
+                  <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-foreground">{stats.countToday}</p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.countMonth}</p>
-                  <p className="text-sm text-muted-foreground">{tStats("thisMonth")}</p>
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-muted/50 to-muted/15 p-5 text-center shadow-sm dark:border-blue-500/25 dark:from-blue-950/40 dark:to-card/60">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tStats("thisMonth")}</p>
+                  <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-foreground">{stats.countMonth}</p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.countYear}</p>
-                  <p className="text-sm text-muted-foreground">{tStats("thisYear")}</p>
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-muted/50 to-muted/15 p-5 text-center shadow-sm dark:border-blue-500/25 dark:from-blue-950/40 dark:to-card/60">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tStats("thisYear")}</p>
+                  <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-foreground">{stats.countYear}</p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <p className="mb-2 text-center text-xs font-medium text-muted-foreground">{tStats("avgTitle")}</p>
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-muted/50 to-muted/15 p-5 shadow-sm dark:border-blue-500/25 dark:from-blue-950/40 dark:to-card/60">
+                  <p className="mb-2 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">{tStats("avgTitle")}</p>
                   <div className="mb-2 flex flex-wrap justify-center gap-1">
                     <Button
                       type="button"
@@ -296,7 +408,7 @@ export default function DashboardPage() {
                       {tStats("avgModeYear")}
                     </Button>
                   </div>
-                  <p className="text-center text-2xl font-bold">
+                  <p className="text-center text-3xl font-bold tabular-nums tracking-tight">
                     {avgMode === "roll30" && stats.kpi.avgPerDayLast30}
                     {avgMode === "month" && stats.kpi.avgPerDayThisMonth}
                     {avgMode === "year" && stats.kpi.avgPerDayThisYear}
@@ -305,58 +417,66 @@ export default function DashboardPage() {
                 </div>
                 {scope === "all" && (
                   <div
-                    className={`rounded-lg border p-4 text-center ${
-                      stuckAlert ? "border-destructive/80 bg-destructive/10 animate-pulse" : "bg-muted/30"
+                    className={`rounded-2xl border p-5 text-center shadow-sm ${
+                      stuckAlert ? "border-destructive/80 bg-destructive/10 animate-pulse" : "border-border/80 bg-gradient-to-br from-muted/50 to-muted/15 dark:border-blue-500/25 dark:from-blue-950/40 dark:to-card/60"
                     }`}
                   >
-                    <p className={`text-2xl font-bold ${stuckAlert ? "text-destructive" : ""}`}>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{tStats("kpiStuck")}</p>
+                    <p className={`mt-2 text-3xl font-bold tabular-nums tracking-tight ${stuckAlert ? "text-destructive" : ""}`}>
                       {stats.kpi.possiblyStuckCount}
                     </p>
-                    <p className="text-sm text-muted-foreground">{tStats("kpiStuck")}</p>
                   </div>
                 )}
               </div>
 
-              {/* Period comparison bar chart (Apache ECharts) */}
+              {/* Recent activity (grouped bars) + carrier share (donut) */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ChartPanel title={tStats("last7DaysTitle")}>
+                  {last7GroupedOption ? (
+                    <div className="h-56 w-full min-h-[224px]">
+                      <ThemedECharts option={last7GroupedOption} height={224} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
+                  )}
+                </ChartPanel>
+                <ChartPanel title={tStats("courierShareTitle")}>
+                  {courierPieOption ? (
+                    <div className="h-56 w-full min-h-[224px]">
+                      <ThemedECharts option={courierPieOption} height={224} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
+                  )}
+                </ChartPanel>
+              </div>
+
               {periodChartOption && (
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("byPeriod")}
-                  </h3>
+                <ChartPanel title={tStats("byPeriod")}>
                   <div className="h-48 w-full min-h-[192px]">
                     <ThemedECharts option={periodChartOption} height={192} />
                   </div>
-                </div>
+                </ChartPanel>
               )}
 
-              {/* Volume line (last 30 days, slider) */}
               {volumeLineOption && (
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("volumeLineTitle")}
-                  </h3>
+                <ChartPanel title={tStats("volumeLineTitle")}>
                   <div className="h-64 w-full min-h-[256px]">
                     <ThemedECharts option={volumeLineOption} height={256} />
                   </div>
-                </div>
+                </ChartPanel>
               )}
 
-              {/* Sankey: lanes */}
               {sankeyOption && (
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("sankeyTitle")}
-                  </h3>
+                <ChartPanel title={tStats("sankeyTitle")}>
                   <div className="h-80 w-full min-h-[320px]">
                     <ThemedECharts option={sankeyOption} height={320} />
                   </div>
-                </div>
+                </ChartPanel>
               )}
 
-              {/* Word clouds: carriers | From | To */}
               <div className="grid gap-6 lg:grid-cols-3">
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudCarriers")}</h3>
+                <ChartPanel title={tStats("wordCloudCarriers")}>
                   {stats.byCourier.length === 0 || !courierWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
@@ -364,9 +484,8 @@ export default function DashboardPage() {
                       <ThemedECharts option={courierWordCloudOption} height={224} />
                     </div>
                   )}
-                </div>
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudFrom")}</h3>
+                </ChartPanel>
+                <ChartPanel title={tStats("wordCloudFrom")}>
                   {stats.fromCities.length === 0 || !fromCitiesWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
@@ -374,9 +493,8 @@ export default function DashboardPage() {
                       <ThemedECharts option={fromCitiesWordCloudOption} height={224} />
                     </div>
                   )}
-                </div>
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">{tStats("wordCloudTo")}</h3>
+                </ChartPanel>
+                <ChartPanel title={tStats("wordCloudTo")}>
                   {stats.toCities.length === 0 || !toCitiesWordCloudOption ? (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
                   ) : (
@@ -384,41 +502,71 @@ export default function DashboardPage() {
                       <ThemedECharts option={toCitiesWordCloudOption} height={224} />
                     </div>
                   )}
-                </div>
+                </ChartPanel>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2">
                 {deliveryBoxOption && (
-                  <div>
-                    <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                      {tStats("deliveryBoxTitle")}
-                    </h3>
+                  <ChartPanel title={tStats("deliveryBoxTitle")}>
                     <div className="h-56 w-full min-h-[224px]">
                       <ThemedECharts option={deliveryBoxOption} height={224} />
                     </div>
-                  </div>
+                  </ChartPanel>
                 )}
-                {calendarHeatmapOption && (
-                  <div>
-                    <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                      {tStats("calendarHeatmapTitle")}
-                    </h3>
-                    <div className="h-72 w-full min-h-[288px]">
-                      <ThemedECharts option={calendarHeatmapOption} height={288} />
+                {stats.bookingsPerDayCurrentMonth.length > 0 && (
+                  <ChartPanel
+                    title={tStats("calendarHeatmapTitle")}
+                    headerRight={
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={goHeatmapPrevMonth}
+                          aria-label={tStats("heatmapPrevMonth")}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="min-w-[9rem] text-center text-sm font-medium tabular-nums text-foreground sm:min-w-[11rem]">
+                          {heatmapMonthLabel}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          disabled={!canHeatmapGoNext}
+                          onClick={goHeatmapNextMonth}
+                          aria-label={tStats("heatmapNextMonth")}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    }
+                  >
+                    <div className="w-full pt-1">
+                      <BookingCalendarHeatmapGrid
+                        daily={stats.bookingsPerDayCurrentMonth}
+                        targetYear={heatmapUtc.year}
+                        targetMonth={heatmapUtc.month}
+                        dowLabels={mondayFirstDowLabels}
+                        weekLabel={(week, isoYear) =>
+                          tStats("heatmapIsoWeekWithYear", { week, year: isoYear })
+                        }
+                        bookingsLabel={tStats("bookings")}
+                      />
                     </div>
-                  </div>
+                  </ChartPanel>
                 )}
               </div>
 
               {exceptionHeatmapOption && (
-                <div>
-                  <h3 className="mb-3 text-sm font-medium text-muted-foreground">
-                    {tStats("heatmapExceptionTitle")}
-                  </h3>
+                <ChartPanel title={tStats("heatmapExceptionTitle")}>
                   <div className="h-72 w-full min-h-[288px]">
                     <ThemedECharts option={exceptionHeatmapOption} height={288} />
                   </div>
-                </div>
+                </ChartPanel>
               )}
             </>
           )}
