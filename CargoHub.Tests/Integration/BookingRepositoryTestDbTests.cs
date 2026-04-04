@@ -266,6 +266,8 @@ public class BookingRepositoryTestDbTests : IDisposable
 
         var stats = await repo.GetDashboardStatsAsync(customerId, null, 2024, 2, default);
         Assert.Equal(29, stats.BookingsPerDayCurrentMonth.Count);
+        Assert.Equal(29, stats.CompletedBookingsPerDayCurrentMonth.Count);
+        Assert.Equal(29, stats.DraftsPerDayCurrentMonth.Count);
     }
 
     [Fact]

@@ -114,6 +114,8 @@
       "last7DaysTitle": "Senaste dagsaktivitet",
       "courierShareTitle": "Andel per transportör",
       "benchmarkAvg30": "30-dagars medel",
+      "sameWeekdayAvg30": "Medel för samma veckodag (30 dagar)",
+      "heatmapCellTooltip": "{date}: {bookingCount} bokningar, {draftCount} utkast",
       "otherCouriers": "Övriga",
       "bookings": "Bokningar",
       "byCourier": "Per speditör",

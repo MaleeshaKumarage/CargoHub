@@ -68,37 +68,53 @@ export function aggregateCouriersForPie(rows: KeyCount[], topN: number, otherLab
   return head;
 }
 
+function averageForUtcWeekday(daily: { date: string; count: number }[], weekdayUtc: number): number {
+  let sum = 0;
+  let n = 0;
+  for (const d of daily) {
+    const dt = new Date(`${d.date}T12:00:00Z`);
+    if (dt.getUTCDay() === weekdayUtc) {
+      sum += d.count;
+      n++;
+    }
+  }
+  if (n === 0) return 0;
+  return Math.round((sum / n) * 10) / 10;
+}
+
 /**
- * Last 7 days: grouped bars — daily bookings vs 30-day average (benchmark), rounded tops.
+ * Last 7 days: grouped bars — actual count per day vs average for that weekday across the window.
  */
 export function buildLast7DaysGroupedBarOption(
   daily: { date: string; count: number }[],
   theme: ThemeSlice,
-  bookingsLabel: string,
-  benchmarkLabel: string,
+  actualLabel: string,
+  weekdayAvgLabel: string,
   primaryBarColor: string,
   benchmarkBarColor: string,
   dowLabelsSunFirst: string[],
 ): EChartsOption | null {
   if (!daily.length) return null;
   const last7 = daily.slice(-7);
-  const sum30 = daily.reduce((s, d) => s + d.count, 0);
-  const avg30 = daily.length ? sum30 / daily.length : 0;
-  const bench = Math.max(0, Math.round(avg30 * 10) / 10);
+  const isoDates = last7.map((d) => d.date);
   const categories = last7.map((d) => {
     const dt = new Date(`${d.date}T12:00:00Z`);
     return dowLabelsSunFirst[dt.getUTCDay()] ?? d.date.slice(5);
   });
   const counts = last7.map((d) => d.count);
-  const benchmark = last7.map(() => bench);
+  const weekdayAverages = last7.map((d) => {
+    const dt = new Date(`${d.date}T12:00:00Z`);
+    return averageForUtcWeekday(daily, dt.getUTCDay());
+  });
   return {
-    grid: { left: 8, right: 8, top: 28, bottom: 8, containLabel: true },
+    grid: { left: 10, right: 10, top: 40, bottom: 28, containLabel: true },
     legend: {
-      bottom: 0,
+      top: 4,
       left: "center",
       textStyle: { color: theme.mutedForeground, fontSize: 11 },
       itemWidth: 12,
       itemHeight: 12,
+      itemGap: 20,
     },
     tooltip: {
       trigger: "axis",
@@ -107,12 +123,28 @@ export function buildLast7DaysGroupedBarOption(
       borderColor: theme.border,
       borderWidth: 1,
       textStyle: { color: theme.foreground },
+      formatter: (params: unknown) => {
+        const items = Array.isArray(params) ? params : [params];
+        const first = items[0] as { dataIndex?: number };
+        const idx = typeof first?.dataIndex === "number" ? first.dataIndex : 0;
+        const date = isoDates[idx] ?? "";
+        const lines = [`<strong>${date}</strong>`];
+        for (const raw of items) {
+          const p = raw as { seriesName?: string; value?: number | number[] };
+          const name = p.seriesName ?? "";
+          const v = Array.isArray(p.value) ? p.value[0] : p.value;
+          if (typeof v !== "number") continue;
+          const display = Number.isInteger(v) ? String(v) : v.toFixed(1);
+          lines.push(`${name}: ${display}`);
+        }
+        return lines.join("<br/>");
+      },
     },
     xAxis: {
       type: "category",
       data: categories,
       axisLine: { lineStyle: { color: theme.border } },
-      axisLabel: { color: theme.mutedForeground, fontSize: 11 },
+      axisLabel: { color: theme.mutedForeground, fontSize: 11, margin: 10 },
     },
     yAxis: {
       type: "value",
@@ -123,23 +155,23 @@ export function buildLast7DaysGroupedBarOption(
     },
     series: [
       {
-        name: bookingsLabel,
+        name: actualLabel,
         type: "bar",
         data: counts.map((value) => ({
           value,
           itemStyle: { color: primaryBarColor, borderRadius: [12, 12, 0, 0] },
         })),
-        barMaxWidth: 22,
-        barGap: "12%",
+        barMaxWidth: 20,
+        barGap: "18%",
       },
       {
-        name: benchmarkLabel,
+        name: weekdayAvgLabel,
         type: "bar",
-        data: benchmark.map((value) => ({
+        data: weekdayAverages.map((value) => ({
           value,
           itemStyle: { color: benchmarkBarColor, borderRadius: [12, 12, 0, 0] },
         })),
-        barMaxWidth: 22,
+        barMaxWidth: 20,
       },
     ],
   };
