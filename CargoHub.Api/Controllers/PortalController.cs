@@ -84,7 +84,7 @@ public class PortalController : ControllerBase
     {
         return Ok(new BrandingResponse
         {
-            AppName = _branding.AppName ?? "Portal",
+            AppName = _branding.AppName ?? "CargoHub",
             LogoUrl = _branding.LogoUrl ?? "",
             PrimaryColor = _branding.PrimaryColor ?? "",
             SecondaryColor = _branding.SecondaryColor ?? ""
