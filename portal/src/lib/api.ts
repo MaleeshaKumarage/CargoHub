@@ -1186,16 +1186,24 @@ export type DashboardStats = {
   exceptionSignalsHeatmap: HeatmapGrid;
 };
 
+export type DashboardHeatmapMonth = { year: number; month: number };
+
 export async function getDashboardStats(
   token: string,
   scope?: DashboardScope | null,
+  heatmap?: DashboardHeatmapMonth | null,
+  signal?: AbortSignal,
 ): Promise<DashboardStats> {
-  const q =
-    scope && scope !== "all"
-      ? `?scope=${encodeURIComponent(scope)}`
-      : "";
+  const params = new URLSearchParams();
+  if (scope && scope !== "all") params.set("scope", scope);
+  if (heatmap) {
+    params.set("heatmapYear", String(heatmap.year));
+    params.set("heatmapMonth", String(heatmap.month));
+  }
+  const q = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${portalBase()}/dashboard/stats${q}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
   if (!res.ok) throw new Error("Failed to load dashboard stats");
   return res.json();

@@ -3,7 +3,8 @@ import {
   buildPeriodBarOption,
   buildCourierPieOption,
   buildCityBarOption,
-  buildMonthCalendarHeatmapOption,
+  aggregateCouriersForPie,
+  buildLast7DaysGroupedBarOption,
 } from "./dashboard-echarts";
 
 const theme = {
@@ -43,11 +44,73 @@ describe("buildCourierPieOption", () => {
       theme,
       "bookings",
     );
-    const s = opt.series?.[0];
+    const s = opt.series?.[0] as { type: string; radius: string[]; data: unknown[] };
     expect(s?.type).toBe("pie");
+    expect(s?.radius).toEqual(["44%", "72%"]);
     const data = s?.data as { name: string; value: number; itemStyle: { color: string } }[];
     expect(data[0]).toMatchObject({ name: "DHL", value: 10, itemStyle: { color: "#c1" } });
     expect(data[1]).toMatchObject({ name: "Posti", value: 5, itemStyle: { color: "#c2" } });
+  });
+});
+
+describe("aggregateCouriersForPie", () => {
+  it("returns top N and rolls the rest into Other", () => {
+    const out = aggregateCouriersForPie(
+      [
+        { key: "A", count: 10 },
+        { key: "B", count: 8 },
+        { key: "C", count: 5 },
+        { key: "D", count: 2 },
+      ],
+      2,
+      "Other",
+    );
+    expect(out).toEqual([
+      { key: "A", count: 10 },
+      { key: "B", count: 8 },
+      { key: "Other", count: 7 },
+    ]);
+  });
+
+  it("omits Other when nothing remains", () => {
+    const out = aggregateCouriersForPie(
+      [
+        { key: "A", count: 1 },
+        { key: "B", count: 1 },
+      ],
+      2,
+      "Other",
+    );
+    expect(out).toEqual([
+      { key: "A", count: 1 },
+      { key: "B", count: 1 },
+    ]);
+  });
+});
+
+describe("buildLast7DaysGroupedBarOption", () => {
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  it("returns null for empty daily", () => {
+    expect(buildLast7DaysGroupedBarOption([], theme, "B", "Avg", "#111", "#222", dow)).toBeNull();
+  });
+
+  it("builds two bar series with 30-day benchmark", () => {
+    const daily = Array.from({ length: 10 }, (_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      count: i < 5 ? 2 : 4,
+    }));
+    const opt = buildLast7DaysGroupedBarOption(daily, theme, "B", "Avg", "#111", "#222", dow);
+    expect(opt).not.toBeNull();
+    const series = opt!.series as { type: string; name: string; data: { value: number }[] }[];
+    expect(series).toHaveLength(2);
+    expect(series[0].type).toBe("bar");
+    expect(series[1].type).toBe("bar");
+    expect(series[0].data).toHaveLength(7);
+    expect(series[1].data).toHaveLength(7);
+    const sum = daily.reduce((s, d) => s + d.count, 0);
+    const bench = Math.max(0, Math.round((sum / daily.length) * 10) / 10);
+    expect(series[1].data.every((d) => d.value === bench)).toBe(true);
   });
 });
 
@@ -74,21 +137,3 @@ describe("buildCityBarOption", () => {
   });
 });
 
-describe("buildMonthCalendarHeatmapOption", () => {
-  it("builds heatmap data for each day in month", () => {
-    const march2025 = Array.from({ length: 31 }, (_, i) => ({
-      date: `2025-03-${String(i + 1).padStart(2, "0")}`,
-      count: i === 0 ? 2 : 0,
-    }));
-    const opt = buildMonthCalendarHeatmapOption(
-      march2025,
-      theme,
-      "bookings",
-      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    );
-    const series = opt?.series?.[0] as { type: string; data: [number, number, number][] };
-    expect(series?.type).toBe("heatmap");
-    expect(series?.data?.length).toBe(31);
-    expect(series?.data?.[0]).toEqual([5, 0, 2]);
-  });
-});

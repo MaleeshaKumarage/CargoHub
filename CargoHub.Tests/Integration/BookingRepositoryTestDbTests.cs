@@ -223,6 +223,73 @@ public class BookingRepositoryTestDbTests : IDisposable
     }
 
     [Fact]
+    public async Task GetDashboardStats_WithDraftsScope_CountsOnlyDraftBookings()
+    {
+        var customerId = "cust-dash-drafts";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var draftStats = await repo.GetDashboardStatsAsync(customerId, "drafts", null, null, default);
+        Assert.True(draftStats.CountMonth >= 1);
+        Assert.Equal("drafts", draftStats.Scope);
+
+        var allStats = await repo.GetDashboardStatsAsync(customerId, "all", null, null, default);
+        Assert.True(allStats.CountMonth >= 1);
+        Assert.Equal("all", allStats.Scope);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WithExplicitHeatmapMonth_HasExpectedDaySlots()
+    {
+        var customerId = "cust-heatmap-feb";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, null, 2024, 2, default);
+        Assert.Equal(29, stats.BookingsPerDayCurrentMonth.Count);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_InvalidHeatmapMonth_FallsBackToCurrentMonth()
+    {
+        var customerId = "cust-heat-invalid";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateBookingCommandHandler(repo).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var now = DateTime.UtcNow;
+        var stats = await repo.GetDashboardStatsAsync(customerId, null, now.Year, 13, default);
+        Assert.Equal(DateTime.DaysInMonth(now.Year, now.Month), stats.BookingsPerDayCurrentMonth.Count);
+    }
+
+    [Fact]
     public async Task ListByCustomerId_WithFilter_AppliesSearchAndDateRange()
     {
         var customerId = "cust-filter";
