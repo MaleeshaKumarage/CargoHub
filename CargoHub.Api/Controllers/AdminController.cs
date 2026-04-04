@@ -89,10 +89,35 @@ public class AdminController : ControllerBase
     public async Task<ActionResult<AdminCompanyDetailDto>> PatchCompany(Guid id, [FromBody] PatchAdminCompanyRequest body, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(
-            new UpdateAdminCompanyCommand(id, body.MaxUserAccounts, body.MaxAdminAccounts, body.ResendAdminInvite),
+            new UpdateAdminCompanyCommand(
+                id,
+                body.MaxUserAccounts,
+                body.MaxAdminAccounts,
+                body.ResendAdminInvite,
+                body.DeactivateUserIds,
+                body.DemoteAdminUserIds),
             cancellationToken);
         if (!result.Success)
+        {
+            if (result.ErrorCode == "LimitReductionRequired" && result.LimitReductionRequired is { } lr)
+            {
+                return Conflict(new
+                {
+                    errorCode = result.ErrorCode,
+                    message = result.Message,
+                    activeUserCount = lr.ActiveUserCount,
+                    proposedMaxUserAccounts = lr.ProposedMaxUserAccounts,
+                    adminCount = lr.AdminCount,
+                    proposedMaxAdminAccounts = lr.ProposedMaxAdminAccounts,
+                    minimumUsersToDeactivate = lr.MinimumUsersToDeactivate,
+                    minimumAdminsToDemote = lr.MinimumAdminsToDemote,
+                    businessId = lr.BusinessId
+                });
+            }
+
             return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        }
+
         return Ok(result.Company);
     }
 
@@ -233,6 +258,8 @@ public class AdminController : ControllerBase
         public int? MaxUserAccounts { get; set; }
         public int? MaxAdminAccounts { get; set; }
         public bool ResendAdminInvite { get; set; }
+        public List<string>? DeactivateUserIds { get; set; }
+        public List<string>? DemoteAdminUserIds { get; set; }
     }
 
     public sealed class AdminUserDto
