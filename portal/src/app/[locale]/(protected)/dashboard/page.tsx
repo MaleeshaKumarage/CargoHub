@@ -307,6 +307,7 @@ export default function DashboardPage() {
     getDashboardStats(token, scope === "all" ? null : scope, heatmapUtc, ac.signal)
       .then((data) => {
         if (id !== statsRequestSeqRef.current) return;
+        setStatsError(null);
         setStats(data);
       })
       .catch((e) => {

@@ -97,19 +97,17 @@ public sealed partial class BookingRepository
         }
 
         var calendarMonth = BuildBookingsPerDayForMonth(rows, calY, calM);
-        var completedMonthTask = BuildBookingCountsPerCalendarMonthAsync(
+        // Do not run these in parallel: same DbContext instance must not be used concurrently (EF Core).
+        var completedCalendarMonth = await BuildBookingCountsPerCalendarMonthAsync(
             forCustomer.Where(b => !b.IsDraft),
             calY,
             calM,
-            cancellationToken);
-        var draftsMonthTask = BuildBookingCountsPerCalendarMonthAsync(
+            cancellationToken).ConfigureAwait(false);
+        var draftsCalendarMonth = await BuildBookingCountsPerCalendarMonthAsync(
             forCustomer.Where(b => b.IsDraft),
             calY,
             calM,
-            cancellationToken);
-        await Task.WhenAll(completedMonthTask, draftsMonthTask).ConfigureAwait(false);
-        var completedCalendarMonth = await completedMonthTask.ConfigureAwait(false);
-        var draftsCalendarMonth = await draftsMonthTask.ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
         var delivery = await BuildDeliveryTimeDistributionAsync(baseQuery, cancellationToken);
         var exceptionHeat = await BuildExceptionHeatmapAsync(forCustomer, normalizedScope, cancellationToken);
 

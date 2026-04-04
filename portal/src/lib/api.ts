@@ -1209,6 +1209,8 @@ export async function getDashboardStats(
     headers: { Authorization: `Bearer ${token}` },
     signal,
   });
-  if (!res.ok) throw new Error("Failed to load dashboard stats");
-  return res.json();
+  if (!res.ok) {
+    throw new Error(`Failed to load dashboard stats (HTTP ${res.status})`);
+  }
+  return res.json() as Promise<DashboardStats>;
 }
