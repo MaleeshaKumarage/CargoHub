@@ -114,6 +114,8 @@
       "last7DaysTitle": "Dagleg virkni nýleg",
       "courierShareTitle": "Hlutfall eftir flutningsaðila",
       "benchmarkAvg30": "30 daga meðaltal",
+      "sameWeekdayAvg30": "Meðaltal fyrir sama vikudag (30 dagar)",
+      "heatmapCellTooltip": "{date}: {bookingCount} bókanir, {draftCount} drög",
       "otherCouriers": "Aðrir",
       "bookings": "Bókanir",
       "byCourier": "Eftir sendiferð",

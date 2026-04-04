@@ -116,6 +116,8 @@
       "last7DaysTitle": "Recent daily activity",
       "courierShareTitle": "Share by carrier",
       "benchmarkAvg30": "30-day average",
+      "sameWeekdayAvg30": "Same weekday average (30 days)",
+      "heatmapCellTooltip": "{date}: {bookingCount} bookings, {draftCount} drafts",
       "otherCouriers": "Other",
       "bookings": "Bookings",
       "byCourier": "By courier",

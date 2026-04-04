@@ -30,6 +30,12 @@ public sealed class DashboardBookingStatsDto
     /// <summary>Current UTC month, one bucket per calendar day (for calendar heatmap).</summary>
     public List<DailyCountDto> BookingsPerDayCurrentMonth { get; set; } = new();
 
+    /// <summary>Non-draft bookings per calendar day in the heatmap month (for tooltips alongside scope).</summary>
+    public List<DailyCountDto> CompletedBookingsPerDayCurrentMonth { get; set; } = new();
+
+    /// <summary>Draft bookings per calendar day in the heatmap month.</summary>
+    public List<DailyCountDto> DraftsPerDayCurrentMonth { get; set; } = new();
+
     public KpiExtendedDto Kpi { get; set; } = new();
 
     /// <summary>Hours from booking creation to Delivered milestone (when available).</summary>

@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDashboardStats,
+  type DailyCount,
   type DashboardScope,
   type DashboardStats,
 } from "@/lib/api";
@@ -253,12 +254,27 @@ export default function DashboardPage() {
       stats.bookingsPerDayLast30,
       themeSlice,
       tStats("bookings"),
-      tStats("benchmarkAvg30"),
+      tStats("sameWeekdayAvg30"),
       chartTheme.chart[0],
       benchColor,
       dayLabels,
     );
   }, [stats, themeSlice, chartTheme.chart, tStats, dayLabels]);
+
+  const heatmapTooltipSeries = useMemo(() => {
+    if (!stats) return { completed: [] as DailyCount[], drafts: [] as DailyCount[] };
+    const completed =
+      stats.completedBookingsPerDayCurrentMonth ??
+      (scope === "all" ? stats.bookingsPerDayCurrentMonth : []);
+    const drafts =
+      stats.draftsPerDayCurrentMonth ?? (scope === "drafts" ? stats.bookingsPerDayCurrentMonth : []);
+    return { completed, drafts };
+  }, [stats, scope]);
+
+  const formatHeatmapCellTooltip = useCallback(
+    (p: { date: string; bookingCount: number; draftCount: number }) => tStats("heatmapCellTooltip", p),
+    [tStats],
+  );
 
   const courierPieOption = useMemo(() => {
     if (!stats?.byCourier.length) return null;
@@ -433,8 +449,8 @@ export default function DashboardPage() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <ChartPanel title={tStats("last7DaysTitle")}>
                   {last7GroupedOption ? (
-                    <div className="h-56 w-full min-h-[224px]">
-                      <ThemedECharts option={last7GroupedOption} height={224} />
+                    <div className="h-60 w-full min-h-[240px]">
+                      <ThemedECharts option={last7GroupedOption} height={240} />
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">{tStats("noData")}</p>
@@ -548,13 +564,15 @@ export default function DashboardPage() {
                     <div className="w-full pt-1">
                       <BookingCalendarHeatmapGrid
                         daily={stats.bookingsPerDayCurrentMonth}
+                        completedDaily={heatmapTooltipSeries.completed}
+                        draftsDaily={heatmapTooltipSeries.drafts}
                         targetYear={heatmapUtc.year}
                         targetMonth={heatmapUtc.month}
                         dowLabels={mondayFirstDowLabels}
                         weekLabel={(week, isoYear) =>
                           tStats("heatmapIsoWeekWithYear", { week, year: isoYear })
                         }
-                        bookingsLabel={tStats("bookings")}
+                        formatCellTooltip={formatHeatmapCellTooltip}
                       />
                     </div>
                   </ChartPanel>

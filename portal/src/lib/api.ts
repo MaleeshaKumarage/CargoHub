@@ -1181,6 +1181,10 @@ export type DashboardStats = {
   laneSankey: SankeyGraph;
   bookingsPerDayLast30: DailyCount[];
   bookingsPerDayCurrentMonth: DailyCount[];
+  /** Non-draft counts for heatmap month (tooltips); optional for older APIs. */
+  completedBookingsPerDayCurrentMonth?: DailyCount[];
+  /** Draft counts for heatmap month (tooltips); optional for older APIs. */
+  draftsPerDayCurrentMonth?: DailyCount[];
   kpi: KpiExtended;
   deliveryTime: DeliveryTimeDistribution;
   exceptionSignalsHeatmap: HeatmapGrid;

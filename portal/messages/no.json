@@ -114,6 +114,8 @@
       "last7DaysTitle": "Siste dagsaktivitet",
       "courierShareTitle": "Andel per transportør",
       "benchmarkAvg30": "30-dagers snitt",
+      "sameWeekdayAvg30": "Snitt for samme ukedag (30 dager)",
+      "heatmapCellTooltip": "{date}: {bookingCount} bookinger, {draftCount} utkast",
       "otherCouriers": "Øvrige",
       "bookings": "Bookinger",
       "byCourier": "Per speditør",

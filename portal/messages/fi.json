@@ -115,6 +115,8 @@
       "last7DaysTitle": "Viime päivien aktiivisuus",
       "courierShareTitle": "Jakauma kuljettajittain",
       "benchmarkAvg30": "30 pv keskiarvo",
+      "sameWeekdayAvg30": "Saman viikonpäivän keskiarvo (30 pv)",
+      "heatmapCellTooltip": "{date}: {bookingCount} varausta, {draftCount} luonnosta",
       "otherCouriers": "Muut",
       "bookings": "Varaukset",
       "byCourier": "Kuljetusliikkeittäin",

@@ -97,6 +97,19 @@ public sealed partial class BookingRepository
         }
 
         var calendarMonth = BuildBookingsPerDayForMonth(rows, calY, calM);
+        var completedMonthTask = BuildBookingCountsPerCalendarMonthAsync(
+            forCustomer.Where(b => !b.IsDraft),
+            calY,
+            calM,
+            cancellationToken);
+        var draftsMonthTask = BuildBookingCountsPerCalendarMonthAsync(
+            forCustomer.Where(b => b.IsDraft),
+            calY,
+            calM,
+            cancellationToken);
+        await Task.WhenAll(completedMonthTask, draftsMonthTask).ConfigureAwait(false);
+        var completedCalendarMonth = await completedMonthTask.ConfigureAwait(false);
+        var draftsCalendarMonth = await draftsMonthTask.ConfigureAwait(false);
         var delivery = await BuildDeliveryTimeDistributionAsync(baseQuery, cancellationToken);
         var exceptionHeat = await BuildExceptionHeatmapAsync(forCustomer, normalizedScope, cancellationToken);
 
@@ -113,6 +126,8 @@ public sealed partial class BookingRepository
             LaneSankey = sankey,
             BookingsPerDayLast30 = daily,
             BookingsPerDayCurrentMonth = calendarMonth,
+            CompletedBookingsPerDayCurrentMonth = completedCalendarMonth,
+            DraftsPerDayCurrentMonth = draftsCalendarMonth,
             Kpi = new KpiExtendedDto
             {
                 AvgPerDayLast30 = Math.Round(avgPerDayLast30, 2),
@@ -233,22 +248,56 @@ public sealed partial class BookingRepository
     private static List<DailyCountDto> BuildBookingsPerDayForMonth(List<DashboardRow> rows, int year, int month)
     {
         var daysInMonth = DateTime.DaysInMonth(year, month);
+        var dict = new Dictionary<string, int>();
+        foreach (var r in rows)
+        {
+            var key = DateOnly.FromDateTime(r.CreatedAtUtc).ToString("yyyy-MM-dd");
+            if (!IsDateInUtcMonth(key, year, month))
+                continue;
+            dict.TryGetValue(key, out var n);
+            dict[key] = n + 1;
+        }
+
+        return BuildDailyListForMonth(year, month, dict);
+    }
+
+    private static bool IsDateInUtcMonth(string yyyyMmDd, int year, int month)
+    {
+        if (!DateOnly.TryParse(yyyyMmDd, out var d))
+            return false;
+        return d.Year == year && d.Month == month;
+    }
+
+    private static List<DailyCountDto> BuildDailyListForMonth(int year, int month, Dictionary<string, int> countsByDate)
+    {
+        var daysInMonth = DateTime.DaysInMonth(year, month);
         var list = new List<DailyCountDto>();
         for (var d = 1; d <= daysInMonth; d++)
         {
             var date = new DateOnly(year, month, d);
-            list.Add(new DailyCountDto { Date = date.ToString("yyyy-MM-dd"), Count = 0 });
-        }
-
-        var idx = list.ToDictionary(x => x.Date, x => x);
-        foreach (var r in rows)
-        {
-            var key = DateOnly.FromDateTime(r.CreatedAtUtc).ToString("yyyy-MM-dd");
-            if (idx.TryGetValue(key, out var cell))
-                cell.Count++;
+            var key = date.ToString("yyyy-MM-dd");
+            list.Add(new DailyCountDto { Date = key, Count = countsByDate.GetValueOrDefault(key) });
         }
 
         return list;
+    }
+
+    private static async Task<List<DailyCountDto>> BuildBookingCountsPerCalendarMonthAsync(
+        IQueryable<Booking> query,
+        int year,
+        int month,
+        CancellationToken cancellationToken)
+    {
+        var monthStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = monthStart.AddMonths(1);
+        var groups = await query
+            .Where(b => b.CreatedAtUtc >= monthStart && b.CreatedAtUtc < monthEnd)
+            .GroupBy(b => DateOnly.FromDateTime(b.CreatedAtUtc))
+            .Select(g => new { Date = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var dict = groups.ToDictionary(x => x.Date.ToString("yyyy-MM-dd"), x => x.Count);
+        return BuildDailyListForMonth(year, month, dict);
     }
 
     private async Task<DeliveryTimeDistributionDto> BuildDeliveryTimeDistributionAsync(
