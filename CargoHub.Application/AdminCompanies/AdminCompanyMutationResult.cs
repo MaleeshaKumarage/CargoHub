@@ -6,6 +6,19 @@ public sealed class AdminCompanyMutationResult
     public string? ErrorCode { get; init; }
     public string? Message { get; init; }
     public AdminCompanyDetailDto? Company { get; init; }
+    public LimitReductionRequiredDetails? LimitReductionRequired { get; init; }
+}
+
+/// <summary>Returned when lowering caps requires choosing users to demote or deactivate.</summary>
+public sealed class LimitReductionRequiredDetails
+{
+    public int ActiveUserCount { get; init; }
+    public int? ProposedMaxUserAccounts { get; init; }
+    public int AdminCount { get; init; }
+    public int? ProposedMaxAdminAccounts { get; init; }
+    public int MinimumUsersToDeactivate { get; init; }
+    public int MinimumAdminsToDemote { get; init; }
+    public string BusinessId { get; init; } = "";
 }
 
 /// <summary>Super Admin company row + live counts.</summary>

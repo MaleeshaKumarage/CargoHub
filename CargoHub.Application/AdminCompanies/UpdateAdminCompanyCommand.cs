@@ -6,4 +6,6 @@ public sealed record UpdateAdminCompanyCommand(
     Guid CompanyId,
     int? MaxUserAccounts,
     int? MaxAdminAccounts,
-    bool ResendAdminInvite) : IRequest<AdminCompanyMutationResult>;
+    bool ResendAdminInvite,
+    IReadOnlyList<string>? DeactivateUserIds,
+    IReadOnlyList<string>? DemoteAdminUserIds) : IRequest<AdminCompanyMutationResult>;

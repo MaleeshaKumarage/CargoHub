@@ -260,7 +260,32 @@ export type AdminPatchCompanyBody = {
   maxUserAccounts?: number | null;
   maxAdminAccounts?: number | null;
   resendAdminInvite?: boolean;
+  /** Super Admin lowering caps: user IDs to demote from Admin to User. */
+  demoteAdminUserIds?: string[];
+  /** Super Admin lowering caps: user IDs to deactivate. */
+  deactivateUserIds?: string[];
 };
+
+/** Returned with HTTP 409 when lowering limits requires choosing users first. */
+export type LimitReductionConflictDetails = {
+  activeUserCount: number;
+  proposedMaxUserAccounts?: number | null;
+  adminCount: number;
+  proposedMaxAdminAccounts?: number | null;
+  minimumUsersToDeactivate: number;
+  minimumAdminsToDemote: number;
+  businessId: string;
+};
+
+export class AdminCompanyLimitReductionRequiredError extends Error {
+  readonly details: LimitReductionConflictDetails;
+
+  constructor(details: LimitReductionConflictDetails, message?: string) {
+    super(message ?? 'Limit reduction required');
+    this.name = 'AdminCompanyLimitReductionRequiredError';
+    this.details = details;
+  }
+}
 export type AdminUser = {
   userId: string;
   email: string;
@@ -313,6 +338,22 @@ export async function adminSendTestEmail(token: string, to: string): Promise<{ o
   return data as { ok: boolean; message?: string };
 }
 
+function parseLimitReductionConflict(data: Record<string, unknown>): LimitReductionConflictDetails {
+  const n = (v: unknown) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  };
+  return {
+    activeUserCount: n(data.activeUserCount ?? data.ActiveUserCount),
+    proposedMaxUserAccounts: (data.proposedMaxUserAccounts ?? data.ProposedMaxUserAccounts ?? null) as number | null,
+    adminCount: n(data.adminCount ?? data.AdminCount),
+    proposedMaxAdminAccounts: (data.proposedMaxAdminAccounts ?? data.ProposedMaxAdminAccounts ?? null) as number | null,
+    minimumUsersToDeactivate: n(data.minimumUsersToDeactivate ?? data.MinimumUsersToDeactivate),
+    minimumAdminsToDemote: n(data.minimumAdminsToDemote ?? data.MinimumAdminsToDemote),
+    businessId: String(data.businessId ?? data.BusinessId ?? ''),
+  };
+}
+
 export async function adminPatchCompany(
   token: string,
   companyId: string,
@@ -323,13 +364,21 @@ export async function adminPatchCompany(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const errCode = (data.errorCode ?? data.ErrorCode) as string | undefined;
+  if (res.status === 409 && errCode === 'LimitReductionRequired') {
+    const details = parseLimitReductionConflict(data);
+    throw new AdminCompanyLimitReductionRequiredError(
+      details,
+      (data as { message?: string }).message
+    );
+  }
   if (!res.ok) {
     const msg =
       (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
     throw new Error(msg || `Update failed (${res.status})`);
   }
-  return data as AdminCompany;
+  return data as unknown as AdminCompany;
 }
 
 /** Anonymous: accept Super Admin–sent company admin invite (returns JWT like register). */
