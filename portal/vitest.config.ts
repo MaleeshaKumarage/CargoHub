@@ -19,7 +19,6 @@ export default defineConfig({
         "src/app/layout.tsx",
         "src/app/providers.tsx",
         "src/app/**/layout.tsx",
-        "src/app/[locale]/page.tsx",
         "src/app/**/forgot-password/**",
         "src/app/**/reset-password/**",
         "src/app/**/manage/**",
