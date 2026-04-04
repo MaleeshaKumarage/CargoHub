@@ -44,22 +44,30 @@ function cellSurfaceClass(
 
 export function BookingCalendarHeatmapGrid({
   daily,
+  completedDaily,
+  draftsDaily,
   targetYear,
   targetMonth,
   dowLabels,
   weekLabel,
-  bookingsLabel,
+  formatCellTooltip,
 }: {
   daily: DailyBookingCell[];
+  /** Non-draft counts per day (heatmap month); used for tooltips. */
+  completedDaily: DailyBookingCell[];
+  /** Draft counts per day (heatmap month); used for tooltips. */
+  draftsDaily: DailyBookingCell[];
   /** Calendar year of the month shown (must match month selector and API request). */
   targetYear: number;
   /** 1–12, must match month selector and API request. */
   targetMonth: number;
   dowLabels: string[];
   weekLabel: (isoWeek: number, isoWeekYear: number) => string;
-  bookingsLabel: string;
+  formatCellTooltip: (p: { date: string; bookingCount: number; draftCount: number }) => string;
 }) {
   const { weeks, maxCount } = buildBookingMonthGrid(daily, targetYear, targetMonth);
+  const completedMap = new Map(completedDaily.map((x) => [x.date, x.count]));
+  const draftsMap = new Map(draftsDaily.map((x) => [x.date, x.count]));
 
   return (
     <div
@@ -84,7 +92,11 @@ export function BookingCalendarHeatmapGrid({
             {weekLabel(w.isoWeek, w.isoWeekYear)}
           </div>
           {w.cells.map((c) => {
-            const title = `${c.date}: ${c.count} ${bookingsLabel}`;
+            const bookingCount = completedMap.get(c.date) ?? 0;
+            const draftCount = draftsMap.get(c.date) ?? 0;
+            const title = c.inTargetMonth
+              ? formatCellTooltip({ date: c.date, bookingCount, draftCount })
+              : c.date;
             return (
               <div
                 key={c.date}

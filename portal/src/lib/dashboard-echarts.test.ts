@@ -95,11 +95,13 @@ describe("buildLast7DaysGroupedBarOption", () => {
     expect(buildLast7DaysGroupedBarOption([], theme, "B", "Avg", "#111", "#222", dow)).toBeNull();
   });
 
-  it("builds two bar series with 30-day benchmark", () => {
-    const daily = Array.from({ length: 10 }, (_, i) => ({
-      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
-      count: i < 5 ? 2 : 4,
-    }));
+  it("builds two bar series with per-weekday averages over the window", () => {
+    const daily: { date: string; count: number }[] = [];
+    for (let d = 1; d <= 14; d++) {
+      const date = `2025-01-${String(d).padStart(2, "0")}`;
+      const count = d === 6 ? 4 : d === 13 ? 8 : 0;
+      daily.push({ date, count });
+    }
     const opt = buildLast7DaysGroupedBarOption(daily, theme, "B", "Avg", "#111", "#222", dow);
     expect(opt).not.toBeNull();
     const series = opt!.series as { type: string; name: string; data: { value: number }[] }[];
@@ -108,9 +110,8 @@ describe("buildLast7DaysGroupedBarOption", () => {
     expect(series[1].type).toBe("bar");
     expect(series[0].data).toHaveLength(7);
     expect(series[1].data).toHaveLength(7);
-    const sum = daily.reduce((s, d) => s + d.count, 0);
-    const bench = Math.max(0, Math.round((sum / daily.length) * 10) / 10);
-    expect(series[1].data.every((d) => d.value === bench)).toBe(true);
+    // last7 ends 2025-01-14 … 2025-01-08; index 5 is Monday 2025-01-13 → avg of Mon = (4+8)/2
+    expect(series[1].data[5].value).toBe(6);
   });
 });
 
