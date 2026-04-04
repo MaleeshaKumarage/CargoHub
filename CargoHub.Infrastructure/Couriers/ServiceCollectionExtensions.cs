@@ -1,6 +1,7 @@
 using CargoHub.Application.Couriers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace CargoHub.Infrastructure.Couriers;
 
@@ -19,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.Configure<MatkahuoltoOptions>(configuration.GetSection(MatkahuoltoOptions.SectionName));
         services.Configure<HameenTavarataxiOptions>(configuration.GetSection(HameenTavarataxiOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        services.AddSingleton<IConfigureOptions<SmtpOptions>, SmtpOptionsLegacyEnvironmentConfigurer>();
 
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
