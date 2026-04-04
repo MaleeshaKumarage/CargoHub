@@ -34,17 +34,35 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         _logger = logger;
     }
 
-    public async Task TryIssueInitialAdminInviteAsync(
+    public Task TryIssueInitialAdminInviteAsync(
         Guid companyId,
         string businessId,
         string? explicitSuperAdminEmail,
         CancellationToken cancellationToken = default)
     {
+        IReadOnlyList<string>? list = string.IsNullOrWhiteSpace(explicitSuperAdminEmail)
+            ? null
+            : new[] { explicitSuperAdminEmail.Trim() };
+        return TryIssueInitialAdminInvitesAsync(companyId, businessId, list, cancellationToken);
+    }
+
+    public async Task TryIssueInitialAdminInvitesAsync(
+        Guid companyId,
+        string businessId,
+        IReadOnlyList<string>? explicitEmails,
+        CancellationToken cancellationToken = default)
+    {
         var domain = _portal.Value.CompanyAdminFallbackEmailDomain;
-        var target = !string.IsNullOrWhiteSpace(explicitSuperAdminEmail)
-            ? explicitSuperAdminEmail.Trim()
-            : CompanyAdminInviteAddress.BuildFallbackEmail(businessId, domain);
-        await TryIssueInviteAsync(companyId, target, cancellationToken);
+        var emails = CompanyAdminInviteEmailsHelper.NormalizeList(explicitEmails);
+        if (emails.Count == 0)
+        {
+            var fallback = CompanyAdminInviteAddress.BuildFallbackEmail(businessId, domain);
+            await TryIssueInviteAsync(companyId, fallback, cancellationToken);
+            return;
+        }
+
+        foreach (var email in emails)
+            await TryIssueInviteAsync(companyId, email, cancellationToken);
     }
 
     /// <returns>Raw token (for tests); do not log in production.</returns>
@@ -59,7 +77,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         var email = inviteEmail.Trim();
         var normalized = email.ToUpperInvariant();
 
-        await _invites.RevokePendingForCompanyAsync(companyId, cancellationToken);
+        await _invites.RevokePendingForCompanyAndEmailAsync(companyId, normalized, cancellationToken);
 
         var raw = CompanyInviteTokenHelper.GenerateRawToken();
         var hash = CompanyInviteTokenHelper.HashRawToken(raw);

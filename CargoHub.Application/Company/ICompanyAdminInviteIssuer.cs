@@ -11,4 +11,14 @@ public interface ICompanyAdminInviteIssuer
         string businessId,
         string? explicitSuperAdminEmail,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// When <paramref name="explicitEmails"/> is null or empty, sends one invite to the fallback <c>{businessId}@domain</c>.
+    /// Otherwise sends one invite per distinct non-empty email (pending invites for the same company+email are replaced).
+    /// </summary>
+    Task TryIssueInitialAdminInvitesAsync(
+        Guid companyId,
+        string businessId,
+        IReadOnlyList<string>? explicitEmails,
+        CancellationToken cancellationToken = default);
 }

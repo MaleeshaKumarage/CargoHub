@@ -1,6 +1,7 @@
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Auth;
 using CargoHub.Application.Company;
+using CargoHub.Application.Couriers;
 using CargoHub.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -73,8 +74,9 @@ public class AdminController : ControllerBase
     [HttpPost("companies")]
     public async Task<ActionResult<AdminCompanyDetailDto>> CreateCompany([FromBody] CreateAdminCompanyRequest body, CancellationToken cancellationToken)
     {
+        var initialEmails = MergeInitialAdminEmails(body);
         var result = await _mediator.Send(
-            new CreateAdminCompanyCommand(body.Name, body.BusinessId, body.MaxUserAccounts, body.MaxAdminAccounts, body.InitialAdminEmail),
+            new CreateAdminCompanyCommand(body.Name, body.BusinessId, body.MaxUserAccounts, body.MaxAdminAccounts, initialEmails),
             cancellationToken);
         if (!result.Success)
             return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
@@ -164,6 +166,38 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Send a simple HTML message to verify SMTP (Super Admin only).</summary>
+    [HttpPost("email/test")]
+    public async Task<ActionResult> SendTestEmail([FromBody] TestEmailRequest body, [FromServices] IEmailSender emailSender, CancellationToken cancellationToken)
+    {
+        var to = body.To?.Trim() ?? "";
+        if (string.IsNullOrEmpty(to))
+            return BadRequest(new { message = "Recipient address (to) is required." });
+        try
+        {
+            await emailSender.SendAsync(
+                to,
+                "CargoHub — email configuration test",
+                "<p>If you received this message, outbound SMTP from the API is working.</p>",
+                cancellationToken);
+            return Ok(new { ok = true, message = "Test email sent." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private static List<string>? MergeInitialAdminEmails(CreateAdminCompanyRequest body)
+    {
+        var fromList = CompanyAdminInviteEmailsHelper.NormalizeList(body.InitialAdminEmails);
+        if (fromList.Count > 0)
+            return fromList;
+        if (!string.IsNullOrWhiteSpace(body.InitialAdminEmail))
+            return new List<string> { body.InitialAdminEmail.Trim() };
+        return null;
+    }
+
     public sealed class CompanySummaryDto
     {
         public Guid Id { get; set; }
@@ -173,6 +207,7 @@ public class AdminController : ControllerBase
         public int? MaxUserAccounts { get; set; }
         public int? MaxAdminAccounts { get; set; }
         public string? InitialAdminInviteEmail { get; set; }
+        public List<string>? InitialAdminInviteEmails { get; set; }
         public int ActiveUserCount { get; set; }
         public int AdminCount { get; set; }
     }
@@ -183,7 +218,14 @@ public class AdminController : ControllerBase
         public string BusinessId { get; set; } = "";
         public int? MaxUserAccounts { get; set; }
         public int? MaxAdminAccounts { get; set; }
+        /// <summary>Legacy single email; ignored when <see cref="InitialAdminEmails"/> is non-empty.</summary>
         public string? InitialAdminEmail { get; set; }
+        public List<string>? InitialAdminEmails { get; set; }
+    }
+
+    public sealed class TestEmailRequest
+    {
+        public string? To { get; set; }
     }
 
     public sealed class PatchAdminCompanyRequest
