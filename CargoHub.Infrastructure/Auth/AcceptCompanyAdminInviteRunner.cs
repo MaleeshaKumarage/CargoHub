@@ -31,7 +31,7 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
         _metrics = metrics;
     }
 
-    public async Task<RegisterResult> RunAsync(string rawToken, string submittedEmail, string password, string userName, CancellationToken cancellationToken = default)
+    public async Task<RegisterResult> RunAsync(string rawToken, string password, string userName, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
             return Fail("InviteTokenRequired", "Invitation token is required.");
@@ -42,12 +42,6 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
         var invite = await _invites.GetActiveByTokenHashAsync(hash, cancellationToken);
         if (invite?.Company == null)
             return Fail("InviteInvalid", "This invitation link is invalid or has expired.");
-
-        if (string.IsNullOrWhiteSpace(submittedEmail))
-            return Fail("InviteEmailRequired", "Enter the email address this invitation was sent to.");
-        var normalizedSubmitted = submittedEmail.Trim().ToUpperInvariant();
-        if (!string.Equals(normalizedSubmitted, invite.NormalizedEmail, StringComparison.Ordinal))
-            return Fail("InviteEmailMismatch", "This email does not match the invitation. Use the address the invite was sent to.");
 
         var company = invite.Company;
         if (string.IsNullOrWhiteSpace(company.BusinessId))

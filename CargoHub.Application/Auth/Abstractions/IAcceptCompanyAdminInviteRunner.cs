@@ -7,5 +7,5 @@ namespace CargoHub.Application.Auth.Abstractions;
 /// </summary>
 public interface IAcceptCompanyAdminInviteRunner
 {
-    Task<RegisterResult> RunAsync(string rawToken, string email, string password, string userName, CancellationToken cancellationToken = default);
+    Task<RegisterResult> RunAsync(string rawToken, string password, string userName, CancellationToken cancellationToken = default);
 }

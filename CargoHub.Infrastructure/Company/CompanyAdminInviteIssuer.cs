@@ -108,7 +108,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         var subject = $"Company admin invitation — {companyLabel}";
         var body =
             $"<p>You have been invited as an administrator for <strong>{System.Net.WebUtility.HtmlEncode(companyLabel)}</strong>.</p>" +
-            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(link)}\">Accept invitation and set your password</a></p>" +
+            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(link)}\">Open the invitation</a> to choose your user name and password.</p>" +
             "<p>If the link expires, ask a Super Admin to resend the invite.</p>";
 
         try

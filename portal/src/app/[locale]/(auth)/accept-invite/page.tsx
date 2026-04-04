@@ -16,7 +16,6 @@ function AcceptInviteForm() {
   const searchParams = useSearchParams();
   const { login: setAuth, isAuthenticated } = useAuth();
   const [token, setToken] = useState("");
-  const [email, setEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,8 +37,6 @@ function AcceptInviteForm() {
   const hasToken = token.trim().length > 0;
 
   function mapInviteError(errorCode: string | null | undefined): string {
-    if (errorCode === "InviteEmailRequired") return t("inviteEmailRequired");
-    if (errorCode === "InviteEmailMismatch") return t("inviteEmailMismatch");
     if (errorCode === "InviteTokenRequired") return t("inviteMissingLink");
     return t("inviteInvalid");
   }
@@ -59,17 +56,12 @@ function AcceptInviteForm() {
     try {
       const result = await acceptCompanyAdminInvite({
         token: token.trim(),
-        email: email.trim(),
         password,
         userName: userName.trim(),
       });
       if (result.success && result.data) {
         setAuth(result.data, result.data.jwtToken);
         router.replace("/dashboard");
-        return;
-      }
-      if (result.errorCode === "InviteEmailRequired" || result.errorCode === "InviteEmailMismatch") {
-        setError(mapInviteError(result.errorCode));
         return;
       }
       setError(result.message ?? mapInviteError(result.errorCode));
@@ -111,17 +103,6 @@ function AcceptInviteForm() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">{t("inviteDescription")}</p>
-          <div className="space-y-2">
-            <Label htmlFor="invite-email">{t("inviteInvitedEmail")}</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
           <div className="space-y-2">
             <Label htmlFor="userName">{t("userName")}</Label>
             <Input
