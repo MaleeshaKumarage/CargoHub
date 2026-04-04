@@ -23,7 +23,9 @@ public sealed class SmtpEmailSender : IEmailSender
     public async Task SendAsync(string to, string subject, string htmlBody, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_options.Host))
-            throw new InvalidOperationException("SmtpOptions.Host is not configured.");
+            throw new InvalidOperationException(
+                "SmtpOptions.Host is not configured. Set Smtp:Host in appsettings, or environment variable Smtp__Host, " +
+                "or legacy SMTP_SERVER_EMAIL / SMTP_HOST. If you use a .env file, remove Smtp__Host when unused (an empty value overrides appsettings).");
 
         using var client = new SmtpClient(_options.Host, _options.Port);
         client.EnableSsl = _options.UseSsl;

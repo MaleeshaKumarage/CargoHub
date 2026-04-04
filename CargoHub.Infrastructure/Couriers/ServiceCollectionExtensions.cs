@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.Configure<HameenTavarataxiOptions>(configuration.GetSection(HameenTavarataxiOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
         services.AddSingleton<IConfigureOptions<SmtpOptions>, SmtpOptionsLegacyEnvironmentConfigurer>();
+        services.AddSingleton<IPostConfigureOptions<SmtpOptions>, SmtpOptionsPostConfigureFillEmpty>();
 
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
