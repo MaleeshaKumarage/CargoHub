@@ -99,8 +99,8 @@ jobs:
       - name: Checkout (for scripts consistency)
         uses: actions/checkout@v4
 
-      - name: Install jq and bc
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq bc
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
 
       # --- Download artifacts from portal-ci + backend-ci ---
       - name: Download portal coverage
@@ -159,17 +159,20 @@ jobs:
             echo "::error::Backend coverage file not found"
             exit 1
           fi
-          LINE_RATE=$(grep -m1 -o 'line-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
-          BRANCH_RATE=$(grep -m1 -o 'branch-rate="[^"]*"' "$COV_FILE" | cut -d'"' -f2)
-          LINE_PCT=$(echo "$LINE_RATE * 100" | bc)
-          BRANCH_PCT=$(echo "$BRANCH_RATE * 100" | bc)
+          # Integer threshold: covered*100 >= valid*75 (avoids bc float quirks vs Cobertura rates)
+          LINE_COV=$(grep -m1 -o 'lines-covered="[0-9]*"' "$COV_FILE" | grep -o '[0-9]*')
+          LINE_VAL=$(grep -m1 -o 'lines-valid="[0-9]*"' "$COV_FILE" | grep -o '[0-9]*')
+          BRANCH_COV=$(grep -m1 -o 'branches-covered="[0-9]*"' "$COV_FILE" | grep -o '[0-9]*')
+          BRANCH_VAL=$(grep -m1 -o 'branches-valid="[0-9]*"' "$COV_FILE" | grep -o '[0-9]*')
+          LINE_PCT=$(awk -v c="$LINE_COV" -v v="$LINE_VAL" 'BEGIN { if (v+0 == 0) print 0; else printf "%.2f", 100*c/v }')
+          BRANCH_PCT=$(awk -v c="$BRANCH_COV" -v v="$BRANCH_VAL" 'BEGIN { if (v+0 == 0) print 0; else printf "%.2f", 100*c/v }')
           FAIL=0
-          if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
-            echo "::error::Backend line coverage ${LINE_PCT}% is below 75% minimum"
+          if [ -z "$LINE_COV" ] || [ -z "$LINE_VAL" ] || [ "$LINE_VAL" -eq 0 ] || [ "$((LINE_COV * 100))" -lt "$((LINE_VAL * 75))" ]; then
+            echo "::error::Backend line coverage ${LINE_PCT}% is below 75% minimum (${LINE_COV}/${LINE_VAL})"
             FAIL=1
           fi
-          if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
-            echo "::error::Backend branch coverage ${BRANCH_PCT}% is below 75% minimum"
+          if [ -z "$BRANCH_COV" ] || [ -z "$BRANCH_VAL" ] || [ "$BRANCH_VAL" -eq 0 ] || [ "$((BRANCH_COV * 100))" -lt "$((BRANCH_VAL * 75))" ]; then
+            echo "::error::Backend branch coverage ${BRANCH_PCT}% is below 75% minimum (${BRANCH_COV}/${BRANCH_VAL})"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
@@ -180,15 +183,19 @@ jobs:
             echo "::error::Portal coverage file not found"
             exit 1
           fi
+          LINE_COV=$(jq -r '.total.lines.covered' portal/coverage/coverage-summary.json)
+          LINE_TOT=$(jq -r '.total.lines.total' portal/coverage/coverage-summary.json)
+          BRANCH_COV=$(jq -r '.total.branches.covered' portal/coverage/coverage-summary.json)
+          BRANCH_TOT=$(jq -r '.total.branches.total' portal/coverage/coverage-summary.json)
           LINE_PCT=$(jq -r '.total.lines.pct' portal/coverage/coverage-summary.json)
           BRANCH_PCT=$(jq -r '.total.branches.pct' portal/coverage/coverage-summary.json)
           FAIL=0
-          if (( $(echo "$LINE_PCT < 75" | bc -l) )); then
-            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum"
+          if [ -z "$LINE_COV" ] || [ -z "$LINE_TOT" ] || [ "$LINE_TOT" = "null" ] || [ "$LINE_TOT" -eq 0 ] || [ "$((LINE_COV * 100))" -lt "$((LINE_TOT * 75))" ]; then
+            echo "::error::Portal line coverage ${LINE_PCT}% is below 75% minimum (${LINE_COV}/${LINE_TOT})"
             FAIL=1
           fi
-          if (( $(echo "$BRANCH_PCT < 75" | bc -l) )); then
-            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum"
+          if [ -z "$BRANCH_COV" ] || [ -z "$BRANCH_TOT" ] || [ "$BRANCH_TOT" = "null" ] || [ "$BRANCH_TOT" -eq 0 ] || [ "$((BRANCH_COV * 100))" -lt "$((BRANCH_TOT * 75))" ]; then
+            echo "::error::Portal branch coverage ${BRANCH_PCT}% is below 75% minimum (${BRANCH_COV}/${BRANCH_TOT})"
             FAIL=1
           fi
           if [ $FAIL -eq 1 ]; then exit 1; fi
