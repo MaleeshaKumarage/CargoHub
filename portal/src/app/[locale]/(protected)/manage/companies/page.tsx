@@ -5,14 +5,21 @@ import { useEffect, useMemo, useState } from "react";
 import {
   adminGetCompanies,
   adminCreateCompany,
+  adminGetUsers,
   adminPatchCompany,
   adminSendTestEmail,
+  AdminCompanyLimitReductionRequiredError,
   type AdminCompany,
+  type AdminPatchCompanyBody,
+  type AdminUser,
+  type LimitReductionConflictDetails,
 } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { cn } from "@/lib/utils";
 
 function parseOptionalInt(s: string): number | undefined {
   const t = s.trim();
@@ -20,6 +27,19 @@ function parseOptionalInt(s: string): number | undefined {
   const n = Number(t);
   return Number.isFinite(n) ? Math.floor(n) : undefined;
 }
+
+function isCompanyAdmin(u: AdminUser): boolean {
+  return Array.isArray(u.roles) && u.roles.includes("Admin");
+}
+
+function isSuperAdminUser(u: AdminUser): boolean {
+  return Array.isArray(u.roles) && u.roles.includes("SuperAdmin");
+}
+
+type PendingCompanyLimits = {
+  maxUserAccounts?: number | null;
+  maxAdminAccounts?: number | null;
+};
 
 export default function ManageCompaniesPage() {
   const { token } = useAuth();
@@ -38,6 +58,24 @@ export default function ManageCompaniesPage() {
   const [testEmailSending, setTestEmailSending] = useState(false);
   const [testEmailMessage, setTestEmailMessage] = useState<string | null>(null);
   const [testEmailIsError, setTestEmailIsError] = useState(false);
+
+  const [editLimitsCompany, setEditLimitsCompany] = useState<AdminCompany | null>(null);
+  const [editMaxUsers, setEditMaxUsers] = useState("");
+  const [editMaxAdmins, setEditMaxAdmins] = useState("");
+  const [savingLimitsId, setSavingLimitsId] = useState<string | null>(null);
+  const [limitsError, setLimitsError] = useState<string | null>(null);
+
+  const [reductionFlow, setReductionFlow] = useState<{
+    company: AdminCompany;
+    details: LimitReductionConflictDetails;
+    pending: PendingCompanyLimits;
+  } | null>(null);
+  const [reductionUsers, setReductionUsers] = useState<AdminUser[]>([]);
+  const [reductionUsersLoading, setReductionUsersLoading] = useState(false);
+  const [selectedDemote, setSelectedDemote] = useState<Set<string>>(() => new Set());
+  const [selectedDeactivate, setSelectedDeactivate] = useState<Set<string>>(() => new Set());
+  const [reductionError, setReductionError] = useState<string | null>(null);
+  const [applyingReduction, setApplyingReduction] = useState(false);
 
   const adminEmailSlotCount = useMemo(() => {
     const n = parseOptionalInt(maxAdmins);
@@ -74,6 +112,36 @@ export default function ManageCompaniesPage() {
       cancelled = true;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !reductionFlow) {
+      setReductionUsers([]);
+      return;
+    }
+    let cancelled = false;
+    setReductionUsersLoading(true);
+    setReductionError(null);
+    adminGetUsers(token, reductionFlow.details.businessId)
+      .then((list) => {
+        if (!cancelled) setReductionUsers(list.filter((u) => !isSuperAdminUser(u)));
+      })
+      .catch(() => {
+        if (!cancelled) setReductionError("Failed to load users for this company.");
+      })
+      .finally(() => {
+        if (!cancelled) setReductionUsersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, reductionFlow]);
+
+  useEffect(() => {
+    if (!reductionFlow) {
+      setSelectedDemote(new Set());
+      setSelectedDeactivate(new Set());
+    }
+  }, [reductionFlow]);
 
   const refetchCompanies = () => {
     if (!token) return;
@@ -141,6 +209,113 @@ export default function ManageCompaniesPage() {
       setInviteActionError(e instanceof Error ? e.message : "Resend failed");
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const openEditLimits = (c: AdminCompany) => {
+    setLimitsError(null);
+    setEditLimitsCompany(c);
+    setEditMaxUsers(c.maxUserAccounts != null ? String(c.maxUserAccounts) : "");
+    setEditMaxAdmins(c.maxAdminAccounts != null ? String(c.maxAdminAccounts) : "");
+  };
+
+  const handleSaveLimits = async () => {
+    if (!token || !editLimitsCompany) return;
+    const body: AdminPatchCompanyBody = {};
+    if (editMaxUsers.trim() !== "") {
+      const p = parseOptionalInt(editMaxUsers);
+      if (p === undefined) {
+        setLimitsError("Max users must be a valid whole number.");
+        return;
+      }
+      body.maxUserAccounts = p;
+    }
+    if (editMaxAdmins.trim() !== "") {
+      const p = parseOptionalInt(editMaxAdmins);
+      if (p === undefined) {
+        setLimitsError("Max admins must be a valid whole number.");
+        return;
+      }
+      body.maxAdminAccounts = p;
+    }
+    if (Object.keys(body).length === 0) {
+      setLimitsError("Change at least one limit, or cancel.");
+      return;
+    }
+    setSavingLimitsId(editLimitsCompany.id);
+    setLimitsError(null);
+    try {
+      await adminPatchCompany(token, editLimitsCompany.id, body);
+      setEditLimitsCompany(null);
+      refetchCompanies();
+    } catch (e) {
+      if (e instanceof AdminCompanyLimitReductionRequiredError) {
+        setLimitsError(null);
+        setReductionFlow({
+          company: editLimitsCompany,
+          details: e.details,
+          pending: {
+            maxUserAccounts: body.maxUserAccounts,
+            maxAdminAccounts: body.maxAdminAccounts,
+          },
+        });
+        return;
+      }
+      setLimitsError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSavingLimitsId(null);
+    }
+  };
+
+  const toggleDemote = (userId: string) => {
+    setSelectedDemote((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleDeactivate = (userId: string) => {
+    setSelectedDeactivate((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const handleApplyReduction = async () => {
+    if (!token || !reductionFlow) return;
+    const { company, details, pending } = reductionFlow;
+    const minD = details.minimumAdminsToDemote;
+    const minU = details.minimumUsersToDeactivate;
+    if (minD > 0 && selectedDemote.size < minD) {
+      setReductionError(`Select at least ${minD} administrator(s) to demote to a normal user.`);
+      return;
+    }
+    if (minU > 0 && selectedDeactivate.size < minU) {
+      setReductionError(`Select at least ${minU} active user account(s) to deactivate.`);
+      return;
+    }
+    setApplyingReduction(true);
+    setReductionError(null);
+    const body: AdminPatchCompanyBody = {};
+    if (pending.maxUserAccounts !== undefined) body.maxUserAccounts = pending.maxUserAccounts;
+    if (pending.maxAdminAccounts !== undefined) body.maxAdminAccounts = pending.maxAdminAccounts;
+    const demote = [...selectedDemote];
+    const deact = [...selectedDeactivate];
+    if (demote.length > 0) body.demoteAdminUserIds = demote;
+    if (deact.length > 0) body.deactivateUserIds = deact;
+    try {
+      await adminPatchCompany(token, company.id, body);
+      setReductionFlow(null);
+      setEditLimitsCompany(null);
+      refetchCompanies();
+    } catch (e) {
+      setReductionError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setApplyingReduction(false);
     }
   };
 
@@ -302,6 +477,7 @@ export default function ManageCompaniesPage() {
                     <th className="p-3 text-left font-medium">Users / max</th>
                     <th className="p-3 text-left font-medium">Admins / max</th>
                     <th className="p-3 text-left font-medium">Company ID</th>
+                    <th className="p-3 text-left font-medium">Limits</th>
                     <th className="p-3 text-left font-medium">Invite</th>
                   </tr>
                 </thead>
@@ -321,6 +497,16 @@ export default function ManageCompaniesPage() {
                           {c.maxAdminAccounts != null ? ` / ${c.maxAdminAccounts}` : ""}
                         </td>
                         <td className="p-3 font-mono text-xs">{c.companyId}</td>
+                        <td className="p-3">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => openEditLimits(c)}
+                          >
+                            Edit limits
+                          </Button>
+                        </td>
                         <td className="p-3">
                           <Button
                             type="button"
@@ -349,6 +535,192 @@ export default function ManageCompaniesPage() {
           )}
         </CardContent>
       </Card>
+
+      <DialogPrimitive.Root
+        open={!!editLimitsCompany}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditLimitsCompany(null);
+            setLimitsError(null);
+          }
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
+          <DialogPrimitive.Content
+            className={cn(
+              "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg border bg-background p-6 shadow-lg",
+            )}
+          >
+            <DialogPrimitive.Title className="text-lg font-semibold">Edit company limits</DialogPrimitive.Title>
+            <DialogPrimitive.Description className="text-sm text-muted-foreground mt-1">
+              Update max users and max admins for {editLimitsCompany?.name ?? "this company"}. Leave a field empty to leave
+              that limit unchanged.
+            </DialogPrimitive.Description>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-max-users">Max users</Label>
+                <Input
+                  id="edit-max-users"
+                  type="number"
+                  min={1}
+                  value={editMaxUsers}
+                  onChange={(e) => setEditMaxUsers(e.target.value)}
+                  placeholder="unchanged if empty"
+                  disabled={!!savingLimitsId}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-max-admins">Max admins</Label>
+                <Input
+                  id="edit-max-admins"
+                  type="number"
+                  min={1}
+                  value={editMaxAdmins}
+                  onChange={(e) => setEditMaxAdmins(e.target.value)}
+                  placeholder="unchanged if empty"
+                  disabled={!!savingLimitsId}
+                />
+              </div>
+              {limitsError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {limitsError}
+                </p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogPrimitive.Close asChild>
+                <Button type="button" variant="outline" disabled={!!savingLimitsId}>
+                  Cancel
+                </Button>
+              </DialogPrimitive.Close>
+              <Button type="button" onClick={() => void handleSaveLimits()} disabled={!!savingLimitsId}>
+                {savingLimitsId ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
+      <DialogPrimitive.Root
+        open={!!reductionFlow}
+        onOpenChange={(open) => {
+          if (!open) setReductionFlow(null);
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
+          <DialogPrimitive.Content
+            className={cn(
+              "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-[60] max-h-[85vh] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg",
+            )}
+          >
+            <DialogPrimitive.Title className="text-lg font-semibold">Choose accounts to free capacity</DialogPrimitive.Title>
+            <DialogPrimitive.Description className="text-sm text-muted-foreground mt-1">
+              Lowering limits requires demoting administrators and/or deactivating users. Demotions run first; then
+              selected accounts are deactivated (they can no longer sign in).
+            </DialogPrimitive.Description>
+            {reductionFlow && (
+              <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                <p>
+                  Current: {reductionFlow.details.activeUserCount} active users
+                  {reductionFlow.details.proposedMaxUserAccounts != null
+                    ? ` → cap ${reductionFlow.details.proposedMaxUserAccounts}`
+                    : ""}
+                  {reductionFlow.details.minimumUsersToDeactivate > 0
+                    ? ` — deactivate at least ${reductionFlow.details.minimumUsersToDeactivate}.`
+                    : ""}
+                </p>
+                <p>
+                  Current: {reductionFlow.details.adminCount} admins
+                  {reductionFlow.details.proposedMaxAdminAccounts != null
+                    ? ` → cap ${reductionFlow.details.proposedMaxAdminAccounts}`
+                    : ""}
+                  {reductionFlow.details.minimumAdminsToDemote > 0
+                    ? ` — demote at least ${reductionFlow.details.minimumAdminsToDemote}.`
+                    : ""}
+                </p>
+              </div>
+            )}
+            {reductionUsersLoading ? (
+              <p className="mt-4 text-sm text-muted-foreground">Loading users…</p>
+            ) : (
+              <div className="mt-4 flex flex-col gap-4">
+                {reductionFlow && reductionFlow.details.minimumAdminsToDemote > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Demote from Admin to User</p>
+                    <ul className="max-h-40 space-y-2 overflow-y-auto rounded border p-2">
+                      {reductionUsers.filter((u) => u.isActive && isCompanyAdmin(u)).length === 0 ? (
+                        <li className="text-sm text-muted-foreground">No active administrators listed.</li>
+                      ) : (
+                        reductionUsers
+                          .filter((u) => u.isActive && isCompanyAdmin(u))
+                          .map((u) => (
+                            <li key={u.userId} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                id={`demote-${u.userId}`}
+                                checked={selectedDemote.has(u.userId)}
+                                onChange={() => toggleDemote(u.userId)}
+                                className="h-4 w-4 rounded border"
+                              />
+                              <label htmlFor={`demote-${u.userId}`} className="cursor-pointer">
+                                {u.email || u.displayName || u.userId}
+                              </label>
+                            </li>
+                          ))
+                      )}
+                    </ul>
+                  </div>
+                )}
+                {reductionFlow && reductionFlow.details.minimumUsersToDeactivate > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Deactivate accounts</p>
+                    <ul className="max-h-40 space-y-2 overflow-y-auto rounded border p-2">
+                      {reductionUsers.filter((u) => u.isActive).length === 0 ? (
+                        <li className="text-sm text-muted-foreground">No active users.</li>
+                      ) : (
+                        reductionUsers
+                          .filter((u) => u.isActive)
+                          .map((u) => (
+                            <li key={`de-${u.userId}`} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                id={`deact-${u.userId}`}
+                                checked={selectedDeactivate.has(u.userId)}
+                                onChange={() => toggleDeactivate(u.userId)}
+                                className="h-4 w-4 rounded border"
+                              />
+                              <label htmlFor={`deact-${u.userId}`} className="cursor-pointer">
+                                {u.email || u.displayName || u.userId}
+                                {isCompanyAdmin(u) ? " (admin)" : ""}
+                              </label>
+                            </li>
+                          ))
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            {reductionError && (
+              <p className="mt-3 text-sm text-destructive" role="alert">
+                {reductionError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogPrimitive.Close asChild>
+                <Button type="button" variant="outline" disabled={applyingReduction}>
+                  Cancel
+                </Button>
+              </DialogPrimitive.Close>
+              <Button type="button" onClick={() => void handleApplyReduction()} disabled={applyingReduction || reductionUsersLoading}>
+                {applyingReduction ? "Applying…" : "Apply limits"}
+              </Button>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
 
       <Card>
         <CardHeader>
