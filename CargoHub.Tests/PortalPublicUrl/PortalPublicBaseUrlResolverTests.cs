@@ -1,0 +1,54 @@
+using CargoHub.Infrastructure.Options;
+using Microsoft.Extensions.Configuration;
+using Xunit;
+
+namespace CargoHub.Tests.PortalPublicUrl;
+
+public class PortalPublicBaseUrlResolverTests
+{
+    private static IConfiguration Config(params (string Key, string Value)[] pairs)
+    {
+        var dict = pairs.ToDictionary(p => p.Key, p => p.Value);
+        return new ConfigurationBuilder().AddInMemoryCollection(dict!).Build();
+    }
+
+    [Fact]
+    public void Resolve_UsesPublicBaseUrl_WhenSet()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "https://app.example.com/" };
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, Config());
+        Assert.Equal("https://app.example.com", url);
+    }
+
+    [Fact]
+    public void Resolve_FallsBackToCorsPortalOrigin_WhenPublicBaseUrlEmpty()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "" };
+        var cfg = Config(("Cors:PortalOrigin", "https://portal.prod.example/"));
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("https://portal.prod.example", url);
+    }
+
+    [Fact]
+    public void Resolve_FallsBackToFirstPortalOrigin_WhenOthersEmpty()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "  " };
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cors:PortalOrigins:0"] = "",
+                ["Cors:PortalOrigins:1"] = "https://first-valid.example"
+            })
+            .Build();
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("https://first-valid.example", url);
+    }
+
+    [Fact]
+    public void Resolve_DefaultsToLocalhost_WhenNothingConfigured()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "" };
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, Config());
+        Assert.Equal("http://localhost:3000", url);
+    }
+}

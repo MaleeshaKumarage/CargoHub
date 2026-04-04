@@ -4,6 +4,7 @@ using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Options;
 using CargoHub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +18,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
     private readonly ICompanyAdminInviteRepository _invites;
     private readonly IEmailSender _emailSender;
     private readonly IOptions<PortalPublicOptions> _portal;
+    private readonly IConfiguration _configuration;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<CompanyAdminInviteIssuer> _logger;
 
@@ -24,12 +26,14 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         ICompanyAdminInviteRepository invites,
         IEmailSender emailSender,
         IOptions<PortalPublicOptions> portal,
+        IConfiguration configuration,
         ApplicationDbContext db,
         ILogger<CompanyAdminInviteIssuer> logger)
     {
         _invites = invites;
         _emailSender = emailSender;
         _portal = portal;
+        _configuration = configuration;
         _db = db;
         _logger = logger;
     }
@@ -95,7 +99,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
 
         await _invites.AddAsync(invite, cancellationToken);
 
-        var baseUrl = _portal.Value.PublicBaseUrl.TrimEnd('/');
+        var baseUrl = PortalPublicBaseUrlResolver.Resolve(_portal.Value, _configuration);
         var link = $"{baseUrl}/en/accept-invite?token={Uri.EscapeDataString(raw)}";
 
         var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
