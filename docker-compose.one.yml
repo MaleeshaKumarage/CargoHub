@@ -26,6 +26,13 @@ services:
       Cors__PortalOrigin: ${CORS__PORTAL_ORIGIN:-http://localhost:3000}
       # Optional: starts in-container ngrok (token from GitHub Actions secret or .env)
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      # SMTP (set via GitHub Secrets synced from .env, or local compose --env-file)
+      Smtp__Host: ${Smtp__Host:-}
+      Smtp__Port: ${Smtp__Port:-587}
+      Smtp__UseSsl: ${Smtp__UseSsl:-true}
+      Smtp__UserName: ${Smtp__UserName:-}
+      Smtp__Password: ${Smtp__Password:-}
+      Smtp__FromAddress: ${Smtp__FromAddress:-}
 
 volumes:
   cargohub_data:
