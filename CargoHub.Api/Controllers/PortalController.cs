@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CargoHub.Api.Options;
+using CargoHub.Application.Auth;
 using CargoHub.Application.Auth.Commands;
 using CargoHub.Application.Auth.Dtos;
 using CargoHub.Application.Company;
@@ -45,13 +46,35 @@ public class PortalController : ControllerBase
         _companyRepository = companyRepository;
     }
 
-    /// <summary>Returns list of registered courier IDs for the booking form dropdown. JWT required.</summary>
+    /// <summary>Enabled courier IDs for the current company (booking dropdown). SuperAdmin receives full registered list.</summary>
     [HttpGet("couriers")]
     [Authorize]
-    public ActionResult<CouriersResponse> GetCouriers()
+    public async Task<ActionResult<CouriersResponse>> GetCouriers(CancellationToken cancellationToken)
     {
-        var ids = _courierFactory.RegisteredCourierIds;
-        return Ok(new CouriersResponse { CourierIds = ids });
+        if (User.IsInRole(RoleNames.SuperAdmin))
+            return Ok(new CouriersResponse { CourierIds = _courierFactory.RegisteredCourierIds });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (string.IsNullOrWhiteSpace(user?.BusinessId))
+            return Ok(new CouriersResponse { CourierIds = Array.Empty<string>() });
+
+        var company = await _companyRepository.GetByBusinessIdAsync(user.BusinessId, cancellationToken);
+        if (company == null)
+            return Ok(new CouriersResponse { CourierIds = Array.Empty<string>() });
+
+        var enabled = await _companyRepository.GetEnabledCourierIdsForCompanyAsync(company.Id, cancellationToken);
+        var ordered = enabled.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+        return Ok(new CouriersResponse { CourierIds = ordered });
+    }
+
+    /// <summary>All registered courier IDs for the company admin contract configuration UI.</summary>
+    [HttpGet("couriers/catalog")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public ActionResult<CouriersResponse> GetCourierCatalog()
+    {
+        return Ok(new CouriersResponse { CourierIds = _courierFactory.RegisteredCourierIds });
     }
 
     /// <summary>Returns deployment branding (app name, logo, colors) for the portal. No auth required.</summary>

@@ -16,7 +16,8 @@
     "manage": "Hallitse",
     "users": "Käyttäjät",
     "companies": "Yritykset",
-    "bookingForm": "Varauslomake"
+    "bookingForm": "Varauslomake",
+    "courierContracts": "Kuljetussopimukset"
   },
   "theme": {
     "light": "Vaalea",
@@ -100,6 +101,7 @@
     "bookings": "Varaukset",
     "bookingsList": "Varausten lista",
     "createBooking": "Luo varaus",
+    "courierContracts": "Kuljetussopimukset",
     "actions": "Toiminnot",
     "plugin": "Laajennus",
     "more": "Lisää",
@@ -146,7 +148,8 @@
       "createDescription": "Luo uusi varaus",
       "actionsDescription": "Sopimusnumerot, lähettäjä, osoitekirja",
       "pluginDescription": "Lataa laajennus ja julkaisutiedot",
-      "moreDescription": "Asetukset ja profiili"
+      "moreDescription": "Asetukset ja profiili",
+      "courierContractsDescription": "Valitse käyttämänne kuljetusliikkeet ja sopimustunnukset"
     }
   },
   "bookings": {
@@ -249,7 +252,11 @@
       "height": "Korkeus",
       "addPackage": "Lisää paketti",
       "remove": "Poista"
-    }
+    },
+    "noCouriersBannerTitle": "Kuljetusliikkeet pitää määrittää",
+    "noCouriersBannerAdmin": "Yritykselläsi ei ole vielä kuljetussopimuksia. Lisää käyttämänne liikkeet ja sopimustunnukset ennen varauksen luontia.",
+    "noCouriersBannerUser": "Yrityksesi ei ole vielä määrittänyt kuljetussopimuksia. Pyydä ylläpitäjää määrittämään ne.",
+    "goToCourierContracts": "Avaa kuljetussopimukset"
   },
   "actions": {
     "title": "Toiminnot",
@@ -285,6 +292,30 @@
     "placeholderCity": "Kaupunki",
     "placeholderCountry": "Maakoodi (esim. FI)"
   },
+  "courierContracts": {
+    "title": "Kuljetussopimukset",
+    "description": "Valitse integroidut kuljetusliikkeet ja syötä kullekin sopimustunnus. Kaikki yrityksesi käyttäjät näkevät vain nämä liikkeet varauksia luodessa.",
+    "loading": "Ladataan…",
+    "loadFailed": "Sopimuksia ei voitu ladata",
+    "saveFailed": "Tallennus epäonnistui",
+    "saved": "Tallennettu",
+    "back": "Takaisin",
+    "backDashboard": "Takaisin kojelautaan",
+    "superAdminNoAccess": "Superylläpitäjät hallitsevat yrityksiä Hallinta-valikosta; kuljetussopimukset määrittää kunkin yrityksen ylläpitäjä.",
+    "readOnlyHint": "Vain yrityksen ylläpitäjä voi muuttaa kuljetussopimuksia. Alla näkyvät tällä hetkellä käytössä olevat liikkeet.",
+    "emptyList": "Ei kuljetussopimuksia vielä.",
+    "catalogUnavailable": "Kuljetusliikkeiden listaa ei voitu ladata. Yritä uudelleen tai ota yhteyttä tukeen.",
+    "courier": "Kuljetusliike",
+    "selectCourier": "— Valitse kuljetusliike —",
+    "contractId": "Sopimustunnus",
+    "contractIdPlaceholder": "Sopimus- tai asiakasnumero",
+    "serviceOptional": "Palvelu / tuote (valinnainen)",
+    "servicePlaceholder": "Valinnainen",
+    "remove": "Poista rivi",
+    "addCourier": "Lisää kuljetusliike",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…"
+  },
   "plugin": {
     "title": "Laajennus",
     "description": "Lataa laajennus ja lue julkaisutiedot.",
@@ -295,6 +326,8 @@
     "description": "Asetukset, profiili ja muut vaihtoehdot.",
     "theme": "Teema",
     "language": "Kieli",
-    "comingSoon": "Lisää vaihtoehtoja tulossa."
+    "comingSoon": "Lisää vaihtoehtoja tulossa.",
+    "courierContracts": "Kuljetussopimukset",
+    "courierContractsHint": "Valitse kuljetusliikkeet ja sopimustunnukset varauksia varten."
   }
 }

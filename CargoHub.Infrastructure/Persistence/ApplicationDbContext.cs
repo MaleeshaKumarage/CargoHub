@@ -180,8 +180,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.OwnsMany(c => c.AgreementNumbers, agreement =>
             {
                 agreement.WithOwner().HasForeignKey("CompanyId");
-                agreement.Property<Guid>("Id");
-                agreement.HasKey("Id");
+                agreement.Property(a => a.Id).ValueGeneratedOnAdd();
+                agreement.HasKey(a => a.Id);
             });
 
             entity.Property(c => c.MaxUserAccounts);

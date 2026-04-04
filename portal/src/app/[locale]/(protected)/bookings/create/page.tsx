@@ -125,6 +125,7 @@ export default function CreateBookingPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
+  const isAdmin = Array.isArray(user?.roles) && user.roles.includes("Admin");
   const t = useTranslations("bookings");
   const tSections = useTranslations("bookings.sections");
   const tFields = useTranslations("bookings.fields");
@@ -155,6 +156,7 @@ export default function CreateBookingPage() {
   const [payerSource, setPayerSource] = useState<PayerSource>("other");
   const [addressBook, setAddressBook] = useState<AddressBookResponse | null>(null);
   const [courierIds, setCourierIds] = useState<string[]>([]);
+  const [couriersReady, setCouriersReady] = useState(false);
   const [saveToAddressBook, setSaveToAddressBook] = useState(true);
 
   useEffect(() => {
@@ -164,7 +166,11 @@ export default function CreateBookingPage() {
 
   useEffect(() => {
     if (!token) return;
-    getCouriers(token).then(setCourierIds).catch(() => setCourierIds([]));
+    setCouriersReady(false);
+    getCouriers(token)
+      .then(setCourierIds)
+      .catch(() => setCourierIds([]))
+      .finally(() => setCouriersReady(true));
   }, [token]);
 
   useEffect(() => {
@@ -321,6 +327,10 @@ export default function CreateBookingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (couriersReady && courierIds.length === 0) {
+      setError(t("noCouriersBannerTitle"));
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -348,6 +358,10 @@ export default function CreateBookingPage() {
   async function handleSaveDraft(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (couriersReady && courierIds.length === 0) {
+      setError(t("noCouriersBannerTitle"));
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -385,6 +399,20 @@ export default function CreateBookingPage() {
           <p className="text-sm text-destructive" role="alert">
             {error}
           </p>
+        )}
+        {couriersReady && courierIds.length === 0 && (
+          <div
+            className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2"
+            role="status"
+          >
+            <p className="text-sm font-medium">{t("noCouriersBannerTitle")}</p>
+            <p className="text-sm text-muted-foreground">
+              {isAdmin ? t("noCouriersBannerAdmin") : t("noCouriersBannerUser")}
+            </p>
+            <Link href="/company/courier-contracts" className="text-sm font-medium text-primary underline">
+              {t("goToCourierContracts")}
+            </Link>
+          </div>
         )}
 
         <Card>
@@ -784,10 +812,18 @@ export default function CreateBookingPage() {
             />
             <span>{t("saveToAddressBook")}</span>
           </label>
-          <Button type="submit" disabled={submitting}>
+          <Button
+            type="submit"
+            disabled={submitting || (couriersReady && courierIds.length === 0)}
+          >
             {submitting ? t("creating") : t("createTitle")}
           </Button>
-          <Button type="button" variant="secondary" disabled={submitting} onClick={handleSaveDraft}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={submitting || (couriersReady && courierIds.length === 0)}
+            onClick={handleSaveDraft}
+          >
             {submitting ? t("saving") : t("saveAsDraft")}
           </Button>
           <Link href="/bookings">

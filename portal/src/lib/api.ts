@@ -220,7 +220,7 @@ export async function updateTheme(token: string, theme: string): Promise<void> {
   }
 }
 
-/** Registered courier IDs for the booking form dropdown (GET /api/v1/portal/couriers). */
+/** Enabled courier IDs for the booking form (GET /api/v1/portal/couriers). */
 export async function getCouriers(token: string): Promise<string[]> {
   const res = await fetch(`${portalBase()}/couriers`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -229,6 +229,63 @@ export async function getCouriers(token: string): Promise<string[]> {
   const data = await res.json();
   const ids = data.courierIds ?? data.CourierIds ?? [];
   return Array.isArray(ids) ? ids : [];
+}
+
+/** All registered courier IDs for company admin contract UI (GET /api/v1/portal/couriers/catalog). Requires Admin role. */
+export async function getCourierCatalog(token: string): Promise<string[]> {
+  const res = await fetch(`${portalBase()}/couriers/catalog`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load courier catalog');
+  const data = await res.json();
+  const ids = data.courierIds ?? data.CourierIds ?? [];
+  return Array.isArray(ids) ? ids : [];
+}
+
+export type CourierContractDto = {
+  id?: string;
+  courierId: string;
+  contractId: string;
+  service?: string | null;
+};
+
+function normalizeCourierContract(x: Record<string, unknown>): CourierContractDto {
+  const id = x.id ?? x.Id;
+  return {
+    id: id != null ? String(id) : undefined,
+    courierId: String(x.courierId ?? x.CourierId ?? ''),
+    contractId: String(x.contractId ?? x.ContractId ?? ''),
+    service: (x.service ?? x.Service) as string | null | undefined,
+  };
+}
+
+/** Company courier contracts (GET /api/v1/portal/company/courier-contracts). */
+export async function getCourierContracts(token: string): Promise<CourierContractDto[]> {
+  const res = await fetch(`${portalBase()}/company/courier-contracts`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load courier contracts');
+  const data = await res.json();
+  const list = data.contracts ?? data.Contracts ?? [];
+  return Array.isArray(list) ? list.map((row) => normalizeCourierContract(row as Record<string, unknown>)) : [];
+}
+
+export type CourierContractInput = { courierId: string; contractId: string; service?: string };
+
+/** Replace courier contracts (PUT /api/v1/portal/company/courier-contracts). Requires Admin role. */
+export async function putCourierContracts(token: string, contracts: CourierContractInput[]): Promise<CourierContractDto[]> {
+  const res = await fetch(`${portalBase()}/company/courier-contracts`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ contracts }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? 'Save failed');
+  }
+  const data = await res.json();
+  const list = data.contracts ?? data.Contracts ?? [];
+  return Array.isArray(list) ? list.map((row) => normalizeCourierContract(row as Record<string, unknown>)) : [];
 }
 
 // --- Admin API (Super Admin only; pass JWT from auth) ---

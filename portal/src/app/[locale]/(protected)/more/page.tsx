@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 export default function MorePage() {
   const { user } = useAuth();
   const t = useTranslations("more");
+  const roles = user?.roles ?? [];
+  const isSuperAdmin = Array.isArray(roles) && roles.includes("SuperAdmin");
 
   return (
     <div className="space-y-6">
@@ -26,6 +28,17 @@ export default function MorePage() {
               <p className="text-sm text-muted-foreground">Company: {user.businessId}</p>
             )}
           </div>
+          {!isSuperAdmin && (
+            <div className="rounded-lg border p-4 space-y-2">
+              <p className="text-sm font-medium">{t("courierContracts")}</p>
+              <p className="text-sm text-muted-foreground">{t("courierContractsHint")}</p>
+              <Link href="/company/courier-contracts">
+                <Button variant="outline" size="sm">
+                  {t("courierContracts")}
+                </Button>
+              </Link>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Theme and language can be changed from the navbar. Password reset and profile settings will be available in a future update.
           </p>

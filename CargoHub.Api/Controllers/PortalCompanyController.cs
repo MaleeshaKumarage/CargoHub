@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CargoHub.Application.Auth;
 using CargoHub.Application.Company;
+using CargoHub.Application.Couriers;
 using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
@@ -20,11 +21,16 @@ public class PortalCompanyController : ControllerBase
 {
     private readonly ICompanyRepository _companyRepository;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ICourierBookingClientFactory _courierFactory;
 
-    public PortalCompanyController(ICompanyRepository companyRepository, UserManager<ApplicationUser> userManager)
+    public PortalCompanyController(
+        ICompanyRepository companyRepository,
+        UserManager<ApplicationUser> userManager,
+        ICourierBookingClientFactory courierFactory)
     {
         _companyRepository = companyRepository;
         _userManager = userManager;
+        _courierFactory = courierFactory;
     }
 
     private string? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -99,6 +105,94 @@ public class PortalCompanyController : ControllerBase
         await _companyRepository.AddReceiverAsync(targetCompanyId.Value, address, cancellationToken);
         return Ok(Map(address));
     }
+
+    /// <summary>Courier contracts for the signed-in user's company.</summary>
+    [HttpGet("courier-contracts")]
+    public async Task<ActionResult<CourierContractsResponse>> GetCourierContracts(CancellationToken cancellationToken)
+    {
+        var userId = UserId;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(user.BusinessId))
+            return Ok(new CourierContractsResponse());
+
+        await EnsureCompanyExistsForBusinessIdAsync(user.BusinessId, cancellationToken);
+        var company = await _companyRepository.GetByBusinessIdWithAgreementsAsync(user.BusinessId, cancellationToken);
+        if (company == null) return Ok(new CourierContractsResponse());
+
+        var contracts = company.AgreementNumbers
+            .OrderBy(a => a.PostalService, StringComparer.OrdinalIgnoreCase)
+            .Select(ToCourierContractDto)
+            .ToList();
+        return Ok(new CourierContractsResponse { Contracts = contracts });
+    }
+
+    /// <summary>Replace courier contracts. Company Admin only.</summary>
+    [HttpPut("courier-contracts")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<ActionResult<CourierContractsResponse>> PutCourierContracts(
+        [FromBody] PutCourierContractsRequest? body,
+        CancellationToken cancellationToken)
+    {
+        if (body?.Contracts == null)
+            return BadRequest(new { message = "contracts is required." });
+
+        var userId = UserId;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(user.BusinessId))
+            return BadRequest(new { message = "User has no company (BusinessId)." });
+
+        await EnsureCompanyExistsForBusinessIdAsync(user.BusinessId, cancellationToken);
+        var company = await _companyRepository.GetByBusinessIdAsync(user.BusinessId, cancellationToken);
+        if (company == null)
+            return BadRequest(new { message = "Company not found." });
+
+        var registered = new HashSet<string>(_courierFactory.RegisteredCourierIds, StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in body.Contracts)
+        {
+            var courierId = (item.CourierId ?? "").Trim();
+            var contractId = (item.ContractId ?? "").Trim();
+            if (string.IsNullOrEmpty(courierId))
+                return BadRequest(new { message = "Each item must have courierId." });
+            if (string.IsNullOrEmpty(contractId))
+                return BadRequest(new { message = "Each item must have contractId." });
+            if (!registered.Contains(courierId))
+                return BadRequest(new { message = $"Unknown courier: {courierId}" });
+            if (!seen.Add(courierId))
+                return BadRequest(new { message = $"Duplicate courier: {courierId}" });
+        }
+
+        var agreements = body.Contracts
+            .Select(c => new AgreementNumber
+            {
+                PostalService = c.CourierId!.Trim(),
+                Number = c.ContractId!.Trim(),
+                Service = string.IsNullOrWhiteSpace(c.Service) ? string.Empty : c.Service!.Trim()
+            })
+            .ToList();
+
+        await _companyRepository.ReplaceAgreementNumbersAsync(company.Id, agreements, cancellationToken);
+
+        var updated = await _companyRepository.GetByBusinessIdWithAgreementsAsync(user.BusinessId, cancellationToken);
+        var list = (updated?.AgreementNumbers ?? new List<AgreementNumber>())
+            .OrderBy(a => a.PostalService, StringComparer.OrdinalIgnoreCase)
+            .Select(ToCourierContractDto)
+            .ToList();
+        return Ok(new CourierContractsResponse { Contracts = list });
+    }
+
+    private static CourierContractDto ToCourierContractDto(AgreementNumber a) =>
+        new()
+        {
+            Id = a.Id,
+            CourierId = a.PostalService,
+            ContractId = a.Number,
+            Service = string.IsNullOrEmpty(a.Service) ? null : a.Service
+        };
 
     /// <summary>
     /// Creates a company for the given BusinessId if one does not exist. Idempotent.
@@ -212,6 +306,31 @@ public class AddressBookResponse
 public class AddressBookListResponse
 {
     public List<AddressBookResponse> AddressBooks { get; set; } = new();
+}
+
+public sealed class CourierContractsResponse
+{
+    public List<CourierContractDto> Contracts { get; set; } = new();
+}
+
+public sealed class CourierContractDto
+{
+    public Guid Id { get; set; }
+    public string CourierId { get; set; } = "";
+    public string ContractId { get; set; } = "";
+    public string? Service { get; set; }
+}
+
+public sealed class PutCourierContractsRequest
+{
+    public List<CourierContractMutationItem>? Contracts { get; set; }
+}
+
+public sealed class CourierContractMutationItem
+{
+    public string? CourierId { get; set; }
+    public string? ContractId { get; set; }
+    public string? Service { get; set; }
 }
 
 public class AddressEntryDto

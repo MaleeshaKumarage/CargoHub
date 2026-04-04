@@ -95,4 +95,42 @@ public class CompanyRepositoryTestDbTests : IDisposable
         var result = await repo.GetByBusinessIdAsync("   ", default);
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetEnabledCourierIds_SkipsBlankContractNumbers()
+    {
+        using var context = _fixture.CreateContext();
+        var company = new CompanyEntity
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = "ag-1",
+            Name = "Agreements Oy",
+            BusinessId = "5555555-5"
+        };
+        company.AgreementNumbers.Add(new AgreementNumber
+        {
+            Id = Guid.NewGuid(),
+            PostalService = "DHLExpress",
+            Number = "C-1",
+            Service = ""
+        });
+        company.AgreementNumbers.Add(new AgreementNumber
+        {
+            Id = Guid.NewGuid(),
+            PostalService = "Posti",
+            Number = " ",
+            Service = ""
+        });
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        var repo = new CompanyRepository(context);
+        var enabled = await repo.GetEnabledCourierIdsForCompanyAsync(company.Id, default);
+        Assert.Single(enabled);
+        Assert.Contains("DHLExpress", enabled);
+
+        var withAgreements = await repo.GetByBusinessIdWithAgreementsAsync("5555555-5", default);
+        Assert.NotNull(withAgreements);
+        Assert.Equal(2, withAgreements.AgreementNumbers.Count);
+    }
 }

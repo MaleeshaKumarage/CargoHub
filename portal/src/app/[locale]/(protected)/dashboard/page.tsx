@@ -452,6 +452,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         )}
+        {!isSuperAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("courierContracts")}</CardTitle>
+              <CardDescription>{tCards("courierContractsDescription")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/company/courier-contracts">
+                <Button variant="outline" className="w-full">
+                  {t("courierContracts")}
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>{t("actions")}</CardTitle>

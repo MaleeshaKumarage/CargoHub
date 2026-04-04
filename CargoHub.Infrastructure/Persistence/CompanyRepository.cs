@@ -106,6 +106,55 @@ public sealed class CompanyRepository : ICompanyRepository
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<CompanyEntity?> GetByBusinessIdWithAgreementsAsync(string businessId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(businessId)) return Task.FromResult<CompanyEntity?>(null);
+        return _db.Companies
+            .AsNoTracking()
+            .Include(c => c.AgreementNumbers)
+            .FirstOrDefaultAsync(c => c.BusinessId != null && c.BusinessId.Trim().ToLower() == businessId.Trim().ToLower(), cancellationToken);
+    }
+
+    public async Task<HashSet<string>> GetEnabledCourierIdsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var company = await _db.Companies
+            .AsNoTracking()
+            .Include(c => c.AgreementNumbers)
+            .FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+        if (company?.AgreementNumbers == null || company.AgreementNumbers.Count == 0)
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in company.AgreementNumbers)
+        {
+            if (string.IsNullOrWhiteSpace(a.PostalService) || string.IsNullOrWhiteSpace(a.Number))
+                continue;
+            set.Add(a.PostalService.Trim());
+        }
+
+        return set;
+    }
+
+    public async Task ReplaceAgreementNumbersAsync(Guid companyId, IReadOnlyList<AgreementNumber> agreements, CancellationToken cancellationToken = default)
+    {
+        var company = await _db.Companies
+            .Include(c => c.AgreementNumbers)
+            .FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+        if (company == null) return;
+        company.AgreementNumbers.Clear();
+        foreach (var a in agreements)
+        {
+            company.AgreementNumbers.Add(new AgreementNumber
+            {
+                PostalService = a.PostalService,
+                Service = a.Service,
+                Number = a.Number,
+                Counter = a.Counter
+            });
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     private static CompanyAddress CloneAddress(CompanyAddress a)
     {
         return new CompanyAddress

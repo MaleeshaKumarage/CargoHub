@@ -15,7 +15,8 @@
     "more": "Meira",
     "manage": "Stjórna",
     "users": "Notendur",
-    "companies": "Fyrirtæki"
+    "companies": "Fyrirtæki",
+    "courierContracts": "Courier contracts"
   },
   "theme": {
     "light": "Ljóst",
@@ -99,6 +100,7 @@
     "bookings": "Bókanir",
     "bookingsList": "Bókanalisti",
     "createBooking": "Búa til bókun",
+    "courierContracts": "Courier contracts",
     "actions": "Aðgerðir",
     "plugin": "Viðbót",
     "more": "Meira",
@@ -145,7 +147,8 @@
       "createDescription": "Búa til nýja bókun",
       "actionsDescription": "Samningsnúmer, sendandi, vistfangaskrá",
       "pluginDescription": "Sækja viðbót og útgáfuupplýsingar",
-      "moreDescription": "Stillingar og prófíll"
+      "moreDescription": "Stillingar og prófíll",
+      "courierContractsDescription": "Choose which couriers your company uses and add contract IDs"
     }
   },
   "bookings": {
@@ -156,7 +159,11 @@
     "createFirst": "Búðu til þína fyrstu bókun",
     "loading": "Hleður bókanir…",
     "comingSoon": "Bókunalistinn birtist hér þegar API er tilbúið.",
-    "saveToAddressBook": "Vista sendanda og viðtakanda í vistfangaskrá eftir stofnun"
+    "saveToAddressBook": "Vista sendanda og viðtakanda í vistfangaskrá eftir stofnun",
+    "noCouriersBannerTitle": "Courier setup required",
+    "noCouriersBannerAdmin": "Your company has no courier contracts yet. Add the carriers you use and your contract IDs before creating bookings.",
+    "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
+    "goToCourierContracts": "Open courier contracts"
   },
   "actions": {
     "title": "Aðgerðir",
@@ -192,6 +199,30 @@
     "placeholderCity": "Borg",
     "placeholderCountry": "Landskóði (t.d. IS)"
   },
+  "courierContracts": {
+    "title": "Courier contracts",
+    "description": "Select which integrated couriers your company may use and enter the contract ID for each. All users in your company will only see these couriers when creating bookings.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load contracts",
+    "saveFailed": "Save failed",
+    "saved": "Saved",
+    "back": "Back",
+    "backDashboard": "Back to dashboard",
+    "superAdminNoAccess": "Super administrators manage companies from Manage; courier contracts are configured by each company’s administrator.",
+    "readOnlyHint": "Only company administrators can change courier contracts. Below is what is currently enabled for your company.",
+    "emptyList": "No courier contracts yet.",
+    "catalogUnavailable": "Could not load the list of available couriers. Try again or contact support.",
+    "courier": "Courier",
+    "selectCourier": "— Select courier —",
+    "contractId": "Contract ID",
+    "contractIdPlaceholder": "Agreement or contract number",
+    "serviceOptional": "Service / product (optional)",
+    "servicePlaceholder": "Optional",
+    "remove": "Remove row",
+    "addCourier": "Add courier",
+    "save": "Save",
+    "saving": "Saving…"
+  },
   "plugin": {
     "title": "Viðbót",
     "description": "Sækja viðbótina og skoða útgáfuupplýsingar.",
@@ -202,6 +233,8 @@
     "description": "Stillingar, prófíll og aðrir valkostir.",
     "theme": "Þema",
     "language": "Tungumál",
-    "comingSoon": "Fleiri valkostir koma fljótlega."
+    "comingSoon": "Fleiri valkostir koma fljótlega.",
+    "courierContracts": "Courier contracts",
+    "courierContractsHint": "Choose carriers and contract IDs for bookings."
   }
 }

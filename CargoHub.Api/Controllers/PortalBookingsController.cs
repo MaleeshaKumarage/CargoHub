@@ -67,6 +67,15 @@ public class PortalBookingsController : ControllerBase
     private string? CustomerId => User.FindFirstValue(ClaimTypes.NameIdentifier);
     private bool IsSuperAdmin => User.IsInRole(RoleNames.SuperAdmin);
 
+    private async Task<CourierValidationError?> ValidateCourierForCompanyBookingAsync(
+        Guid? companyId,
+        string? postalService,
+        CancellationToken cancellationToken)
+    {
+        var allowed = await BookingCourierValidation.LoadAllowedCourierIdsAsync(_companyRepository, companyId, cancellationToken);
+        return BookingCourierValidation.ValidatePostalServiceForCompany(allowed, postalService);
+    }
+
     /// <summary>List completed bookings. SuperAdmin sees all companies; others see only their own.</summary>
     [HttpGet]
     public async Task<ActionResult<List<BookingListDto>>> List([FromQuery] int skip = 0, [FromQuery] int take = 100)
@@ -171,6 +180,9 @@ public class PortalBookingsController : ControllerBase
             return Unauthorized();
         var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
         var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var courierError = await ValidateCourierForCompanyBookingAsync(companyId, request.PostalService, HttpContext.RequestAborted);
+        if (courierError != null)
+            return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
         var created = await _mediator.Send(new CreateBookingCommand(customerId, displayName, request, companyId), HttpContext.RequestAborted);
         if (created == null)
             return BadRequest();
@@ -188,6 +200,9 @@ public class PortalBookingsController : ControllerBase
             return Unauthorized();
         var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email);
         var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var courierError = await ValidateCourierForCompanyBookingAsync(companyId, request.PostalService, HttpContext.RequestAborted);
+        if (courierError != null)
+            return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
         var created = await _mediator.Send(new CreateDraftCommand(customerId, displayName, request, companyId), HttpContext.RequestAborted);
         if (created == null)
             return BadRequest();
@@ -225,6 +240,14 @@ public class PortalBookingsController : ControllerBase
         var customerId = CustomerId;
         if (string.IsNullOrEmpty(customerId))
             return Unauthorized();
+        var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var draftDetail = await _mediator.Send(new GetDraftByIdQuery(id, customerId), HttpContext.RequestAborted);
+        if (draftDetail == null)
+            return NotFound();
+        var effectivePostal = request.PostalService != null ? request.PostalService : draftDetail.Header?.PostalService;
+        var courierError = await ValidateCourierForCompanyBookingAsync(companyId, effectivePostal, HttpContext.RequestAborted);
+        if (courierError != null)
+            return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
         var updated = await _mediator.Send(new UpdateDraftCommand(id, customerId, request), HttpContext.RequestAborted);
         if (updated == null)
             return NotFound();
@@ -238,6 +261,13 @@ public class PortalBookingsController : ControllerBase
         var customerId = CustomerId;
         if (string.IsNullOrEmpty(customerId))
             return Unauthorized();
+        var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var draftDetail = await _mediator.Send(new GetDraftByIdQuery(id, customerId), HttpContext.RequestAborted);
+        if (draftDetail == null)
+            return NotFound();
+        var courierError = await ValidateCourierForCompanyBookingAsync(companyId, draftDetail.Header?.PostalService, HttpContext.RequestAborted);
+        if (courierError != null)
+            return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
         var result = await _mediator.Send(new ConfirmDraftCommand(id, customerId), HttpContext.RequestAborted);
         if (result == null)
             return NotFound();
@@ -442,6 +472,14 @@ public class PortalBookingsController : ControllerBase
 
         var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email) ?? "";
         var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var allowed = await BookingCourierValidation.LoadAllowedCourierIdsAsync(_companyRepository, companyId, HttpContext.RequestAborted);
+        foreach (var row in toImport)
+        {
+            var err = BookingCourierValidation.ValidatePostalServiceForCompany(allowed, row.Request.PostalService);
+            if (err != null)
+                return BadRequest(new { errorCode = err.ErrorCode, message = err.Message });
+        }
+
         var result = await _mediator.Send(
             new ImportBookingsCommand(customerId, displayName, companyId, toImport),
             HttpContext.RequestAborted);
@@ -465,6 +503,14 @@ public class PortalBookingsController : ControllerBase
         var importRows = rows.Select(r => new ImportRowDto(r.Request, r.IsComplete)).ToList();
         var displayName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue(ClaimTypes.Email) ?? "";
         var (companyId, _) = await GetCompanyIdAndAllowedSlotsAsync(HttpContext.RequestAborted);
+        var allowed = await BookingCourierValidation.LoadAllowedCourierIdsAsync(_companyRepository, companyId, HttpContext.RequestAborted);
+        foreach (var row in importRows)
+        {
+            var err = BookingCourierValidation.ValidatePostalServiceForCompany(allowed, row.Request.PostalService);
+            if (err != null)
+                return BadRequest(new { errorCode = err.ErrorCode, message = err.Message });
+        }
+
         var result = await _mediator.Send(
             new ImportBookingsCommand(customerId, displayName, companyId, importRows),
             HttpContext.RequestAborted);
