@@ -22,9 +22,15 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 
 vi.mock("next-intl", () => ({
-  useTranslations: (ns: string) => (key: string, values?: Record<string, string>) => {
+  useLocale: () => "en",
+  useTranslations: (ns: string) => (key: string, values?: Record<string, string | number>) => {
     if (ns === "dashboard") return key in (values ?? {}) ? `${key}:${JSON.stringify(values)}` : key;
-    if (ns === "dashboard.stats") return key;
+    if (ns === "dashboard.stats")
+      return values && typeof values === "object" && "week" in values
+        ? `${key}:${String(values.week)}`
+        : values && typeof values === "object" && "n" in values
+          ? `${key}:${values.n}`
+          : key;
     if (ns === "dashboard.cards") return key;
     return key;
   },

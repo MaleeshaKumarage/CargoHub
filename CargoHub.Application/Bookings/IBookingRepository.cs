@@ -33,7 +33,14 @@ public interface IBookingRepository
     Task<Dictionary<Guid, List<BookingStatusEventDto>>> GetStatusHistoryForBookingIdsAsync(IEnumerable<Guid> bookingIds, CancellationToken cancellationToken = default);
     /// <summary>When customerId is null, returns stats for all bookings (Super Admin). Otherwise for that customer only.</summary>
     /// <param name="scope">all (default, non-draft), drafts, or tests.</param>
-    Task<DashboardBookingStatsDto> GetDashboardStatsAsync(string? customerId, string? scope = null, CancellationToken cancellationToken = default);
+    /// <param name="heatmapYear">UTC year for calendar heatmap series; null = current year.</param>
+    /// <param name="heatmapMonth">UTC month 1–12 for calendar heatmap; null = current month.</param>
+    Task<DashboardBookingStatsDto> GetDashboardStatsAsync(
+        string? customerId,
+        string? scope = null,
+        int? heatmapYear = null,
+        int? heatmapMonth = null,
+        CancellationToken cancellationToken = default);
     /// <summary>Bookings for a company created in [fromUtc, toUtc) (half-open). Includes drafts; excludes test bookings.</summary>
     Task<List<BookingEntity>> ListByCompanyCreatedUtcRangeAsync(Guid companyId, DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default);
 }

@@ -22,7 +22,10 @@ public class PortalDashboardController : ControllerBase
     /// <summary>Get booking stats. Super Admin sees all users' bookings; other users see only their own.</summary>
     /// <param name="scope">Optional: all (default, non-draft completed), drafts.</param>
     [HttpGet("stats")]
-    public async Task<ActionResult> GetStats([FromQuery] string? scope = null)
+    public async Task<ActionResult> GetStats(
+        [FromQuery] string? scope = null,
+        [FromQuery] int? heatmapYear = null,
+        [FromQuery] int? heatmapMonth = null)
     {
         var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
         string? customerId = null;
@@ -37,7 +40,9 @@ public class PortalDashboardController : ControllerBase
         if (normalized is not (null or "all" or "drafts"))
             normalized = null;
 
-        var stats = await _mediator.Send(new GetDashboardStatsQuery(customerId, normalized), HttpContext.RequestAborted);
+        var stats = await _mediator.Send(
+            new GetDashboardStatsQuery(customerId, normalized, heatmapYear, heatmapMonth),
+            HttpContext.RequestAborted);
         return Ok(stats);
     }
 }

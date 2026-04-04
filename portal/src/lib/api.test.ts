@@ -877,6 +877,45 @@ describe("api", () => {
         expect.anything(),
       );
     });
+    it("passes heatmap year and month when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          scope: "all",
+          countToday: 0,
+          countMonth: 0,
+          countYear: 0,
+          byCourier: [],
+          fromCities: [],
+          toCities: [],
+          carrierServiceSunburst: null,
+          laneSankey: { nodes: [], links: [] },
+          bookingsPerDayLast30: [],
+          bookingsPerDayCurrentMonth: [],
+          kpi: {
+            avgPerDayLast30: 0,
+            avgPerDayThisMonth: 0,
+            avgPerDayThisYear: 0,
+            possiblyStuckCount: 0,
+          },
+          deliveryTime: {
+            sampleSize: 0,
+            minHours: 0,
+            q1Hours: 0,
+            medianHours: 0,
+            q3Hours: 0,
+            maxHours: 0,
+            outlierCount: 0,
+            sampleHours: [],
+          },
+          exceptionSignalsHeatmap: { cells: [], maxCount: 0 },
+        }),
+      });
+      await getDashboardStats("token", null, { year: 2024, month: 6 });
+      const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(url).toContain("heatmapYear=2024");
+      expect(url).toContain("heatmapMonth=6");
+    });
     it("throws when API returns non-ok", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
       await expect(getDashboardStats("token")).rejects.toThrow("Failed to load dashboard stats");

@@ -47,15 +47,103 @@ export function buildPeriodBarOption(
         name: bookingsLabel,
         data: values.map((value, i) => ({
           value,
-          itemStyle: { color: barColors[i % barColors.length], borderRadius: [4, 4, 0, 0] },
+          itemStyle: { color: barColors[i % barColors.length], borderRadius: [14, 14, 0, 0] },
         })),
-        barMaxWidth: 56,
+        barMaxWidth: 64,
       },
     ],
   };
 }
 
 export type KeyCount = { key: string; count: number };
+
+/** Top N couriers plus an "Other" bucket for readable pie / donut charts. */
+export function aggregateCouriersForPie(rows: KeyCount[], topN: number, otherLabel: string): KeyCount[] {
+  if (!rows.length) return [];
+  const sorted = [...rows].sort((a, b) => b.count - a.count);
+  const head = sorted.slice(0, topN);
+  const rest = sorted.slice(topN);
+  const other = rest.reduce((s, r) => s + r.count, 0);
+  if (other > 0) head.push({ key: otherLabel, count: other });
+  return head;
+}
+
+/**
+ * Last 7 days: grouped bars — daily bookings vs 30-day average (benchmark), rounded tops.
+ */
+export function buildLast7DaysGroupedBarOption(
+  daily: { date: string; count: number }[],
+  theme: ThemeSlice,
+  bookingsLabel: string,
+  benchmarkLabel: string,
+  primaryBarColor: string,
+  benchmarkBarColor: string,
+  dowLabelsSunFirst: string[],
+): EChartsOption | null {
+  if (!daily.length) return null;
+  const last7 = daily.slice(-7);
+  const sum30 = daily.reduce((s, d) => s + d.count, 0);
+  const avg30 = daily.length ? sum30 / daily.length : 0;
+  const bench = Math.max(0, Math.round(avg30 * 10) / 10);
+  const categories = last7.map((d) => {
+    const dt = new Date(`${d.date}T12:00:00Z`);
+    return dowLabelsSunFirst[dt.getUTCDay()] ?? d.date.slice(5);
+  });
+  const counts = last7.map((d) => d.count);
+  const benchmark = last7.map(() => bench);
+  return {
+    grid: { left: 8, right: 8, top: 28, bottom: 8, containLabel: true },
+    legend: {
+      bottom: 0,
+      left: "center",
+      textStyle: { color: theme.mutedForeground, fontSize: 11 },
+      itemWidth: 12,
+      itemHeight: 12,
+    },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      borderWidth: 1,
+      textStyle: { color: theme.foreground },
+    },
+    xAxis: {
+      type: "category",
+      data: categories,
+      axisLine: { lineStyle: { color: theme.border } },
+      axisLabel: { color: theme.mutedForeground, fontSize: 11 },
+    },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLine: { show: false },
+      axisLabel: { color: theme.mutedForeground, fontSize: 11 },
+      splitLine: { lineStyle: { color: theme.border, opacity: 0.35 } },
+    },
+    series: [
+      {
+        name: bookingsLabel,
+        type: "bar",
+        data: counts.map((value) => ({
+          value,
+          itemStyle: { color: primaryBarColor, borderRadius: [12, 12, 0, 0] },
+        })),
+        barMaxWidth: 22,
+        barGap: "12%",
+      },
+      {
+        name: benchmarkLabel,
+        type: "bar",
+        data: benchmark.map((value) => ({
+          value,
+          itemStyle: { color: benchmarkBarColor, borderRadius: [12, 12, 0, 0] },
+        })),
+        barMaxWidth: 22,
+      },
+    ],
+  };
+}
 
 /**
  * Donut: share by courier / carrier.
@@ -76,15 +164,25 @@ export function buildCourierPieOption(
       // String formatter avoids strict CallbackDataParams typing; {b} name, {c} value, {d} percent.
       formatter: "{b}<br/>{c} " + bookingsLabel + " ({d}%)",
     },
+    legend: {
+      bottom: 4,
+      left: "center",
+      type: "scroll",
+      textStyle: { color: theme.mutedForeground, fontSize: 10 },
+      itemWidth: 10,
+      itemHeight: 10,
+    },
     series: [
       {
         type: "pie",
-        radius: ["40%", "64%"],
+        radius: ["44%", "72%"],
+        center: ["50%", "44%"],
         padAngle: 2,
-        itemStyle: { borderRadius: 4 },
+        itemStyle: { borderRadius: 6, borderColor: theme.card, borderWidth: 2 },
         label: {
           color: theme.mutedForeground,
-          formatter: "{b} {d}%",
+          formatter: "{b}\n{d}%",
+          fontSize: 10,
         },
         data: rows.map((r, i) => ({
           name: r.key,
@@ -139,9 +237,9 @@ export function buildCityBarOption(
         name: bookingsLabel,
         data: counts.map((value) => ({
           value,
-          itemStyle: { color: barColor, borderRadius: [0, 4, 4, 0] },
+          itemStyle: { color: barColor, borderRadius: [0, 10, 10, 0] },
         })),
-        barMaxWidth: 22,
+        barMaxWidth: 24,
       },
     ],
   };
@@ -269,8 +367,8 @@ export function buildDailyVolumeLineOption(
         type: "line",
         smooth: true,
         showSymbol: false,
-        areaStyle: { opacity: 0.12 },
-        lineStyle: { width: 2, color: lineColor },
+        areaStyle: { opacity: 0.22 },
+        lineStyle: { width: 3, color: lineColor },
         itemStyle: { color: lineColor },
         data: vals,
       },
@@ -361,7 +459,7 @@ export function buildDayHourHeatmapOption(
       orient: "horizontal",
       left: "center",
       bottom: 2,
-      inRange: { color: ["#f0f0f0", "#3b82f6"] },
+      inRange: { color: ["#cbd5e1", "#2563eb", "#818cf8"] },
       textStyle: { color: theme.mutedForeground, fontSize: 10 },
     },
     series: [
@@ -369,87 +467,8 @@ export function buildDayHourHeatmapOption(
         type: "heatmap",
         data,
         label: { show: false },
-        emphasis: { itemStyle: { shadowBlur: 6 } },
-      },
-    ],
-  };
-}
-
-/**
- * Month calendar heatmap (Mon–Sun columns). Hover shows bookings for that day.
- */
-export function buildMonthCalendarHeatmapOption(
-  daily: { date: string; count: number }[],
-  theme: ThemeSlice,
-  bookingsLabel: string,
-  dowLabelsMonFirst: string[],
-): EChartsOption | null {
-  if (!daily.length) return null;
-  const first = daily[0].date;
-  const y = parseInt(first.slice(0, 4), 10);
-  const m = parseInt(first.slice(5, 7), 10) - 1;
-  const start = new Date(Date.UTC(y, m, 1));
-  const startCol = (start.getUTCDay() + 6) % 7;
-  const daysInMonth = daily.length;
-  const toolDates: string[] = [];
-  const heatData: [number, number, number][] = [];
-  let max = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const count = daily[d - 1]?.count ?? 0;
-    const idx = startCol + d - 1;
-    const col = idx % 7;
-    const row = Math.floor(idx / 7);
-    if (count > max) max = count;
-    heatData.push([col, row, count]);
-    toolDates.push(dateStr);
-  }
-
-  return {
-    tooltip: {
-      position: "top",
-      backgroundColor: theme.card,
-      borderColor: theme.border,
-      borderWidth: 1,
-      textStyle: { color: theme.foreground },
-      formatter: (params: unknown) => {
-        const p = params as { dataIndex?: number; value?: [number, number, number] };
-        const idx = p.dataIndex ?? 0;
-        const v = p.value?.[2] ?? 0;
-        const day = toolDates[idx] ?? "";
-        return `${day}<br/>${v} ${bookingsLabel}`;
-      },
-    },
-    grid: { left: 8, right: 8, top: 8, bottom: 36, containLabel: true },
-    xAxis: {
-      type: "category",
-      data: dowLabelsMonFirst,
-      splitArea: { show: true },
-      axisLabel: { fontSize: 10, color: theme.mutedForeground },
-    },
-    yAxis: {
-      type: "category",
-      data: ["1", "2", "3", "4", "5", "6"],
-      inverse: true,
-      axisLabel: { show: false },
-      splitArea: { show: true },
-    },
-    visualMap: {
-      min: 0,
-      max: Math.max(max, 1),
-      calculable: true,
-      orient: "horizontal",
-      left: "center",
-      bottom: 2,
-      inRange: { color: ["#f0f0f0", "#3b82f6"] },
-      textStyle: { color: theme.mutedForeground, fontSize: 10 },
-    },
-    series: [
-      {
-        type: "heatmap",
-        data: heatData,
-        label: { show: false },
-        emphasis: { itemStyle: { shadowBlur: 6 } },
+        itemStyle: { borderRadius: 4 },
+        emphasis: { itemStyle: { shadowBlur: 8 } },
       },
     ],
   };

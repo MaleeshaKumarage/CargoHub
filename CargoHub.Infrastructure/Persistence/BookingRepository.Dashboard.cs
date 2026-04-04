@@ -6,7 +6,12 @@ namespace CargoHub.Infrastructure.Persistence;
 
 public sealed partial class BookingRepository
 {
-    public async Task<DashboardBookingStatsDto> GetDashboardStatsAsync(string? customerId, string? scope, CancellationToken cancellationToken = default)
+    public async Task<DashboardBookingStatsDto> GetDashboardStatsAsync(
+        string? customerId,
+        string? scope,
+        int? heatmapYear = null,
+        int? heatmapMonth = null,
+        CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var startOfToday = DateOnly.FromDateTime(now).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -75,7 +80,23 @@ public sealed partial class BookingRepository
         var sunburst = BuildCarrierServiceSunburst(rows);
         var sankey = BuildSankey(rows);
         var daily = BuildDailySeries(rows, now);
-        var calendarMonth = BuildBookingsPerDayCurrentMonth(rows, now);
+        var calY = heatmapYear ?? now.Year;
+        var calM = heatmapMonth ?? now.Month;
+        if (calM is < 1 or > 12)
+        {
+            calY = now.Year;
+            calM = now.Month;
+        }
+
+        var firstSelected = new DateTime(calY, calM, 1, 0, 0, 0, DateTimeKind.Utc);
+        var firstNow = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        if (firstSelected > firstNow)
+        {
+            calY = now.Year;
+            calM = now.Month;
+        }
+
+        var calendarMonth = BuildBookingsPerDayForMonth(rows, calY, calM);
         var delivery = await BuildDeliveryTimeDistributionAsync(baseQuery, cancellationToken);
         var exceptionHeat = await BuildExceptionHeatmapAsync(forCustomer, normalizedScope, cancellationToken);
 
@@ -209,15 +230,13 @@ public sealed partial class BookingRepository
         return list;
     }
 
-    private static List<DailyCountDto> BuildBookingsPerDayCurrentMonth(List<DashboardRow> rows, DateTime nowUtc)
+    private static List<DailyCountDto> BuildBookingsPerDayForMonth(List<DashboardRow> rows, int year, int month)
     {
-        var y = nowUtc.Year;
-        var m = nowUtc.Month;
-        var daysInMonth = DateTime.DaysInMonth(y, m);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
         var list = new List<DailyCountDto>();
         for (var d = 1; d <= daysInMonth; d++)
         {
-            var date = new DateOnly(y, m, d);
+            var date = new DateOnly(year, month, d);
             list.Add(new DailyCountDto { Date = date.ToString("yyyy-MM-dd"), Count = 0 });
         }
 
