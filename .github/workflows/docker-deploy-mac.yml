@@ -121,6 +121,12 @@ jobs:
           Jwt__SigningKey: ${{ secrets.JWT__SIGNING_KEY }}
           CORS__PORTAL_ORIGIN: ${{ secrets.CORS__PORTAL_ORIGIN }}
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+          Smtp__Host: ${{ secrets.Smtp__Host }}
+          Smtp__Port: ${{ secrets.Smtp__Port }}
+          Smtp__UseSsl: ${{ secrets.Smtp__UseSsl }}
+          Smtp__UserName: ${{ secrets.Smtp__UserName }}
+          Smtp__Password: ${{ secrets.Smtp__Password }}
+          Smtp__FromAddress: ${{ secrets.Smtp__FromAddress }}
         run: |
           set -e
           export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-600}"
