@@ -38,9 +38,9 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
         if (dup != null)
             return Fail("BusinessIdExists", "A company with this Business ID already exists.");
 
-        var explicitEmail = string.IsNullOrWhiteSpace(request.InitialAdminEmail)
-            ? null
-            : request.InitialAdminEmail.Trim();
+        var inviteEmails = CompanyAdminInviteEmailsHelper.NormalizeList(request.InitialAdminEmails);
+        if (request.MaxAdminAccounts is int maxAdmins && inviteEmails.Count > maxAdmins)
+            return Fail("TooManyInviteEmails", "Number of admin emails cannot exceed max admin accounts.");
 
         var company = new CompanyEntity
         {
@@ -50,7 +50,8 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
             CompanyId = "", // handler fills after gen
             MaxUserAccounts = request.MaxUserAccounts,
             MaxAdminAccounts = request.MaxAdminAccounts,
-            InitialAdminInviteEmail = explicitEmail
+            InitialAdminInviteEmail = inviteEmails.FirstOrDefault(),
+            InitialAdminInviteEmailsJson = CompanyAdminInviteEmailsHelper.SerializeJson(inviteEmails)
         };
         if (string.IsNullOrWhiteSpace(company.CompanyId))
             company.CompanyId = company.Id.ToString("N");
@@ -59,7 +60,7 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
 
         var admins = await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
         if (admins == 0)
-            await _inviteIssuer.TryIssueInitialAdminInviteAsync(company.Id, bid, explicitEmail, cancellationToken);
+            await _inviteIssuer.TryIssueInitialAdminInvitesAsync(company.Id, bid, inviteEmails.Count > 0 ? inviteEmails : null, cancellationToken);
 
         return await ToSuccessAsync(company.Id, cancellationToken);
     }
@@ -74,6 +75,8 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
         var users = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountActiveUsersForBusinessIdAsync(bid, cancellationToken);
         var admins = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
 
+        var inviteList = CompanyAdminInviteEmailsHelper.GetExplicitTargets(c.InitialAdminInviteEmailsJson, c.InitialAdminInviteEmail);
+
         return new AdminCompanyMutationResult
         {
             Success = true,
@@ -86,6 +89,7 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
                 MaxUserAccounts = c.MaxUserAccounts,
                 MaxAdminAccounts = c.MaxAdminAccounts,
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
+                InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
                 AdminCount = admins
             }
