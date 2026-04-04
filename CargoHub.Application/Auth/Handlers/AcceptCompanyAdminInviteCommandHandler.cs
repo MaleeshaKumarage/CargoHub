@@ -17,6 +17,6 @@ public sealed class AcceptCompanyAdminInviteCommandHandler : IRequestHandler<Acc
     public Task<RegisterResult> Handle(AcceptCompanyAdminInviteCommand request, CancellationToken cancellationToken)
     {
         var body = request.Request;
-        return _runner.RunAsync(body.Token, body.Email, body.Password, body.UserName, cancellationToken);
+        return _runner.RunAsync(body.Token, body.Password, body.UserName, cancellationToken);
     }
 }

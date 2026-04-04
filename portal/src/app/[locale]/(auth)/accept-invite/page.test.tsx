@@ -52,20 +52,19 @@ describe("AcceptInvitePage", () => {
     searchParamsMock.token = null;
     render(<AcceptInvitePage />);
     await expect(screen.findByText("inviteMissingLink")).resolves.toBeInTheDocument();
-    expect(screen.queryByLabelText(/inviteInvitedEmail/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/userName/i)).not.toBeInTheDocument();
   });
 
-  it("renders invite form with email field when token is in query string", async () => {
+  it("renders invite form with user name and password when token is in query string", async () => {
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
+    await screen.findByLabelText(/userName/i);
     expect(screen.getByText("inviteTitle")).toBeInTheDocument();
     expect(screen.queryByLabelText(/inviteToken/i)).not.toBeInTheDocument();
   });
 
   it("shows password mismatch error", async () => {
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
-    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
+    await screen.findByLabelText(/userName/i);
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -92,8 +91,7 @@ describe("AcceptInvitePage", () => {
     });
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
-    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
+    await screen.findByLabelText(/userName/i);
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -104,7 +102,6 @@ describe("AcceptInvitePage", () => {
     await waitFor(() => {
       expect(mockAcceptInvite).toHaveBeenCalledWith({
         token: "from-query",
-        email: "a@b.com",
         password: "secret12",
         userName: "admin",
       });
@@ -120,8 +117,7 @@ describe("AcceptInvitePage", () => {
     });
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
-    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
+    await screen.findByLabelText(/userName/i);
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -132,32 +128,11 @@ describe("AcceptInvitePage", () => {
     await expect(screen.findByRole("alert")).resolves.toHaveTextContent("Expired token");
   });
 
-  it("shows inviteEmailMismatch when API returns that code", async () => {
-    mockAcceptInvite.mockResolvedValueOnce({
-      success: false,
-      errorCode: "InviteEmailMismatch",
-      message: "ignored",
-    });
-
-    render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
-    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "wrong@x.com" } });
-    fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
-    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
-    fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
-      target: { value: "secret12" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /inviteSubmit/i }));
-
-    await expect(screen.findByRole("alert")).resolves.toHaveTextContent("inviteEmailMismatch");
-  });
-
   it("shows inviteInvalid when API throws", async () => {
     mockAcceptInvite.mockRejectedValueOnce(new Error("network"));
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteInvitedEmail/i);
-    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
+    await screen.findByLabelText(/userName/i);
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
