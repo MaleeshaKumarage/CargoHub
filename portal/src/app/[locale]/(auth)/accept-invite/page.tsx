@@ -37,7 +37,7 @@ function AcceptInviteForm() {
 
   const hasToken = token.trim().length > 0;
 
-  function mapInviteError(errorCode: string | undefined): string {
+  function mapInviteError(errorCode: string | null | undefined): string {
     if (errorCode === "InviteEmailRequired") return t("inviteEmailRequired");
     if (errorCode === "InviteEmailMismatch") return t("inviteEmailMismatch");
     if (errorCode === "InviteTokenRequired") return t("inviteMissingLink");
