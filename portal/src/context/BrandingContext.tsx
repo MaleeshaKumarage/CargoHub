@@ -5,7 +5,7 @@ import type { BrandingResponse } from '@/lib/api';
 import { getBranding } from '@/lib/api';
 
 const defaultBranding: BrandingResponse = {
-  appName: 'Portal',
+  appName: 'CargoHub',
   logoUrl: '',
   primaryColor: '',
   secondaryColor: '',
@@ -58,7 +58,7 @@ export function BrandingDocumentHead() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const title = branding.appName ? `${branding.appName}` : 'Portal';
+    const title = branding.appName ? `${branding.appName}` : 'CargoHub';
     document.title = title;
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
