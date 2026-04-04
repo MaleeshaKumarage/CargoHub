@@ -290,13 +290,15 @@ public sealed partial class BookingRepository
     {
         var monthStart = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthEnd = monthStart.AddMonths(1);
-        var groups = await query
+        // Load timestamps only; GroupBy(DateOnly.FromDateTime(...)) is not reliably translatable to SQL.
+        var createdList = await query
             .Where(b => b.CreatedAtUtc >= monthStart && b.CreatedAtUtc < monthEnd)
-            .GroupBy(b => DateOnly.FromDateTime(b.CreatedAtUtc))
-            .Select(g => new { Date = g.Key, Count = g.Count() })
+            .Select(b => b.CreatedAtUtc)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        var dict = groups.ToDictionary(x => x.Date.ToString("yyyy-MM-dd"), x => x.Count);
+        var dict = createdList
+            .GroupBy(d => DateOnly.FromDateTime(d))
+            .ToDictionary(g => g.Key.ToString("yyyy-MM-dd"), g => g.Count());
         return BuildDailyListForMonth(year, month, dict);
     }
 
