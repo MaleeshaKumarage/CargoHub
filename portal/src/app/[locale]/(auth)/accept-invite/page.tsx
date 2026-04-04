@@ -16,6 +16,7 @@ function AcceptInviteForm() {
   const searchParams = useSearchParams();
   const { login: setAuth, isAuthenticated } = useAuth();
   const [token, setToken] = useState("");
+  const [email, setEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,9 +35,22 @@ function AcceptInviteForm() {
     return null;
   }
 
+  const hasToken = token.trim().length > 0;
+
+  function mapInviteError(errorCode: string | undefined): string {
+    if (errorCode === "InviteEmailRequired") return t("inviteEmailRequired");
+    if (errorCode === "InviteEmailMismatch") return t("inviteEmailMismatch");
+    if (errorCode === "InviteTokenRequired") return t("inviteMissingLink");
+    return t("inviteInvalid");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!hasToken) {
+      setError(t("inviteMissingLink"));
+      return;
+    }
     if (password !== confirmPassword) {
       setError(t("passwordMismatch"));
       return;
@@ -45,6 +59,7 @@ function AcceptInviteForm() {
     try {
       const result = await acceptCompanyAdminInvite({
         token: token.trim(),
+        email: email.trim(),
         password,
         userName: userName.trim(),
       });
@@ -53,12 +68,39 @@ function AcceptInviteForm() {
         router.replace("/dashboard");
         return;
       }
-      setError(result.message ?? t("inviteInvalid"));
+      if (result.errorCode === "InviteEmailRequired" || result.errorCode === "InviteEmailMismatch") {
+        setError(mapInviteError(result.errorCode));
+        return;
+      }
+      setError(result.message ?? mapInviteError(result.errorCode));
     } catch {
       setError(t("inviteInvalid"));
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!hasToken) {
+    return (
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>{t("inviteTitle")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground" role="alert">
+            {t("inviteMissingLink")}
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link
+            href="/login"
+            className="text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            {t("backToSignIn")}
+          </Link>
+        </CardFooter>
+      </Card>
+    );
   }
 
   return (
@@ -70,12 +112,13 @@ function AcceptInviteForm() {
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">{t("inviteDescription")}</p>
           <div className="space-y-2">
-            <Label htmlFor="token">{t("inviteToken")}</Label>
+            <Label htmlFor="invite-email">{t("inviteInvitedEmail")}</Label>
             <Input
-              id="token"
-              type="text"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              id="invite-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>

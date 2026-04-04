@@ -87,10 +87,12 @@ public sealed class ResetPasswordRequest
     public string NewPassword { get; set; } = string.Empty;
 }
 
-/// <summary>Request for POST /api/v1/portal/accept-company-admin-invite. Body: { token, password, userName }.</summary>
+/// <summary>Request for POST /api/v1/portal/accept-company-admin-invite. Body: { token, email, password, userName }.</summary>
 public sealed class AcceptCompanyAdminInviteRequest
 {
     public string Token { get; set; } = string.Empty;
+    /// <summary>Must match the address the invite was sent to (case-insensitive).</summary>
+    public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
 }

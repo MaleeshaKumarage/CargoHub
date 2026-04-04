@@ -441,6 +441,7 @@ export async function adminPatchCompany(
 /** Anonymous: accept Super Admin–sent company admin invite (returns JWT like register). */
 export async function acceptCompanyAdminInvite(body: {
   token: string;
+  email: string;
   password: string;
   userName: string;
 }): Promise<LoginResult> {

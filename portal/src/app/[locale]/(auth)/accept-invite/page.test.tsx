@@ -25,8 +25,14 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
+const searchParamsMock = vi.hoisted(() => ({ token: "from-query" as string | null }));
+
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams({ token: "from-query" }),
+  useSearchParams: () => {
+    const p = new URLSearchParams();
+    if (searchParamsMock.token) p.set("token", searchParamsMock.token);
+    return p;
+  },
 }));
 
 const mockAcceptInvite = vi.hoisted(() => vi.fn());
@@ -39,18 +45,27 @@ describe("AcceptInvitePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.isAuthenticated = false;
+    searchParamsMock.token = "from-query";
   });
 
-  it("renders invite form with token from query string", async () => {
+  it("shows missing link message when token is absent", async () => {
+    searchParamsMock.token = null;
     render(<AcceptInvitePage />);
-    const tokenInput = await screen.findByLabelText(/inviteToken/i);
-    expect(tokenInput).toHaveValue("from-query");
+    await expect(screen.findByText("inviteMissingLink")).resolves.toBeInTheDocument();
+    expect(screen.queryByLabelText(/inviteInvitedEmail/i)).not.toBeInTheDocument();
+  });
+
+  it("renders invite form with email field when token is in query string", async () => {
+    render(<AcceptInvitePage />);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
     expect(screen.getByText("inviteTitle")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/inviteToken/i)).not.toBeInTheDocument();
   });
 
   it("shows password mismatch error", async () => {
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteToken/i);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
+    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -77,7 +92,8 @@ describe("AcceptInvitePage", () => {
     });
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteToken/i);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
+    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -88,6 +104,7 @@ describe("AcceptInvitePage", () => {
     await waitFor(() => {
       expect(mockAcceptInvite).toHaveBeenCalledWith({
         token: "from-query",
+        email: "a@b.com",
         password: "secret12",
         userName: "admin",
       });
@@ -103,7 +120,8 @@ describe("AcceptInvitePage", () => {
     });
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteToken/i);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
+    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
@@ -114,11 +132,32 @@ describe("AcceptInvitePage", () => {
     await expect(screen.findByRole("alert")).resolves.toHaveTextContent("Expired token");
   });
 
+  it("shows inviteEmailMismatch when API returns that code", async () => {
+    mockAcceptInvite.mockResolvedValueOnce({
+      success: false,
+      errorCode: "InviteEmailMismatch",
+      message: "ignored",
+    });
+
+    render(<AcceptInvitePage />);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
+    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "wrong@x.com" } });
+    fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
+    fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
+      target: { value: "secret12" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /inviteSubmit/i }));
+
+    await expect(screen.findByRole("alert")).resolves.toHaveTextContent("inviteEmailMismatch");
+  });
+
   it("shows inviteInvalid when API throws", async () => {
     mockAcceptInvite.mockRejectedValueOnce(new Error("network"));
 
     render(<AcceptInvitePage />);
-    await screen.findByLabelText(/inviteToken/i);
+    await screen.findByLabelText(/inviteInvitedEmail/i);
+    fireEvent.change(screen.getByLabelText(/inviteInvitedEmail/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
     fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
