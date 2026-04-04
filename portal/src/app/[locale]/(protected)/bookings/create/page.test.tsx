@@ -5,6 +5,7 @@ import CreateBookingPage from "./page";
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
     token: "token",
+    user: { roles: ["User", "Admin"] },
     isAuthenticated: true,
     isLoading: false,
   }),
@@ -41,7 +42,7 @@ describe("CreateBookingPage", () => {
     vi.mocked(getAddressBook).mockResolvedValue({
       addressBooks: [{ companyId: "c1", companyName: "Co", senders: [], receivers: [] }],
     });
-    vi.mocked(getCouriers).mockResolvedValue([]);
+    vi.mocked(getCouriers).mockResolvedValue(["DHLExpress"]);
   });
 
   it("loads address book and shows create form with createTitle button", async () => {
@@ -57,6 +58,14 @@ describe("CreateBookingPage", () => {
     await screen.findByRole("button", { name: /createTitle/i });
     expect(screen.getByRole("heading", { name: /createTitle/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /saveAsDraft/i })).toBeInTheDocument();
+  });
+
+  it("shows no couriers banner and disables submit when courier list is empty", async () => {
+    vi.mocked(getCouriers).mockResolvedValue([]);
+    render(<CreateBookingPage />);
+    await expect(screen.findByRole("status")).resolves.toHaveTextContent(/noCouriersBannerTitle/);
+    expect(screen.getByRole("button", { name: /createTitle/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /saveAsDraft/i })).toBeDisabled();
   });
 
   it("shows error when bookingCreate fails", async () => {

@@ -16,7 +16,8 @@
     "manage": "Manage",
     "users": "Users",
     "companies": "Companies",
-    "bookingForm": "Booking form"
+    "bookingForm": "Booking form",
+    "courierContracts": "Courier contracts"
   },
   "theme": {
     "light": "Light",
@@ -100,6 +101,7 @@
     "bookings": "Bookings",
     "bookingsList": "Bookings list",
     "createBooking": "Create booking",
+    "courierContracts": "Courier contracts",
     "actions": "Actions",
     "plugin": "Plugin",
     "more": "More",
@@ -147,7 +149,8 @@
       "createDescription": "Create a new booking",
       "actionsDescription": "Agreement numbers, shipper, address book",
       "pluginDescription": "Download plugin and release notes",
-      "moreDescription": "Settings and profile"
+      "moreDescription": "Settings and profile",
+      "courierContractsDescription": "Choose which couriers your company uses and add contract IDs"
     }
   },
   "bookings": {
@@ -251,6 +254,10 @@
       "addPackage": "Add package",
       "remove": "Remove"
     },
+    "noCouriersBannerTitle": "Courier setup required",
+    "noCouriersBannerAdmin": "Your company has no courier contracts yet. Add the carriers you use and your contract IDs before creating bookings.",
+    "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
+    "goToCourierContracts": "Open courier contracts",
     "tableReference": "Reference / Shipment",
     "tableCustomer": "Customer",
     "tableCreated": "Created",
@@ -330,6 +337,30 @@
     "placeholderCity": "City",
     "placeholderCountry": "Country code (e.g. FI)"
   },
+  "courierContracts": {
+    "title": "Courier contracts",
+    "description": "Select which integrated couriers your company may use and enter the contract ID for each. All users in your company will only see these couriers when creating bookings.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load contracts",
+    "saveFailed": "Save failed",
+    "saved": "Saved",
+    "back": "Back",
+    "backDashboard": "Back to dashboard",
+    "superAdminNoAccess": "Super administrators manage companies from Manage; courier contracts are configured by each company’s administrator.",
+    "readOnlyHint": "Only company administrators can change courier contracts. Below is what is currently enabled for your company.",
+    "emptyList": "No courier contracts yet.",
+    "catalogUnavailable": "Could not load the list of available couriers. Try again or contact support.",
+    "courier": "Courier",
+    "selectCourier": "— Select courier —",
+    "contractId": "Contract ID",
+    "contractIdPlaceholder": "Agreement or contract number",
+    "serviceOptional": "Service / product (optional)",
+    "servicePlaceholder": "Optional",
+    "remove": "Remove row",
+    "addCourier": "Add courier",
+    "save": "Save",
+    "saving": "Saving…"
+  },
   "plugin": {
     "title": "Plugin",
     "description": "Download the plugin and view release notes.",
@@ -340,6 +371,8 @@
     "description": "Settings, profile and other options.",
     "theme": "Theme",
     "language": "Language",
-    "comingSoon": "More options coming soon."
+    "comingSoon": "More options coming soon.",
+    "courierContracts": "Courier contracts",
+    "courierContractsHint": "Choose carriers and contract IDs for bookings."
   }
 }

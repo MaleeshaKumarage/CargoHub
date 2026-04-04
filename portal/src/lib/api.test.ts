@@ -10,6 +10,9 @@ import {
   resetPassword,
   getBranding,
   getCouriers,
+  getCourierCatalog,
+  getCourierContracts,
+  putCourierContracts,
   adminGetCompanies,
   adminGetUsers,
   adminPatchUser,
@@ -444,6 +447,65 @@ describe("api", () => {
     it("throws when API returns non-ok", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
       await expect(getCouriers("token")).rejects.toThrow("Failed to load couriers");
+    });
+  });
+
+  describe("getCourierCatalog", () => {
+    it("returns ids when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ courierIds: ["A", "B"] }),
+      });
+      const ids = await getCourierCatalog("token");
+      expect(ids).toEqual(["A", "B"]);
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      await expect(getCourierCatalog("token")).rejects.toThrow("Failed to load courier catalog");
+    });
+  });
+
+  describe("getCourierContracts", () => {
+    it("normalizes contracts from API", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          contracts: [{ id: "550e8400-e29b-41d4-a716-446655440000", courierId: "DHL", contractId: "X", service: "S" }],
+        }),
+      });
+      const list = await getCourierContracts("token");
+      expect(list).toHaveLength(1);
+      expect(list[0].courierId).toBe("DHL");
+      expect(list[0].contractId).toBe("X");
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      await expect(getCourierContracts("token")).rejects.toThrow("Failed to load courier contracts");
+    });
+  });
+
+  describe("putCourierContracts", () => {
+    it("returns updated contracts when API returns 200", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          contracts: [{ courierId: "DHL", contractId: "N1" }],
+        }),
+      });
+      const list = await putCourierContracts("token", [{ courierId: "DHL", contractId: "N1" }]);
+      expect(list).toHaveLength(1);
+      expect(list[0].contractId).toBe("N1");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/company/courier-contracts"),
+        expect.objectContaining({ method: "PUT" })
+      );
+    });
+    it("throws with message when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "Duplicate courier: DHL" }),
+      });
+      await expect(putCourierContracts("token", [])).rejects.toThrow("Duplicate courier: DHL");
     });
   });
 

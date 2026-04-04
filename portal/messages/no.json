@@ -15,7 +15,8 @@
     "more": "Mer",
     "manage": "Administrer",
     "users": "Brukere",
-    "companies": "Firmaer"
+    "companies": "Firmaer",
+    "courierContracts": "Courier contracts"
   },
   "theme": {
     "light": "Lys",
@@ -99,6 +100,7 @@
     "bookings": "Bookinger",
     "bookingsList": "Bookingliste",
     "createBooking": "Opprett booking",
+    "courierContracts": "Courier contracts",
     "actions": "Handlinger",
     "plugin": "Plugin",
     "more": "Mer",
@@ -145,7 +147,8 @@
       "createDescription": "Opprett en ny booking",
       "actionsDescription": "Avtalenummer, avsender, adressebok",
       "pluginDescription": "Last ned plugin og utgivelsesnotater",
-      "moreDescription": "Innstillinger og profil"
+      "moreDescription": "Innstillinger og profil",
+      "courierContractsDescription": "Choose which couriers your company uses and add contract IDs"
     }
   },
   "bookings": {
@@ -156,7 +159,11 @@
     "createFirst": "Opprett din første booking",
     "loading": "Laster bookinger…",
     "comingSoon": "Bookinglisten vises her når API-et er klart.",
-    "saveToAddressBook": "Lagre avsender og mottaker i adresseboken etter opprettelse"
+    "saveToAddressBook": "Lagre avsender og mottaker i adresseboken etter opprettelse",
+    "noCouriersBannerTitle": "Courier setup required",
+    "noCouriersBannerAdmin": "Your company has no courier contracts yet. Add the carriers you use and your contract IDs before creating bookings.",
+    "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
+    "goToCourierContracts": "Open courier contracts"
   },
   "actions": {
     "title": "Handlinger",
@@ -192,6 +199,30 @@
     "placeholderCity": "By",
     "placeholderCountry": "Landskode (f.eks. NO)"
   },
+  "courierContracts": {
+    "title": "Courier contracts",
+    "description": "Select which integrated couriers your company may use and enter the contract ID for each. All users in your company will only see these couriers when creating bookings.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load contracts",
+    "saveFailed": "Save failed",
+    "saved": "Saved",
+    "back": "Back",
+    "backDashboard": "Back to dashboard",
+    "superAdminNoAccess": "Super administrators manage companies from Manage; courier contracts are configured by each company’s administrator.",
+    "readOnlyHint": "Only company administrators can change courier contracts. Below is what is currently enabled for your company.",
+    "emptyList": "No courier contracts yet.",
+    "catalogUnavailable": "Could not load the list of available couriers. Try again or contact support.",
+    "courier": "Courier",
+    "selectCourier": "— Select courier —",
+    "contractId": "Contract ID",
+    "contractIdPlaceholder": "Agreement or contract number",
+    "serviceOptional": "Service / product (optional)",
+    "servicePlaceholder": "Optional",
+    "remove": "Remove row",
+    "addCourier": "Add courier",
+    "save": "Save",
+    "saving": "Saving…"
+  },
   "plugin": {
     "title": "Plugin",
     "description": "Last ned pluginet og vis utgivelsesnotater.",
@@ -202,6 +233,8 @@
     "description": "Innstillinger, profil og andre alternativer.",
     "theme": "Tema",
     "language": "Språk",
-    "comingSoon": "Flere alternativer kommer snart."
+    "comingSoon": "Flere alternativer kommer snart.",
+    "courierContracts": "Courier contracts",
+    "courierContractsHint": "Choose carriers and contract IDs for bookings."
   }
 }

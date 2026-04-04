@@ -15,7 +15,8 @@
     "more": "Mer",
     "manage": "Hantera",
     "users": "Användare",
-    "companies": "Företag"
+    "companies": "Företag",
+    "courierContracts": "Courier contracts"
   },
   "theme": {
     "light": "Ljus",
@@ -99,6 +100,7 @@
     "bookings": "Bokningar",
     "bookingsList": "Bokningslista",
     "createBooking": "Skapa bokning",
+    "courierContracts": "Courier contracts",
     "actions": "Åtgärder",
     "plugin": "Plugin",
     "more": "Mer",
@@ -145,7 +147,8 @@
       "createDescription": "Skapa en ny bokning",
       "actionsDescription": "Avtalsnummer, avsändare, adressbok",
       "pluginDescription": "Ladda ner plugin och release notes",
-      "moreDescription": "Inställningar och profil"
+      "moreDescription": "Inställningar och profil",
+      "courierContractsDescription": "Choose which couriers your company uses and add contract IDs"
     }
   },
   "bookings": {
@@ -156,7 +159,11 @@
     "createFirst": "Skapa din första bokning",
     "loading": "Laddar bokningar…",
     "comingSoon": "Bokningslistan visas här när API:et är klart.",
-    "saveToAddressBook": "Spara avsändare och mottagare i adressboken efter skapande"
+    "saveToAddressBook": "Spara avsändare och mottagare i adressboken efter skapande",
+    "noCouriersBannerTitle": "Courier setup required",
+    "noCouriersBannerAdmin": "Your company has no courier contracts yet. Add the carriers you use and your contract IDs before creating bookings.",
+    "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
+    "goToCourierContracts": "Open courier contracts"
   },
   "actions": {
     "title": "Åtgärder",
@@ -192,6 +199,30 @@
     "placeholderCity": "Stad",
     "placeholderCountry": "Landskod (t.ex. FI)"
   },
+  "courierContracts": {
+    "title": "Courier contracts",
+    "description": "Select which integrated couriers your company may use and enter the contract ID for each. All users in your company will only see these couriers when creating bookings.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load contracts",
+    "saveFailed": "Save failed",
+    "saved": "Saved",
+    "back": "Back",
+    "backDashboard": "Back to dashboard",
+    "superAdminNoAccess": "Super administrators manage companies from Manage; courier contracts are configured by each company’s administrator.",
+    "readOnlyHint": "Only company administrators can change courier contracts. Below is what is currently enabled for your company.",
+    "emptyList": "No courier contracts yet.",
+    "catalogUnavailable": "Could not load the list of available couriers. Try again or contact support.",
+    "courier": "Courier",
+    "selectCourier": "— Select courier —",
+    "contractId": "Contract ID",
+    "contractIdPlaceholder": "Agreement or contract number",
+    "serviceOptional": "Service / product (optional)",
+    "servicePlaceholder": "Optional",
+    "remove": "Remove row",
+    "addCourier": "Add courier",
+    "save": "Save",
+    "saving": "Saving…"
+  },
   "plugin": {
     "title": "Plugin",
     "description": "Ladda ner pluginet och visa release notes.",
@@ -202,6 +233,8 @@
     "description": "Inställningar, profil och andra alternativ.",
     "theme": "Tema",
     "language": "Språk",
-    "comingSoon": "Fler alternativ kommer snart."
+    "comingSoon": "Fler alternativ kommer snart.",
+    "courierContracts": "Courier contracts",
+    "courierContractsHint": "Choose carriers and contract IDs for bookings."
   }
 }

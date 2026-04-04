@@ -1,3 +1,4 @@
+using CargoHub.Domain.Companies;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
 using CompanyAddress = CargoHub.Domain.Companies.CompanyAddress;
 
@@ -27,4 +28,13 @@ public interface ICompanyRepository
     Task AddSenderAsync(Guid companyId, CompanyAddress address, CancellationToken cancellationToken = default);
     /// <summary>Add a receiver to the company's AddressBook. Company is loaded with tracking.</summary>
     Task AddReceiverAsync(Guid companyId, CompanyAddress address, CancellationToken cancellationToken = default);
+
+    /// <summary>Agreement numbers (courier contracts) for the company. No-tracking.</summary>
+    Task<CompanyEntity?> GetByBusinessIdWithAgreementsAsync(string businessId, CancellationToken cancellationToken = default);
+
+    /// <summary>Courier ids with a non-empty contract id (PostalService values). Empty if none.</summary>
+    Task<HashSet<string>> GetEnabledCourierIdsForCompanyAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    /// <summary>Replace all agreement numbers for the company. Company must exist.</summary>
+    Task ReplaceAgreementNumbersAsync(Guid companyId, IReadOnlyList<AgreementNumber> agreements, CancellationToken cancellationToken = default);
 }
