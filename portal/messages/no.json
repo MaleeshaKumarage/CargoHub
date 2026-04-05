@@ -195,7 +195,10 @@
     "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
     "goToCourierContracts": "Open courier contracts",
     "fieldRequired": "Dette feltet er obligatorisk.",
-    "validationActionBanner": "Noen obligatoriske felt mangler. Bla opp til de markerte feilene og prøv igjen."
+    "validationActionBanner": "Noen obligatoriske felt mangler. Bla opp til de markerte feilene og prøv igjen.",
+    "trialLimitBannerTitle": "Prøvegrensen for bookinger er nådd",
+    "trialLimitBannerHint": "Oppgrader abonnementet ditt eller be en administrator tildele en betalt plan slik at du kan fortsette å opprette bookinger.",
+    "trialLimitBannerDismiss": "Lukk"
   },
   "actions": {
     "title": "Handlinger",

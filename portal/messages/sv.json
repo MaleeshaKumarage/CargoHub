@@ -195,7 +195,10 @@
     "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
     "goToCourierContracts": "Open courier contracts",
     "fieldRequired": "Det här fältet är obligatoriskt.",
-    "validationActionBanner": "Obligatoriska fält saknas. Bläddra upp till markerade fel och försök igen."
+    "validationActionBanner": "Obligatoriska fält saknas. Bläddra upp till markerade fel och försök igen.",
+    "trialLimitBannerTitle": "Provgränsen för bokningar är nådd",
+    "trialLimitBannerHint": "Uppgradera din prenumeration eller be en administratör tilldela en betald plan så att du kan fortsätta skapa bokningar.",
+    "trialLimitBannerDismiss": "Stäng"
   },
   "actions": {
     "title": "Åtgärder",

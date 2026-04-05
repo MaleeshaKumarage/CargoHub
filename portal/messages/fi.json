@@ -202,6 +202,9 @@
     "quickBookingDescription": "Kun käytössä, näytetään vain pakolliset kentät jokaisessa osiossa; valinnaiset kentät piilotetaan.",
     "fieldRequired": "Tämä kenttä on pakollinen.",
     "validationActionBanner": "Joitakin pakollisia kenttiä puuttuu. Tarkista yläpuolella korostetut virheet ja yritä uudelleen.",
+    "trialLimitBannerTitle": "Kokeilujakson varausraja täynnä",
+    "trialLimitBannerHint": "Päivitä tilaus tai pyydä ylläpitäjää määrittämään maksullinen paketti, jotta voit jatkaa varausten luomista.",
+    "trialLimitBannerDismiss": "Sulje",
     "optional": "Valinnainen",
     "sections": {
       "header": "Otsikko",

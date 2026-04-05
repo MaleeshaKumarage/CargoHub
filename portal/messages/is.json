@@ -195,7 +195,10 @@
     "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
     "goToCourierContracts": "Open courier contracts",
     "fieldRequired": "Þetta reit er skylda.",
-    "validationActionBanner": "Sum skyldureitir vantar. Skrunaðu upp að merktum villum og reyndu aftur."
+    "validationActionBanner": "Sum skyldureitir vantar. Skrunaðu upp að merktum villum og reyndu aftur.",
+    "trialLimitBannerTitle": "Prufuheimild fyrir bókanir er út",
+    "trialLimitBannerHint": "Uppfærðu áskriftina þína eða biddu stjórnanda um greidda áætlun svo þú getir haldið áfram að búa til bókanir.",
+    "trialLimitBannerDismiss": "Loka"
   },
   "actions": {
     "title": "Aðgerðir",

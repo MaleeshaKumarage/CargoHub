@@ -24,6 +24,9 @@ import {
   adminGetBillableMonths,
   adminGetBillingMonthBreakdown,
   adminGetBillingBreakdownByDateRange,
+  adminGetPlatformEarningsMonthly,
+  adminGetPlatformEarningsByCompany,
+  adminGetPlatformEarningsBySubscription,
   adminSetBookingInvoiceExcluded,
   AdminCompanyLimitReductionRequiredError,
   DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
@@ -37,6 +40,7 @@ import {
   bookingList,
   bookingGet,
   bookingCreate,
+  SubscriptionBillingConflictError,
   draftList,
   draftGet,
   draftCreate,
@@ -1418,6 +1422,36 @@ describe("api", () => {
       });
       await expect(bookingCreate("token", {})).rejects.toThrow("Invalid receiver");
     });
+    it("throws SubscriptionBillingConflictError on 409 TrialBookingLimitExceeded", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          errorCode: "TrialBookingLimitExceeded",
+          message: "Trial booking allowance has been used.",
+        }),
+      });
+      try {
+        await bookingCreate("token", { receiverName: "R" });
+        expect.fail("expected throw");
+      } catch (e) {
+        expect(e).toBeInstanceOf(SubscriptionBillingConflictError);
+        expect((e as SubscriptionBillingConflictError).errorCode).toBe("TrialBookingLimitExceeded");
+        expect((e as SubscriptionBillingConflictError).message).toBe("Trial booking allowance has been used.");
+        expect((e as SubscriptionBillingConflictError).isTrialBookingLimitExceeded).toBe(true);
+      }
+    });
+    it("throws SubscriptionBillingConflictError on 409 with ErrorCode/Message casing", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          ErrorCode: "TrialBookingLimitExceeded",
+          Message: "Trial booking allowance has been used.",
+        }),
+      });
+      await expect(bookingCreate("token", {})).rejects.toBeInstanceOf(SubscriptionBillingConflictError);
+    });
   });
 
   describe("draftList", () => {
@@ -1499,6 +1533,17 @@ describe("api", () => {
         json: async () => ({ message: "Draft already confirmed" }),
       });
       await expect(draftConfirm("token", "d1")).rejects.toThrow("Draft already confirmed");
+    });
+    it("throws SubscriptionBillingConflictError on 409 TrialBookingLimitExceeded", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          errorCode: "TrialBookingLimitExceeded",
+          message: "Trial booking allowance has been used.",
+        }),
+      });
+      await expect(draftConfirm("token", "d1")).rejects.toBeInstanceOf(SubscriptionBillingConflictError);
     });
   });
 

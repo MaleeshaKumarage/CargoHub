@@ -203,6 +203,9 @@
     "quickBookingDescription": "When enabled, only mandatory fields in each section are shown; optional fields are hidden.",
     "fieldRequired": "This field is required.",
     "validationActionBanner": "Some required fields are missing. Scroll up to the highlighted errors, fix them, then try again.",
+    "trialLimitBannerTitle": "Trial booking limit reached",
+    "trialLimitBannerHint": "Upgrade your subscription or ask an administrator to assign a paid plan so you can keep creating bookings.",
+    "trialLimitBannerDismiss": "Dismiss",
     "optional": "Optional",
     "sections": {
       "header": "Header",

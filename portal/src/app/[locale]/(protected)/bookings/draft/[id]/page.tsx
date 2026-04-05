@@ -11,6 +11,7 @@ import {
   draftUpdate,
   draftConfirm,
   getBookingFieldRules,
+  SubscriptionBillingConflictError,
   type BookingDetail,
   type BookingDetailParty,
   type UpdateDraftBody,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TrialBookingLimitBanner } from "@/components/TrialBookingLimitBanner";
 
 const emptyParty = (): BookingDetailParty => ({
   name: "",
@@ -90,6 +92,8 @@ export default function DraftDetailPage() {
   const [confirming, setConfirming] = useState(false);
   const [bookingRules, setBookingRules] = useState<BookingFieldRules>(() => defaultBookingFieldRules());
   const [confirmFieldErrors, setConfirmFieldErrors] = useState<Record<string, string>>({});
+  const [trialBannerOpen, setTrialBannerOpen] = useState(false);
+  const [trialBannerMessage, setTrialBannerMessage] = useState("");
 
   const clearConfirmFieldErrors = useCallback(() => setConfirmFieldErrors({}), []);
 
@@ -175,12 +179,19 @@ export default function DraftDetailPage() {
       return;
     }
     setConfirmFieldErrors({});
+    setTrialBannerOpen(false);
     setConfirming(true);
     try {
       const completed = await draftConfirm(token, id);
       router.push(`/bookings/${completed.id}?printWaybill=1`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Confirm failed");
+      if (e instanceof SubscriptionBillingConflictError && e.isTrialBookingLimitExceeded) {
+        setTrialBannerMessage(e.message);
+        setTrialBannerOpen(true);
+        setError(null);
+      } else {
+        setError(e instanceof Error ? e.message : "Confirm failed");
+      }
     } finally {
       setConfirming(false);
     }
@@ -191,7 +202,13 @@ export default function DraftDetailPage() {
   if (!isAuthenticated || isLoading) return null;
 
   return (
-    <div className="space-y-6">
+    <>
+      <TrialBookingLimitBanner
+        open={trialBannerOpen}
+        onDismiss={() => setTrialBannerOpen(false)}
+        detailMessage={trialBannerMessage}
+      />
+      <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/bookings">
           <Button variant="ghost">Back</Button>
@@ -419,5 +436,6 @@ export default function DraftDetailPage() {
         </div>
       ) : null}
     </div>
+    </>
   );
 }
