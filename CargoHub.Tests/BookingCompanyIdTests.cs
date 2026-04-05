@@ -2,6 +2,7 @@ using CargoHub.Application.Bookings;
 using CargoHub.Application.Bookings.Commands;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Domain.Bookings;
+using CargoHub.Tests.TestDoubles;
 using Moq;
 using Xunit;
 
@@ -12,6 +13,8 @@ namespace CargoHub.Tests;
 /// </summary>
 public class BookingCompanyIdTests
 {
+    private static readonly NoOpSubscriptionBillingOrchestrator Billing = new();
+
     private static CreateBookingRequest MinimalRequest() => new()
     {
         ReceiverName = "Test",
@@ -36,7 +39,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
         await handler.Handle(new CreateBookingCommand(
             "customer-1",
             "Customer One",
@@ -59,7 +62,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
         await handler.Handle(new CreateBookingCommand(
             "customer-1",
             "Customer One",
@@ -133,7 +136,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
         await handler.Handle(new CreateBookingCommand("cust-min", null, MinimalRequest(), companyId), default);
 
         Assert.NotNull(captured);

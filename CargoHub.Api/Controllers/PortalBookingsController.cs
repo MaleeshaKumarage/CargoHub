@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using CargoHub.Api.Services;
 using CargoHub.Application.Auth;
+using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings;
 using CargoHub.Application.Company;
 using CargoHub.Application.Bookings.Commands;
@@ -183,10 +184,17 @@ public class PortalBookingsController : ControllerBase
         var courierError = await ValidateCourierForCompanyBookingAsync(companyId, request.PostalService, HttpContext.RequestAborted);
         if (courierError != null)
             return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
-        var created = await _mediator.Send(new CreateBookingCommand(customerId, displayName, request, companyId), HttpContext.RequestAborted);
-        if (created == null)
-            return BadRequest();
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await _mediator.Send(new CreateBookingCommand(customerId, displayName, request, companyId), HttpContext.RequestAborted);
+            if (created == null)
+                return BadRequest();
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (SubscriptionBillingException ex)
+        {
+            return Conflict(new { errorCode = ex.ErrorCode, message = ex.Message });
+        }
     }
 
     // ---- Drafts: save as draft, retrieve, fill rest, confirm to complete ----
@@ -268,10 +276,17 @@ public class PortalBookingsController : ControllerBase
         var courierError = await ValidateCourierForCompanyBookingAsync(companyId, draftDetail.Header?.PostalService, HttpContext.RequestAborted);
         if (courierError != null)
             return BadRequest(new { errorCode = courierError.ErrorCode, message = courierError.Message });
-        var result = await _mediator.Send(new ConfirmDraftCommand(id, customerId), HttpContext.RequestAborted);
-        if (result == null)
-            return NotFound();
-        return Ok(result);
+        try
+        {
+            var result = await _mediator.Send(new ConfirmDraftCommand(id, customerId), HttpContext.RequestAborted);
+            if (result == null)
+                return NotFound();
+            return Ok(result);
+        }
+        catch (SubscriptionBillingException ex)
+        {
+            return Conflict(new { errorCode = ex.ErrorCode, message = ex.Message });
+        }
     }
 
     /// <summary>Download completed bookings as CSV or Excel (columns match export/import template).</summary>

@@ -76,6 +76,8 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
             company.MaxUserAccounts = request.MaxUserAccounts;
         if (request.MaxAdminAccounts.HasValue)
             company.MaxAdminAccounts = request.MaxAdminAccounts;
+        if (request.SubscriptionPlanId.HasValue)
+            company.SubscriptionPlanId = request.SubscriptionPlanId;
 
         await _companies.UpdateAsync(company, cancellationToken);
 
@@ -120,7 +122,8 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
                 InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
-                AdminCount = adminCount
+                AdminCount = adminCount,
+                SubscriptionPlanId = c.SubscriptionPlanId
             }
         };
     }

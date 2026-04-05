@@ -250,6 +250,26 @@
     "language": "Språk",
     "comingSoon": "Fler alternativ kommer snart.",
     "courierContracts": "Courier contracts",
-    "courierContractsHint": "Choose carriers and contract IDs for bookings."
+    "courierContractsHint": "Choose carriers and contract IDs for bookings.",
+    "signedInAs": "Inloggad som",
+    "companyLabel": "Företag",
+    "subscriptionTitle": "Prenumeration",
+    "subscriptionPlanLabel": "Namn",
+    "subscriptionPricingLabel": "Pris",
+    "subscriptionUnnamedPlan": "Prenumerationsplan",
+    "subscriptionNonePlan": "Ingen prenumerationsplan har tilldelats ännu.",
+    "subscriptionUnknownPlan": "Prenumerationsuppgifter är inte tillgängliga.",
+    "subscriptionTrial": "Provperiod.",
+    "subscriptionTrialBookings": "Upp till {count} bokningar ingår under provperioden.",
+    "subscriptionPerBooking": "{amount} per slutförd bokning.",
+    "subscriptionRatesPending": "Detaljerade priser visas när de konfigurerats.",
+    "subscriptionMonthlyBase": "Månadsavgift: {amount}.",
+    "subscriptionIncludedBookings": "{count} bokningar ingår per månad.",
+    "subscriptionOverageEach": "Ytterligare bokningar: {amount} styck.",
+    "subscriptionTierBandMax": "Upp till {max} bokningar under perioden",
+    "subscriptionTierBandOpen": "Utöver tidigare nivåer",
+    "subscriptionPerBookingShort": "per bokning",
+    "subscriptionPerMonthShort": "per månad",
+    "subscriptionLoadError": "Kunde inte ladda prenumerationen."
   }
 }

@@ -250,6 +250,26 @@
     "language": "Sprog",
     "comingSoon": "Flere muligheder kommer snart.",
     "courierContracts": "Courier contracts",
-    "courierContractsHint": "Choose carriers and contract IDs for bookings."
+    "courierContractsHint": "Choose carriers and contract IDs for bookings.",
+    "signedInAs": "Logget ind som",
+    "companyLabel": "Virksomhed",
+    "subscriptionTitle": "Abonnement",
+    "subscriptionPlanLabel": "Navn",
+    "subscriptionPricingLabel": "Priser",
+    "subscriptionUnnamedPlan": "Abonnementsplan",
+    "subscriptionNonePlan": "Der er endnu ikke tildelt en abonnementsplan.",
+    "subscriptionUnknownPlan": "Abonnementsoplysninger er ikke tilgængelige.",
+    "subscriptionTrial": "Prøveabonnement.",
+    "subscriptionTrialBookings": "Op til {count} bookinger inkluderet i prøveperioden.",
+    "subscriptionPerBooking": "{amount} pr. gennemført booking.",
+    "subscriptionRatesPending": "Detaljerede priser vises, når de er konfigureret.",
+    "subscriptionMonthlyBase": "Månedlig grundpris: {amount}.",
+    "subscriptionIncludedBookings": "{count} bookinger inkluderet pr. måned.",
+    "subscriptionOverageEach": "Yderligere bookinger: {amount} pr. stk.",
+    "subscriptionTierBandMax": "Op til {max} bookinger i perioden",
+    "subscriptionTierBandOpen": "Ud over tidligere niveauer",
+    "subscriptionPerBookingShort": "pr. booking",
+    "subscriptionPerMonthShort": "pr. måned",
+    "subscriptionLoadError": "Kunne ikke indlæse abonnementet."
   }
 }

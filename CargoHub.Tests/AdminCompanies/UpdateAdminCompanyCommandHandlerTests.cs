@@ -279,4 +279,22 @@ public class UpdateAdminCompanyCommandHandlerTests
         Assert.True(r.Success);
         metrics.Verify(x => x.CountActiveUsersForBusinessIdAsync(It.IsAny<string>(), default), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_UpdatesSubscriptionPlanId_WhenProvided()
+    {
+        var id = Guid.NewGuid();
+        var company = TrackedCompany(id);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
+        metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        repo.Setup(x => x.UpdateAsync(company, default)).ReturnsAsync(company);
+        repo.Setup(x => x.GetByIdAsync(id, default)).ReturnsAsync(company);
+        var newPlan = Guid.NewGuid();
+        var r = await h.Handle(new UpdateAdminCompanyCommand(id, null, null, false, null, null, newPlan), default);
+        Assert.True(r.Success);
+        Assert.Equal(newPlan, company.SubscriptionPlanId);
+        Assert.Equal(newPlan, r.Company!.SubscriptionPlanId);
+    }
 }

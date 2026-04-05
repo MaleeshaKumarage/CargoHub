@@ -1,4 +1,5 @@
 using CargoHub.Application.AdminCompanies;
+using CargoHub.Application.Billing;
 using CargoHub.Application.Company;
 using Moq;
 using Xunit;
@@ -60,6 +61,25 @@ public class CreateAdminCompanyCommandHandlerTests
         invites.Verify(
             x => x.TryIssueInitialAdminInvitesAsync(It.IsAny<Guid>(), "bid", null, default),
             Times.Once);
+        Assert.Equal(SubscriptionBillingConstants.DefaultTrialPlanId, created!.SubscriptionPlanId);
+    }
+
+    [Fact]
+    public async Task Handle_UsesExplicitSubscriptionPlanId_WhenProvided()
+    {
+        var h = CreateHandler(out var repo, out _, out var metrics);
+        repo.Setup(x => x.GetByBusinessIdAsync("bid", default)).ReturnsAsync((CompanyEntity?)null);
+        CompanyEntity? created = null;
+        repo.Setup(x => x.CreateAsync(It.IsAny<CompanyEntity>(), default))
+            .Callback<CompanyEntity, CancellationToken>((c, _) => created = c)
+            .ReturnsAsync((CompanyEntity c, CancellationToken _) => c);
+        repo.Setup(x => x.GetByIdAsync(It.IsAny<Guid>(), default))
+            .ReturnsAsync((Guid id, CancellationToken _) => created!.Id == id ? created : null);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("bid", default)).ReturnsAsync(0);
+        var planId = Guid.NewGuid();
+        var r = await h.Handle(new CreateAdminCompanyCommand("Co", "bid", 10, 2, null, planId), default);
+        Assert.True(r.Success);
+        Assert.Equal(planId, created!.SubscriptionPlanId);
     }
 
     [Fact]

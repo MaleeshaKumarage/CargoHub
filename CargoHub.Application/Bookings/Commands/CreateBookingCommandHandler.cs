@@ -1,3 +1,4 @@
+using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Application.Bookings.Queries;
 using CargoHub.Domain.Bookings;
@@ -8,10 +9,12 @@ namespace CargoHub.Application.Bookings.Commands;
 public sealed class CreateBookingCommandHandler : IRequestHandler<CreateBookingCommand, BookingDetailDto?>
 {
     private readonly IBookingRepository _repository;
+    private readonly ISubscriptionBillingOrchestrator _billing;
 
-    public CreateBookingCommandHandler(IBookingRepository repository)
+    public CreateBookingCommandHandler(IBookingRepository repository, ISubscriptionBillingOrchestrator billing)
     {
         _repository = repository;
+        _billing = billing;
     }
 
     public async Task<BookingDetailDto?> Handle(CreateBookingCommand request, CancellationToken cancellationToken)
@@ -46,8 +49,10 @@ public sealed class CreateBookingCommandHandler : IRequestHandler<CreateBookingC
             ShippingInfo = MapShippingInfo(r.ShippingInfo)
         };
         MapPackages(booking, r.ShippingInfo?.Packages);
+        await _billing.AssertBillableBookingAllowedAsync(booking.CompanyId, booking.IsTestBooking, cancellationToken);
         await _repository.AddAsync(booking, cancellationToken);
         await _repository.AddStatusEventAsync(booking.Id, BookingStatus.CompletedBooking, "booking_created", cancellationToken);
+        await _billing.PostBillingForNewCompletedBookingAsync(booking.Id, cancellationToken);
         return GetBookingByIdQueryHandler.MapToDetail(booking);
     }
 
