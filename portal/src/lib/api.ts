@@ -537,6 +537,61 @@ export async function adminSendTestEmail(token: string, to: string): Promise<{ o
   return data as { ok: boolean; message?: string };
 }
 
+export type AdminSendReleaseNotesPayload = {
+  subject: string;
+  body: string;
+  allCompanies: boolean;
+  /** Required when allCompanies is false; company row GUIDs from admin list. */
+  companyIds?: string[];
+  allRoles: boolean;
+  /** Required when allRoles is false. */
+  roles?: string[];
+};
+
+export type AdminSendReleaseNotesResult = {
+  recipientCount: number;
+  sentCount: number;
+  failures: { email: string; message: string }[];
+};
+
+/** Super Admin: broadcast release notes to users filtered by company and role. */
+export async function adminSendReleaseNotes(
+  token: string,
+  payload: AdminSendReleaseNotesPayload
+): Promise<AdminSendReleaseNotesResult> {
+  const res = await fetch(`${adminBase()}/email/release-notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      subject: payload.subject,
+      body: payload.body,
+      allCompanies: payload.allCompanies,
+      companyIds: payload.companyIds,
+      allRoles: payload.allRoles,
+      roles: payload.roles,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
+    throw new Error(msg || `Release notes send failed (${res.status})`);
+  }
+  const raw = data as Record<string, unknown>;
+  const failuresRaw = raw.failures ?? raw.Failures;
+  const failures: { email: string; message: string }[] = Array.isArray(failuresRaw)
+    ? (failuresRaw as Record<string, unknown>[]).map((f) => ({
+        email: String(f.email ?? f.Email ?? ''),
+        message: String(f.message ?? f.Message ?? ''),
+      }))
+    : [];
+  return {
+    recipientCount: Number(raw.recipientCount ?? raw.RecipientCount ?? 0),
+    sentCount: Number(raw.sentCount ?? raw.SentCount ?? 0),
+    failures,
+  };
+}
+
 function parseLimitReductionConflict(data: Record<string, unknown>): LimitReductionConflictDetails {
   const n = (v: unknown) => {
     const x = Number(v);

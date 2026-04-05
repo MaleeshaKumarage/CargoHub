@@ -9,7 +9,6 @@ import {
   adminGetUsers,
   adminGetSubscriptionPlans,
   adminPatchCompany,
-  adminSendTestEmail,
   AdminCompanyLimitReductionRequiredError,
   DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
   type AdminCompany,
@@ -59,10 +58,6 @@ export default function ManageCompaniesPage() {
   const [maxAdmins, setMaxAdmins] = useState("");
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
-  const [testEmailTo, setTestEmailTo] = useState("");
-  const [testEmailSending, setTestEmailSending] = useState(false);
-  const [testEmailMessage, setTestEmailMessage] = useState<string | null>(null);
-  const [testEmailIsError, setTestEmailIsError] = useState(false);
 
   const [editLimitsCompany, setEditLimitsCompany] = useState<AdminCompany | null>(null);
   const [editMaxUsers, setEditMaxUsers] = useState("");
@@ -386,30 +381,6 @@ export default function ManageCompaniesPage() {
       setReductionError(e instanceof Error ? e.message : "Update failed");
     } finally {
       setApplyingReduction(false);
-    }
-  };
-
-  const handleTestEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    const to = testEmailTo.trim();
-    if (!to) {
-      setTestEmailIsError(true);
-      setTestEmailMessage("Enter an email address.");
-      return;
-    }
-    setTestEmailSending(true);
-    setTestEmailMessage(null);
-    setTestEmailIsError(false);
-    try {
-      const r = await adminSendTestEmail(token, to);
-      setTestEmailIsError(false);
-      setTestEmailMessage(r.message ?? "Sent. Check the inbox (and spam).");
-    } catch (e) {
-      setTestEmailIsError(true);
-      setTestEmailMessage(e instanceof Error ? e.message : "Failed to send test email");
-    } finally {
-      setTestEmailSending(false);
     }
   };
 
@@ -848,43 +819,6 @@ export default function ManageCompaniesPage() {
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Verify email (SMTP)</CardTitle>
-          <CardDescription>
-            Sends a short test message through the API&apos;s configured SMTP. Requires <code className="text-xs">Smtp:Host</code>{" "}
-            and <code className="text-xs">Smtp:FromAddress</code> (see appsettings or environment variables).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleTestEmail} className="flex flex-wrap items-end gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="test-email-to">Recipient</Label>
-              <Input
-                id="test-email-to"
-                type="email"
-                value={testEmailTo}
-                onChange={(e) => setTestEmailTo(e.target.value)}
-                placeholder="you@example.com"
-                className="w-[280px]"
-                disabled={testEmailSending}
-              />
-            </div>
-            <Button type="submit" variant="secondary" disabled={testEmailSending}>
-              {testEmailSending ? "Sending…" : "Send test email"}
-            </Button>
-          </form>
-          {testEmailMessage && (
-            <p
-              className={`mt-3 text-sm ${testEmailIsError ? "text-destructive" : "text-muted-foreground"}`}
-              role={testEmailIsError ? "alert" : "status"}
-            >
-              {testEmailMessage}
-            </p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
