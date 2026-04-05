@@ -7,11 +7,11 @@ public interface ISubscriptionBillingOrchestrator
     /// Confirm draft in one DB transaction: trial check, FirstBillableAtUtc, lines, status history.
     /// Returns false if the draft does not exist or is not owned by the customer.
     /// </summary>
-    /// <exception cref="SubscriptionBillingException">Trial allowance exhausted, etc.</exception>
+    /// <exception cref="SubscriptionBillingException">Trial allowance exhausted, company missing for a non-test booking, etc.</exception>
     Task<bool> ConfirmDraftWithBillingAsync(Guid bookingId, string customerId, CancellationToken cancellationToken = default);
 
-    /// <summary>Throws if the company cannot add another billable (non-test) booking under the current trial.</summary>
-    /// <exception cref="SubscriptionBillingException">Trial allowance exhausted.</exception>
+    /// <summary>Throws if the company cannot add another billable (non-test) booking under the current trial, or company id is missing.</summary>
+    /// <exception cref="SubscriptionBillingException">Trial allowance exhausted, or company required for non-test bookings.</exception>
     Task AssertBillableBookingAllowedAsync(Guid? companyId, bool isTestBooking, CancellationToken cancellationToken = default);
 
     /// <summary>After a completed booking is inserted, set FirstBillableAtUtc and post billing lines.</summary>

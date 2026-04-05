@@ -13,8 +13,7 @@ vi.mock("@/context/AuthContext", () => ({
 }));
 
 const mockGetCompanies = vi.fn();
-const mockGetBillableMonths = vi.fn();
-const mockGetBreakdown = vi.fn();
+const mockGetBreakdownByRange = vi.fn();
 const mockGetDetail = vi.fn();
 const mockGetUsers = vi.fn();
 
@@ -23,8 +22,7 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     adminGetCompanies: (...a: unknown[]) => mockGetCompanies(...a),
-    adminGetBillableMonths: (...a: unknown[]) => mockGetBillableMonths(...a),
-    adminGetBillingMonthBreakdown: (...a: unknown[]) => mockGetBreakdown(...a),
+    adminGetBillingBreakdownByDateRange: (...a: unknown[]) => mockGetBreakdownByRange(...a),
     adminGetBillingPeriodDetail: (...a: unknown[]) => mockGetDetail(...a),
     adminGetUsers: (...a: unknown[]) => mockGetUsers(...a),
     adminDownloadBillingPeriodInvoicePdf: vi.fn(),
@@ -37,7 +35,9 @@ const defaultBreakdown = {
   companyId: "c1",
   yearUtc: 2026,
   monthUtc: 4,
-  billingPeriodId: "per1",
+  billingPeriodId: "per1" as string | null,
+  rangeStartUtc: "2026-04-01T00:00:00Z",
+  rangeEndExclusiveUtc: "2026-05-01T00:00:00Z",
   currency: "EUR",
   billableBookingCount: 1,
   payableTotal: 10,
@@ -66,10 +66,7 @@ describe("ManageInvoicesPage", () => {
     mockGetCompanies.mockResolvedValue([
       { id: "c1", name: "Acme", companyId: "x", businessId: "123" },
     ]);
-    mockGetBillableMonths.mockResolvedValue([
-      { yearUtc: 2026, monthUtc: 4, billableBookingCount: 1, billingPeriodId: "per1" },
-    ]);
-    mockGetBreakdown.mockResolvedValue(defaultBreakdown);
+    mockGetBreakdownByRange.mockResolvedValue(defaultBreakdown);
     mockGetDetail.mockResolvedValue({
       id: "per1",
       companyId: "c1",
@@ -93,14 +90,13 @@ describe("ManageInvoicesPage", () => {
     });
   });
 
-  async function selectCompanyAndMonth() {
-    fireEvent.change(screen.getByRole("combobox", { name: "selectCompany" }), { target: { value: "c1" } });
-    await waitFor(() => expect(mockGetBillableMonths).toHaveBeenCalledWith("jwt", "c1"));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "billableMonth" })).toBeInTheDocument());
-    fireEvent.change(screen.getByRole("combobox", { name: "billableMonth" }), {
-      target: { value: "2026-04" },
-    });
-    await waitFor(() => expect(mockGetBreakdown).toHaveBeenCalledWith("jwt", "c1", 2026, 4));
+  async function selectCompanyAndLoadBreakdown() {
+    const companyCombo = screen.getByRole("combobox", { name: "selectCompany" });
+    await waitFor(() => expect(companyCombo).not.toBeDisabled());
+    fireEvent.change(companyCombo, { target: { value: "c1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "loadBreakdown" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "loadBreakdown" }));
+    await waitFor(() => expect(mockGetBreakdownByRange).toHaveBeenCalledWith("jwt", "c1", expect.any(String), expect.any(String)));
   }
 
   it("renders heading and loads companies", async () => {
@@ -109,22 +105,26 @@ describe("ManageInvoicesPage", () => {
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalledWith("jwt"));
   });
 
-  it("loads breakdown when company and month selected and opens line detail", async () => {
+  it("loads breakdown when company selected and load clicked; opens line detail", async () => {
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    await selectCompanyAndMonth();
+    await selectCompanyAndLoadBreakdown();
     await waitFor(() => expect(screen.getByRole("button", { name: "viewLines" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "viewLines" }));
     await waitFor(() => expect(mockGetDetail).toHaveBeenCalledWith("jwt", "per1"));
     await waitFor(() => expect(screen.getByText("PerBooking")).toBeInTheDocument());
   });
 
-  it("shows error when billable months request fails", async () => {
-    mockGetBillableMonths.mockRejectedValueOnce(new Error("months failed"));
+  it("shows error when breakdown request fails", async () => {
+    mockGetBreakdownByRange.mockRejectedValueOnce(new Error("breakdown failed"));
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    fireEvent.change(screen.getByRole("combobox", { name: "selectCompany" }), { target: { value: "c1" } });
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/months failed/));
+    const companyCombo = screen.getByRole("combobox", { name: "selectCompany" });
+    await waitFor(() => expect(companyCombo).not.toBeDisabled());
+    fireEvent.change(companyCombo, { target: { value: "c1" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "loadBreakdown" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "loadBreakdown" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/breakdown failed/));
   });
 
   it("shows excluded marker text for invoice-excluded lines in detail dialog", async () => {
@@ -151,7 +151,7 @@ describe("ManageInvoicesPage", () => {
     });
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    await selectCompanyAndMonth();
+    await selectCompanyAndLoadBreakdown();
     fireEvent.click(screen.getByRole("button", { name: "viewLines" }));
     await waitFor(() => expect(screen.getByText("excludedYes")).toBeInTheDocument());
   });
@@ -166,17 +166,23 @@ describe("ManageInvoicesPage", () => {
     mockGetDetail.mockRejectedValueOnce(new Error("detail failed"));
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    await selectCompanyAndMonth();
+    await selectCompanyAndLoadBreakdown();
     fireEvent.click(screen.getByRole("button", { name: "viewLines" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/detail failed/));
   });
 
-  it("shows no billable months message when list is empty", async () => {
-    mockGetBillableMonths.mockResolvedValueOnce([]);
+  it("shows no bookings in range when breakdown has zero bookings", async () => {
+    mockGetBreakdownByRange.mockResolvedValueOnce({
+      ...defaultBreakdown,
+      billableBookingCount: 0,
+      bookings: [],
+      payableTotal: 0,
+      ledgerTotal: 0,
+    });
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    fireEvent.change(screen.getByRole("combobox", { name: "selectCompany" }), { target: { value: "c1" } });
-    await waitFor(() => expect(screen.getByText("noBillableMonths")).toBeInTheDocument());
+    await selectCompanyAndLoadBreakdown();
+    await waitFor(() => expect(screen.getByText("noBookingsInRange")).toBeInTheDocument());
   });
 
   it("shows dialog loading then detail after fetch resolves", async () => {
@@ -207,7 +213,7 @@ describe("ManageInvoicesPage", () => {
     );
     render(<ManageInvoicesPage />);
     await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
-    await selectCompanyAndMonth();
+    await selectCompanyAndLoadBreakdown();
     fireEvent.click(screen.getByRole("button", { name: "viewLines" }));
     await waitFor(() => expect(screen.getByText("…")).toBeInTheDocument());
     resolveDetail({

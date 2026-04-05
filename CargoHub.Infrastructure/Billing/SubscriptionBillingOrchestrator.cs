@@ -28,7 +28,11 @@ public sealed class SubscriptionBillingOrchestrator : ISubscriptionBillingOrches
                 return false;
 
             if (!booking.IsTestBooking)
-                await AssertTrialNotExceededForCompanyAsync(booking.CompanyId, ct);
+            {
+                if (!booking.CompanyId.HasValue)
+                    throw new SubscriptionBillingException(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, "A company subscription is required to complete bookings.");
+                await AssertTrialNotExceededForCompanyAsync(booking.CompanyId.Value, ct);
+            }
 
             await ApplyBillableTransitionAsync(booking, ct);
 
@@ -66,9 +70,11 @@ public sealed class SubscriptionBillingOrchestrator : ISubscriptionBillingOrches
 
     public async Task AssertBillableBookingAllowedAsync(Guid? companyId, bool isTestBooking, CancellationToken cancellationToken = default)
     {
-        if (isTestBooking || !companyId.HasValue)
+        if (isTestBooking)
             return;
-        await AssertTrialNotExceededForCompanyAsync(companyId, cancellationToken);
+        if (!companyId.HasValue)
+            throw new SubscriptionBillingException(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, "A company subscription is required to create bookings.");
+        await AssertTrialNotExceededForCompanyAsync(companyId.Value, cancellationToken);
     }
 
     public async Task PostBillingForNewCompletedBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
@@ -101,26 +107,23 @@ public sealed class SubscriptionBillingOrchestrator : ISubscriptionBillingOrches
             await Body(cancellationToken);
     }
 
-    private async Task AssertTrialNotExceededForCompanyAsync(Guid? companyId, CancellationToken cancellationToken)
+    private async Task AssertTrialNotExceededForCompanyAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        if (!companyId.HasValue)
-            return;
-
-        var company = await _db.Companies.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == companyId.Value, cancellationToken);
-        if (company?.SubscriptionPlanId is not { } planId)
+        var instant = DateTime.UtcNow;
+        var planId = await CompanySubscriptionPlanResolver.ResolvePlanIdAtAsync(_db, companyId, instant, cancellationToken);
+        if (planId is not { } pid)
             return;
 
         var plan = await _db.SubscriptionPlans.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == pid, cancellationToken);
         if (plan == null || plan.Kind != SubscriptionPlanKind.Trial || plan.TrialBookingAllowance is not int cap)
             return;
 
+        // Count every completed non-test booking, including legacy rows without FirstBillableAtUtc (trial cap is about real usage).
         var used = await _db.Bookings.CountAsync(b =>
             b.CompanyId == companyId &&
             !b.IsDraft &&
-            !b.IsTestBooking &&
-            b.FirstBillableAtUtc != null, cancellationToken);
+            !b.IsTestBooking, cancellationToken);
 
         if (used >= cap)
             throw new SubscriptionBillingException(TrialLimitCode, "Trial booking allowance has been used.");
