@@ -2,15 +2,18 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   adminGetCompanies,
   adminCreateCompany,
   adminGetUsers,
+  adminGetSubscriptionPlans,
   adminPatchCompany,
   adminSendTestEmail,
   AdminCompanyLimitReductionRequiredError,
   type AdminCompany,
   type AdminPatchCompanyBody,
+  type AdminSubscriptionPlanSummary,
   type AdminUser,
   type LimitReductionConflictDetails,
 } from "@/lib/api";
@@ -43,6 +46,7 @@ type PendingCompanyLimits = {
 
 export default function ManageCompaniesPage() {
   const { token } = useAuth();
+  const tMc = useTranslations("manageCompanies");
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +66,13 @@ export default function ManageCompaniesPage() {
   const [editLimitsCompany, setEditLimitsCompany] = useState<AdminCompany | null>(null);
   const [editMaxUsers, setEditMaxUsers] = useState("");
   const [editMaxAdmins, setEditMaxAdmins] = useState("");
+  const [editSubscriptionPlanId, setEditSubscriptionPlanId] = useState("");
+  const [editSubscriptionInitial, setEditSubscriptionInitial] = useState("");
   const [savingLimitsId, setSavingLimitsId] = useState<string | null>(null);
+  const [savingSubscriptionId, setSavingSubscriptionId] = useState<string | null>(null);
   const [limitsError, setLimitsError] = useState<string | null>(null);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<AdminSubscriptionPlanSummary[]>([]);
+  const [createSubscriptionPlanId, setCreateSubscriptionPlanId] = useState("");
 
   const [reductionFlow, setReductionFlow] = useState<{
     company: AdminCompany;
@@ -112,6 +121,28 @@ export default function ManageCompaniesPage() {
       cancelled = true;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    adminGetSubscriptionPlans(token)
+      .then((list) => {
+        if (!cancelled) setSubscriptionPlans(list);
+      })
+      .catch(() => {
+        if (!cancelled) setSubscriptionPlans([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const planDisplayName = (planId: string | null | undefined) => {
+    if (!planId) return tMc("subscriptionUnknown");
+    const p = subscriptionPlans.find((x) => x.id === planId);
+    if (!p) return tMc("subscriptionUnknown");
+    return p.name + (p.isActive ? "" : tMc("subscriptionInactiveSuffix"));
+  };
 
   useEffect(() => {
     if (!token || !reductionFlow) {
@@ -184,11 +215,13 @@ export default function ManageCompaniesPage() {
         maxUserAccounts: parseOptionalInt(maxUsers),
         maxAdminAccounts: maxA ?? null,
         initialAdminEmails: filledEmails.length > 0 ? filledEmails : undefined,
+        subscriptionPlanId: createSubscriptionPlanId.trim() || undefined,
       });
       setName("");
       setBusinessId("");
       setMaxUsers("");
       setMaxAdmins("");
+      setCreateSubscriptionPlanId("");
       setAdminEmails([""]);
       refetchCompanies();
     } catch (e) {
@@ -217,6 +250,32 @@ export default function ManageCompaniesPage() {
     setEditLimitsCompany(c);
     setEditMaxUsers(c.maxUserAccounts != null ? String(c.maxUserAccounts) : "");
     setEditMaxAdmins(c.maxAdminAccounts != null ? String(c.maxAdminAccounts) : "");
+    const sid = c.subscriptionPlanId ?? "";
+    setEditSubscriptionPlanId(sid);
+    setEditSubscriptionInitial(sid);
+  };
+
+  const handleSaveSubscriptionOnly = async () => {
+    if (!token || !editLimitsCompany) return;
+    if (!editSubscriptionPlanId.trim()) {
+      setLimitsError(tMc("subscriptionSelectRequired"));
+      return;
+    }
+    if (editSubscriptionPlanId === editSubscriptionInitial) {
+      setLimitsError(null);
+      return;
+    }
+    setSavingSubscriptionId(editLimitsCompany.id);
+    setLimitsError(null);
+    try {
+      await adminPatchCompany(token, editLimitsCompany.id, { subscriptionPlanId: editSubscriptionPlanId });
+      setEditSubscriptionInitial(editSubscriptionPlanId);
+      refetchCompanies();
+    } catch (e) {
+      setLimitsError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setSavingSubscriptionId(null);
+    }
   };
 
   const handleSaveLimits = async () => {
@@ -238,14 +297,21 @@ export default function ManageCompaniesPage() {
       }
       body.maxAdminAccounts = p;
     }
+    if (
+      editSubscriptionPlanId.trim() &&
+      editSubscriptionPlanId !== editSubscriptionInitial
+    ) {
+      body.subscriptionPlanId = editSubscriptionPlanId;
+    }
     if (Object.keys(body).length === 0) {
-      setLimitsError("Change at least one limit, or cancel.");
+      setLimitsError("Change at least one limit, subscription, or cancel.");
       return;
     }
     setSavingLimitsId(editLimitsCompany.id);
     setLimitsError(null);
     try {
       await adminPatchCompany(token, editLimitsCompany.id, body);
+      if (body.subscriptionPlanId) setEditSubscriptionInitial(body.subscriptionPlanId);
       setEditLimitsCompany(null);
       refetchCompanies();
     } catch (e) {
@@ -416,6 +482,24 @@ export default function ManageCompaniesPage() {
                   disabled={creating}
                 />
               </div>
+              <div className="space-y-2 min-w-[240px]">
+                <Label htmlFor="create-subscription">{tMc("subscriptionLabel")}</Label>
+                <select
+                  id="create-subscription"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  value={createSubscriptionPlanId}
+                  onChange={(e) => setCreateSubscriptionPlanId(e.target.value)}
+                  disabled={creating}
+                >
+                  <option value="">{tMc("subscriptionDefault")}</option>
+                  {subscriptionPlans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.kind})
+                      {p.isActive ? "" : tMc("subscriptionInactiveSuffix")}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="space-y-3 max-w-lg">
               <Label>Initial admin email(s) (optional)</Label>
@@ -476,6 +560,7 @@ export default function ManageCompaniesPage() {
                     <th className="p-3 text-left font-medium">Business ID</th>
                     <th className="p-3 text-left font-medium">Users / max</th>
                     <th className="p-3 text-left font-medium">Admins / max</th>
+                    <th className="p-3 text-left font-medium">{tMc("subscriptionColumn")}</th>
                     <th className="p-3 text-left font-medium">Company ID</th>
                     <th className="p-3 text-left font-medium">Limits</th>
                     <th className="p-3 text-left font-medium">Invite</th>
@@ -495,6 +580,9 @@ export default function ManageCompaniesPage() {
                         <td className="p-3">
                           {c.adminCount ?? "—"}
                           {c.maxAdminAccounts != null ? ` / ${c.maxAdminAccounts}` : ""}
+                        </td>
+                        <td className="p-3 max-w-[200px] truncate" title={planDisplayName(c.subscriptionPlanId)}>
+                          {planDisplayName(c.subscriptionPlanId)}
                         </td>
                         <td className="p-3 font-mono text-xs">{c.companyId}</td>
                         <td className="p-3">
@@ -582,6 +670,39 @@ export default function ManageCompaniesPage() {
                   disabled={!!savingLimitsId}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-subscription">{tMc("editSubscriptionTitle")}</Label>
+                <select
+                  id="edit-subscription"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  value={editSubscriptionPlanId}
+                  onChange={(e) => setEditSubscriptionPlanId(e.target.value)}
+                  disabled={!!savingLimitsId || !!savingSubscriptionId}
+                >
+                  {editLimitsCompany?.subscriptionPlanId &&
+                    !subscriptionPlans.some((p) => p.id === editLimitsCompany.subscriptionPlanId) && (
+                      <option value={editLimitsCompany.subscriptionPlanId}>
+                        {planDisplayName(editLimitsCompany.subscriptionPlanId)}
+                      </option>
+                    )}
+                  {subscriptionPlans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.kind})
+                      {p.isActive ? "" : tMc("subscriptionInactiveSuffix")}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => void handleSaveSubscriptionOnly()}
+                  disabled={!!savingLimitsId || !!savingSubscriptionId}
+                >
+                  {savingSubscriptionId ? tMc("savingSubscription") : tMc("saveSubscription")}
+                </Button>
+              </div>
               {limitsError && (
                 <p className="text-sm text-destructive" role="alert">
                   {limitsError}
@@ -594,7 +715,11 @@ export default function ManageCompaniesPage() {
                   Cancel
                 </Button>
               </DialogPrimitive.Close>
-              <Button type="button" onClick={() => void handleSaveLimits()} disabled={!!savingLimitsId}>
+              <Button
+                type="button"
+                onClick={() => void handleSaveLimits()}
+                disabled={!!savingLimitsId || !!savingSubscriptionId}
+              >
                 {savingLimitsId ? "Saving…" : "Save"}
               </Button>
             </div>

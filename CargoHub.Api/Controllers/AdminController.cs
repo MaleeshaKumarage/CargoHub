@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Auth;
+using CargoHub.Application.Billing.Admin;
+using CargoHub.Application.Billing.AdminInvoicing;
 using CargoHub.Application.Company;
 using CargoHub.Application.Couriers;
 using CargoHub.Infrastructure.Identity;
@@ -69,6 +72,29 @@ public class AdminController : ControllerBase
         }
 
         return Ok(list);
+    }
+
+    /// <summary>List billing periods (UTC month buckets) for a company.</summary>
+    [HttpGet("companies/{companyId:guid}/billing-periods")]
+    public async Task<ActionResult<IReadOnlyList<CompanyBillingPeriodSummaryDto>>> GetCompanyBillingPeriods(
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
+        var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
+        if (company == null)
+            return NotFound(new { message = "Company not found." });
+        var list = await _mediator.Send(new ListCompanyBillingPeriodsQuery(companyId), cancellationToken);
+        return Ok(list);
+    }
+
+    /// <summary>Billing period detail with line items (Super Admin invoice-style view).</summary>
+    [HttpGet("billing-periods/{periodId:guid}")]
+    public async Task<ActionResult<BillingPeriodDetailDto>> GetBillingPeriodDetail(Guid periodId, CancellationToken cancellationToken)
+    {
+        var detail = await _mediator.Send(new GetBillingPeriodDetailQuery(periodId), cancellationToken);
+        if (detail == null)
+            return NotFound(new { message = "Billing period not found." });
+        return Ok(detail);
     }
 
     /// <summary>Create a company with limits and send initial admin invite (explicit or fallback email).</summary>
@@ -281,5 +307,15 @@ public class AdminController : ControllerBase
     {
         public string? Role { get; set; }
         public bool? IsActive { get; set; }
+    }
+
+    public sealed class SendInvoiceEmailRequest
+    {
+        public string? RecipientAdminUserId { get; set; }
+    }
+
+    public sealed class PatchBillingLineItemRequest
+    {
+        public bool ExcludedFromInvoice { get; set; }
     }
 }
