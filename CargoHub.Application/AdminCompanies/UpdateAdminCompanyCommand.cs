@@ -8,4 +8,5 @@ public sealed record UpdateAdminCompanyCommand(
     int? MaxAdminAccounts,
     bool ResendAdminInvite,
     IReadOnlyList<string>? DeactivateUserIds,
-    IReadOnlyList<string>? DemoteAdminUserIds) : IRequest<AdminCompanyMutationResult>;
+    IReadOnlyList<string>? DemoteAdminUserIds,
+    Guid? SubscriptionPlanId = null) : IRequest<AdminCompanyMutationResult>;

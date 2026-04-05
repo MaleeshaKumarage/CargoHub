@@ -86,6 +86,11 @@ public class Booking
     public DateTime CreatedAtUtc { get; set; }
 
     /// <summary>
+    /// UTC when the booking first became non-draft; set once for subscription volume / pricing anchor.
+    /// </summary>
+    public DateTime? FirstBillableAtUtc { get; set; }
+
+    /// <summary>
     /// UTC last update timestamp for auditing.
     /// </summary>
     public DateTime UpdatedAtUtc { get; set; }

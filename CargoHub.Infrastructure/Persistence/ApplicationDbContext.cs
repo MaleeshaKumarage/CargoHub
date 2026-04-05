@@ -1,3 +1,4 @@
+using CargoHub.Domain.Billing;
 using CargoHub.Domain.Bookings;
 using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Identity;
@@ -37,6 +38,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     /// <summary>Idempotency for daily per-company booking digest emails.</summary>
     public DbSet<DailyDigestSendLog> DailyDigestSendLogs => Set<DailyDigestSendLog>();
+
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+
+    public DbSet<SubscriptionPlanPricingPeriod> SubscriptionPlanPricingPeriods => Set<SubscriptionPlanPricingPeriod>();
+
+    public DbSet<SubscriptionPlanPricingTier> SubscriptionPlanPricingTiers => Set<SubscriptionPlanPricingTier>();
+
+    public DbSet<CompanyBillingPeriod> CompanyBillingPeriods => Set<CompanyBillingPeriod>();
+
+    public DbSet<BillingLineItem> BillingLineItems => Set<BillingLineItem>();
+
+    public DbSet<SubscriptionInvoiceSend> SubscriptionInvoiceSends => Set<SubscriptionInvoiceSend>();
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -94,8 +107,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                   .HasDatabaseName("IX_Bookings_ShipmentNumber");
 
             entity.Property(b => b.CompanyId);
+            entity.Property(b => b.FirstBillableAtUtc);
             entity.HasIndex(b => new { b.CompanyId, b.CreatedAtUtc })
                   .HasDatabaseName("IX_Bookings_CompanyId_CreatedAtUtc");
+            entity.HasIndex(b => new { b.CompanyId, b.FirstBillableAtUtc })
+                  .HasDatabaseName("IX_Bookings_CompanyId_FirstBillableAtUtc");
             entity.HasOne<CompanyEntity>()
                   .WithMany()
                   .HasForeignKey(b => b.CompanyId)
@@ -188,6 +204,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(c => c.MaxAdminAccounts);
             entity.Property(c => c.InitialAdminInviteEmail).HasMaxLength(256);
             entity.Property(c => c.InitialAdminInviteEmailsJson);
+            entity.Property(c => c.SubscriptionPlanId);
+            entity.HasOne<SubscriptionPlan>()
+                  .WithMany()
+                  .HasForeignKey(c => c.SubscriptionPlanId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(c => c.SubscriptionPlanId)
+                  .HasDatabaseName("IX_Companies_SubscriptionPlanId");
         });
 
         builder.Entity<CompanyAdminInvite>(entity =>
@@ -238,6 +262,103 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne<CompanyEntity>()
                   .WithMany()
                   .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SubscriptionPlan>(entity =>
+        {
+            entity.ToTable("SubscriptionPlans", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(x => x.Kind).HasConversion<int>();
+            entity.Property(x => x.ChargeTimeAnchor).HasConversion<int>();
+            entity.HasIndex(x => x.IsActive).HasDatabaseName("IX_SubscriptionPlans_IsActive");
+        });
+
+        builder.Entity<SubscriptionPlanPricingPeriod>(entity =>
+        {
+            entity.ToTable("SubscriptionPlanPricingPeriods", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EffectiveFromUtc).IsRequired();
+            entity.Property(x => x.ChargePerBooking).HasPrecision(18, 4);
+            entity.Property(x => x.MonthlyFee).HasPrecision(18, 4);
+            entity.Property(x => x.OverageChargePerBooking).HasPrecision(18, 4);
+            entity.HasIndex(x => new { x.SubscriptionPlanId, x.EffectiveFromUtc })
+                  .IsUnique()
+                  .HasDatabaseName("IX_SubscriptionPlanPricingPeriods_Plan_EffectiveFrom");
+            entity.HasOne(x => x.SubscriptionPlan)
+                  .WithMany(p => p.PricingPeriods)
+                  .HasForeignKey(x => x.SubscriptionPlanId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SubscriptionPlanPricingTier>(entity =>
+        {
+            entity.ToTable("SubscriptionPlanPricingTiers", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ChargePerBooking).HasPrecision(18, 4);
+            entity.Property(x => x.MonthlyFee).HasPrecision(18, 4);
+            entity.HasIndex(x => new { x.SubscriptionPlanPricingPeriodId, x.Ordinal })
+                  .IsUnique()
+                  .HasDatabaseName("IX_SubscriptionPlanPricingTiers_Period_Ordinal");
+            entity.HasOne(x => x.PricingPeriod)
+                  .WithMany(p => p.Tiers)
+                  .HasForeignKey(x => x.SubscriptionPlanPricingPeriodId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CompanyBillingPeriod>(entity =>
+        {
+            entity.ToTable("CompanyBillingPeriods", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(x => x.Status).HasConversion<int>();
+            entity.HasIndex(x => new { x.CompanyId, x.YearUtc, x.MonthUtc })
+                  .IsUnique()
+                  .HasDatabaseName("IX_CompanyBillingPeriods_Company_Year_Month");
+            entity.HasOne<CompanyEntity>()
+                  .WithMany()
+                  .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BillingLineItem>(entity =>
+        {
+            entity.ToTable("BillingLineItems", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.LineType).HasConversion<int>();
+            entity.Property(x => x.Component).HasMaxLength(64);
+            entity.Property(x => x.Amount).HasPrecision(18, 4);
+            entity.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.InvoiceExclusionUpdatedByUserId).HasMaxLength(128);
+            entity.HasIndex(x => x.CompanyBillingPeriodId).HasDatabaseName("IX_BillingLineItems_CompanyBillingPeriodId");
+            entity.HasIndex(x => x.BookingId).HasDatabaseName("IX_BillingLineItems_BookingId");
+            entity.HasOne(x => x.CompanyBillingPeriod)
+                  .WithMany(p => p.LineItems)
+                  .HasForeignKey(x => x.CompanyBillingPeriodId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Booking>()
+                  .WithMany()
+                  .HasForeignKey(x => x.BookingId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SubscriptionInvoiceSend>(entity =>
+        {
+            entity.ToTable("SubscriptionInvoiceSends", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SentBySuperAdminUserId).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.RecipientAdminUserId).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.RecipientEmailSnapshot).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.LedgerTotalSnapshot).HasPrecision(18, 4);
+            entity.Property(x => x.InvoiceTotalSnapshot).HasPrecision(18, 4);
+            entity.HasIndex(x => x.CompanyBillingPeriodId).HasDatabaseName("IX_SubscriptionInvoiceSends_CompanyBillingPeriodId");
+            entity.HasOne(x => x.CompanyBillingPeriod)
+                  .WithMany(p => p.InvoiceSends)
+                  .HasForeignKey(x => x.CompanyBillingPeriodId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

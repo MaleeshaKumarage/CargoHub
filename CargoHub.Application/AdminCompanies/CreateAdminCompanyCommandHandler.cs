@@ -1,3 +1,4 @@
+using CargoHub.Application.Billing;
 using CargoHub.Application.Company;
 using MediatR;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
@@ -50,6 +51,7 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
             CompanyId = "", // handler fills after gen
             MaxUserAccounts = request.MaxUserAccounts,
             MaxAdminAccounts = request.MaxAdminAccounts,
+            SubscriptionPlanId = request.SubscriptionPlanId ?? SubscriptionBillingConstants.DefaultTrialPlanId,
             InitialAdminInviteEmail = inviteEmails.FirstOrDefault(),
             InitialAdminInviteEmailsJson = CompanyAdminInviteEmailsHelper.SerializeJson(inviteEmails)
         };
@@ -91,7 +93,8 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
                 InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
-                AdminCount = admins
+                AdminCount = admins,
+                SubscriptionPlanId = c.SubscriptionPlanId
             }
         };
     }

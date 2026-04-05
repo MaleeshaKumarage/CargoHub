@@ -7,4 +7,5 @@ public sealed record CreateAdminCompanyCommand(
     string BusinessId,
     int? MaxUserAccounts,
     int? MaxAdminAccounts,
-    IReadOnlyList<string>? InitialAdminEmails) : IRequest<AdminCompanyMutationResult>;
+    IReadOnlyList<string>? InitialAdminEmails,
+    Guid? SubscriptionPlanId = null) : IRequest<AdminCompanyMutationResult>;
