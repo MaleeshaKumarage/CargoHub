@@ -3,11 +3,13 @@ import {
   applySectionRequirement,
   bookingFieldRulesToApiBody,
   defaultBookingFieldRules,
+  inferPayerSourceFromBookingDetail,
   isFieldRequired,
   parseBookingFieldRulesFromApi,
   validateBookingCreateForm,
+  validationContextFromBookingDetail,
 } from "./booking-field-rules";
-import type { CreateBookingPackage, CreateBookingParty } from "./api";
+import type { BookingDetail, CreateBookingPackage, CreateBookingParty } from "./api";
 
 const party = (over: Partial<CreateBookingParty> = {}): CreateBookingParty => ({
   name: "",
@@ -140,6 +142,47 @@ describe("bookingFieldRulesToApiBody", () => {
     expect(body.fields["shipper.name"]).toBe("optional");
     expect(body.sections.courier).toBeUndefined();
     expect(body.fields["courier.postalService"]).toBeUndefined();
+  });
+});
+
+describe("validationContextFromBookingDetail", () => {
+  const minimalDetail = (): BookingDetail => ({
+    id: "d1",
+    customerId: "c1",
+    enabled: false,
+    isTestBooking: false,
+    isFavourite: false,
+    isDraft: true,
+    createdAtUtc: "",
+    updatedAtUtc: "",
+    header: { senderId: "s1", postalService: "Posti" },
+    shipper: {
+      name: "S",
+      address1: "A",
+      postalCode: "1",
+      city: "C",
+      country: "FI",
+    },
+    receiver: {
+      name: "R",
+      address1: "B",
+      postalCode: "2",
+      city: "D",
+      country: "FI",
+    },
+  });
+
+  it("maps parties and infers payer sender when payer empty", () => {
+    const ctx = validationContextFromBookingDetail(minimalDetail(), false);
+    expect(ctx.postalService).toBe("Posti");
+    expect(ctx.payerSource).toBe("sender");
+    expect(ctx.shipper.name).toBe("S");
+  });
+
+  it("infers payer receiver when payer matches receiver", () => {
+    const d = minimalDetail();
+    d.payer = { ...d.receiver! };
+    expect(inferPayerSourceFromBookingDetail(d)).toBe("receiver");
   });
 });
 
