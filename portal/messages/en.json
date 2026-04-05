@@ -398,6 +398,26 @@
     "language": "Language",
     "comingSoon": "More options coming soon.",
     "courierContracts": "Courier contracts",
-    "courierContractsHint": "Choose carriers and contract IDs for bookings."
+    "courierContractsHint": "Choose carriers and contract IDs for bookings.",
+    "signedInAs": "Signed in as",
+    "companyLabel": "Company",
+    "subscriptionTitle": "Subscription",
+    "subscriptionPlanLabel": "Name",
+    "subscriptionPricingLabel": "Pricing",
+    "subscriptionUnnamedPlan": "Subscription plan",
+    "subscriptionNonePlan": "No subscription plan is assigned yet.",
+    "subscriptionUnknownPlan": "Subscription details are unavailable.",
+    "subscriptionTrial": "Trial subscription.",
+    "subscriptionTrialBookings": "Up to {count} bookings included during the trial.",
+    "subscriptionPerBooking": "{amount} per completed booking.",
+    "subscriptionRatesPending": "Detailed rates will appear when configured.",
+    "subscriptionMonthlyBase": "Monthly base: {amount}.",
+    "subscriptionIncludedBookings": "{count} bookings included per month.",
+    "subscriptionOverageEach": "Additional bookings: {amount} each.",
+    "subscriptionTierBandMax": "Up to {max} bookings in the period",
+    "subscriptionTierBandOpen": "Beyond previous tiers",
+    "subscriptionPerBookingShort": "per booking",
+    "subscriptionPerMonthShort": "per month",
+    "subscriptionLoadError": "Could not load subscription."
   }
 }

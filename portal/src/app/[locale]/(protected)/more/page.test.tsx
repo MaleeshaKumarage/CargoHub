@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@/test/test-utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@/test/test-utils";
 import MorePage from "./page";
 
 const mockUseAuth = vi.fn();
@@ -16,9 +16,19 @@ vi.mock("@/context/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockGetCompanySubscription = vi.fn();
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    getCompanySubscription: (...args: unknown[]) => mockGetCompanySubscription(...args),
+  };
+});
+
 describe("MorePage", () => {
   beforeEach(() => {
     mockUseAuth.mockClear();
+    mockGetCompanySubscription.mockReset();
   });
 
   it("renders title and signed in info with email", () => {
@@ -42,8 +52,32 @@ describe("MorePage", () => {
   });
 
   it("renders company businessId when present", () => {
-    mockUseAuth.mockReturnValue({ user: { email: "u@x.com", businessId: "1234567-8" } });
+    mockUseAuth.mockReturnValue({ user: { email: "u@x.com", businessId: "1234567-8" }, token: null });
     render(<MorePage />);
-    expect(screen.getByText(/Company: 1234567-8/)).toBeInTheDocument();
+    expect(screen.getByText(/companyLabel/)).toBeInTheDocument();
+    expect(screen.getByText(/1234567-8/)).toBeInTheDocument();
+  });
+
+  it("loads and shows subscription name and pricing when token and businessId exist", async () => {
+    mockGetCompanySubscription.mockResolvedValue({
+      planName: "Trial",
+      planKind: "Trial",
+      currency: "EUR",
+      trialBookingAllowance: 5,
+    });
+    mockUseAuth.mockReturnValue({
+      user: { email: "u@x.com", businessId: "BIZ-1" },
+      token: "jwt",
+    });
+    render(<MorePage />);
+    await waitFor(() => {
+      expect(mockGetCompanySubscription).toHaveBeenCalledWith("jwt");
+    });
+    await waitFor(() => {
+      expect(screen.getByText("subscriptionTitle")).toBeInTheDocument();
+      expect(screen.getByText("Trial")).toBeInTheDocument();
+      expect(screen.getByText("subscriptionPlanLabel")).toBeInTheDocument();
+      expect(screen.getByText("subscriptionPricingLabel")).toBeInTheDocument();
+    });
   });
 });
