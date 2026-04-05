@@ -459,6 +459,12 @@ export default function CreateBookingPage() {
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
       setError(null);
+      setTimeout(() =>
+        document.getElementById("create-booking-validation-banner")?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        })
+      );
       return;
     }
     setFieldErrors({});
@@ -491,12 +497,6 @@ export default function CreateBookingPage() {
     if (!token) return;
     if (couriersReady && courierIds.length === 0) {
       setError(t("noCouriersBannerTitle"));
-      return;
-    }
-    const validationErrors = runBookingValidation();
-    if (Object.keys(validationErrors).length > 0) {
-      setFieldErrors(validationErrors);
-      setError(null);
       return;
     }
     setFieldErrors({});
@@ -1070,8 +1070,8 @@ export default function CreateBookingPage() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-2">
-          <label className="flex items-center gap-2 text-sm">
+        <div className="space-y-3 border-t pt-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
               checked={saveToAddressBook}
@@ -1080,25 +1080,33 @@ export default function CreateBookingPage() {
             />
             <span>{t("saveToAddressBook")}</span>
           </label>
-          <Button
-            type="submit"
-            disabled={submitting || (couriersReady && courierIds.length === 0)}
-          >
-            {submitting ? t("creating") : t("createTitle")}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={submitting || (couriersReady && courierIds.length === 0)}
-            onClick={handleSaveDraft}
-          >
-            {submitting ? t("saving") : t("saveAsDraft")}
-          </Button>
-          <Link href="/bookings">
-            <Button type="button" variant="outline">
-              {t("cancel")}
+          <div className="flex flex-wrap items-center gap-3">
+            {Object.keys(fieldErrors).length > 0 ? (
+              <p className="text-sm text-destructive shrink-0 max-w-md" role="alert" id="create-booking-validation-banner">
+                {t("validationActionBanner")}
+              </p>
+            ) : null}
+            <Button
+              type="submit"
+              disabled={submitting || (couriersReady && courierIds.length === 0)}
+              aria-describedby={Object.keys(fieldErrors).length > 0 ? "create-booking-validation-banner" : undefined}
+            >
+              {submitting ? t("creating") : t("createTitle")}
             </Button>
-          </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={submitting || (couriersReady && courierIds.length === 0)}
+              onClick={handleSaveDraft}
+            >
+              {submitting ? t("saving") : t("saveAsDraft")}
+            </Button>
+            <Link href="/bookings">
+              <Button type="button" variant="outline">
+                {t("cancel")}
+              </Button>
+            </Link>
+          </div>
         </div>
       </form>
     </div>

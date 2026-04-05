@@ -174,7 +174,9 @@
     "noCouriersBannerTitle": "Courier setup required",
     "noCouriersBannerAdmin": "Your company has no courier contracts yet. Add the carriers you use and your contract IDs before creating bookings.",
     "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
-    "goToCourierContracts": "Open courier contracts"
+    "goToCourierContracts": "Open courier contracts",
+    "fieldRequired": "Det här fältet är obligatoriskt.",
+    "validationActionBanner": "Obligatoriska fält saknas. Bläddra upp till markerade fel och försök igen."
   },
   "actions": {
     "title": "Åtgärder",

@@ -183,6 +183,7 @@
     "quickBooking": "Quick booking",
     "quickBookingDescription": "When enabled, only mandatory fields in each section are shown; optional fields are hidden.",
     "fieldRequired": "This field is required.",
+    "validationActionBanner": "Some required fields are missing. Scroll up to the highlighted errors, fix them, then try again.",
     "optional": "Optional",
     "sections": {
       "header": "Header",
