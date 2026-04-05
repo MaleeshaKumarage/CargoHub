@@ -116,6 +116,7 @@ builder.Services.AddScoped<IBillingPeriodRegenerationService, BillingPeriodRegen
 builder.Services.AddScoped<IBillingMonthBreakdownReader, BillingMonthBreakdownReader>();
 builder.Services.AddScoped<IBillingPeriodBookingExclusionMutator, BillingPeriodBookingExclusionMutator>();
 builder.Services.AddScoped<IAdminBillingReader, AdminBillingReader>();
+builder.Services.AddScoped<IAdminPlatformEarningsReader, AdminPlatformEarningsReader>();
 builder.Services.AddScoped<ISubscriptionPlanAdminRepository, SubscriptionPlanAdminRepository>();
 builder.Services.AddScoped<IBillingInvoicePdfGenerator, BillingPeriodInvoicePdfGenerator>();
 builder.Services.AddScoped<IAdminBillingInvoiceOperations, AdminBillingInvoiceOperations>();

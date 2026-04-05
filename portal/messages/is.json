@@ -157,6 +157,22 @@
       "dowFri": "Fös",
       "dowSat": "Lau"
     },
+    "earnings": {
+      "title": "Platform earnings (EUR)",
+      "description": "Payable totals from billing by UTC month. Excludes lines marked excluded from invoice.",
+      "monthLabel": "Month",
+      "trendTitle": "Monthly total (EUR)",
+      "companiesTitle": "By company (selected month)",
+      "subscriptionTitle": "By subscription plan",
+      "tableTitle": "All companies",
+      "tableCompany": "Company",
+      "tableAmount": "Amount (EUR)",
+      "tablePercent": "Share",
+      "otherCompanies": "Other companies",
+      "otherPlans": "Other plans",
+      "loading": "Loading…",
+      "noData": "No billing data for this period."
+    },
     "cards": {
       "createDescription": "Búa til nýja bókun",
       "actionsDescription": "Samningsnúmer, sendandi, vistfangaskrá",

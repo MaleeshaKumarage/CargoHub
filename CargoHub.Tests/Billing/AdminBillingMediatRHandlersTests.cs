@@ -141,4 +141,37 @@ public sealed class AdminBillingMediatRHandlersTests
         Assert.False(fail.Success);
         Assert.Equal("CreateFailed", fail.ErrorCode);
     }
+
+    [Fact]
+    public async Task GetPlatformEarningsMonthlyQueryHandler_delegates()
+    {
+        var mock = new Mock<IAdminPlatformEarningsReader>();
+        mock.Setup(x => x.GetMonthlyTotalsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<PlatformEarningsMonthDto>());
+        var h = new GetPlatformEarningsMonthlyQueryHandler(mock.Object);
+        await h.Handle(new GetPlatformEarningsMonthlyQuery(12), default);
+        mock.Verify(x => x.GetMonthlyTotalsAsync(12, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPlatformEarningsByCompanyQueryHandler_delegates()
+    {
+        var mock = new Mock<IAdminPlatformEarningsReader>();
+        mock.Setup(x => x.GetByCompanyForMonthAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<PlatformEarningsCompanyDto>());
+        var h = new GetPlatformEarningsByCompanyQueryHandler(mock.Object);
+        await h.Handle(new GetPlatformEarningsByCompanyQuery(2025, 4), default);
+        mock.Verify(x => x.GetByCompanyForMonthAsync(2025, 4, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPlatformEarningsBySubscriptionQueryHandler_delegates()
+    {
+        var mock = new Mock<IAdminPlatformEarningsReader>();
+        mock.Setup(x => x.GetBySubscriptionForMonthAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<PlatformEarningsSubscriptionDto>());
+        var h = new GetPlatformEarningsBySubscriptionQueryHandler(mock.Object);
+        await h.Handle(new GetPlatformEarningsBySubscriptionQuery(2025, 4), default);
+        mock.Verify(x => x.GetBySubscriptionForMonthAsync(2025, 4, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

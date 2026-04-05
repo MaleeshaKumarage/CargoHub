@@ -3,11 +3,19 @@ import { render, screen } from "@/test/test-utils";
 import DashboardPage from "./page";
 
 const mockReplace = vi.fn();
-const mockGetDashboardStats = vi.fn();
+const authState = vi.hoisted(() => ({
+  roles: ["User"] as string[],
+}));
+const apiMocks = vi.hoisted(() => ({
+  getDashboardStats: vi.fn(),
+  adminGetPlatformEarningsMonthly: vi.fn().mockResolvedValue([]),
+  adminGetPlatformEarningsByCompany: vi.fn().mockResolvedValue([]),
+  adminGetPlatformEarningsBySubscription: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
-    user: { displayName: "Test", email: "t@t.com", roles: ["User"] },
+    user: { displayName: "Test", email: "t@t.com", roles: authState.roles },
     token: "token",
     isAuthenticated: true,
     isLoading: false,
@@ -32,12 +40,16 @@ vi.mock("next-intl", () => ({
           ? `${key}:${values.n}`
           : key;
     if (ns === "dashboard.cards") return key;
+    if (ns === "dashboard.earnings") return key;
     return key;
   },
 }));
 
 vi.mock("@/lib/api", () => ({
-  getDashboardStats: (...args: unknown[]) => mockGetDashboardStats(...args),
+  getDashboardStats: (...args: unknown[]) => apiMocks.getDashboardStats(...args),
+  adminGetPlatformEarningsMonthly: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsMonthly(...args),
+  adminGetPlatformEarningsByCompany: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsByCompany(...args),
+  adminGetPlatformEarningsBySubscription: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsBySubscription(...args),
 }));
 
 vi.mock("@/lib/dashboard-wordcloud", () => ({
@@ -51,7 +63,9 @@ vi.mock("@/components/charts/ThemedECharts", () => ({
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetDashboardStats.mockResolvedValue({
+    authState.roles = ["User"];
+    apiMocks.adminGetPlatformEarningsMonthly.mockResolvedValue([]);
+    apiMocks.getDashboardStats.mockResolvedValue({
       scope: "all",
       countToday: 5,
       countMonth: 20,
@@ -106,10 +120,26 @@ describe("DashboardPage", () => {
   });
 
   it("shows stats error when getDashboardStats fails", async () => {
-    mockGetDashboardStats.mockRejectedValue(new Error("Network error"));
+    apiMocks.getDashboardStats.mockRejectedValue(new Error("Network error"));
     render(<DashboardPage />);
     await vi.waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Network error");
+    });
+  });
+
+  it("loads platform earnings when SuperAdmin", async () => {
+    authState.roles = ["SuperAdmin"];
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth() + 1;
+    apiMocks.adminGetPlatformEarningsMonthly.mockResolvedValue([{ yearUtc: y, monthUtc: m, totalEur: 0 }]);
+    render(<DashboardPage />);
+    await vi.waitFor(() => {
+      expect(apiMocks.adminGetPlatformEarningsMonthly).toHaveBeenCalled();
+    });
+    await vi.waitFor(() => {
+      expect(apiMocks.adminGetPlatformEarningsByCompany).toHaveBeenCalled();
+      expect(apiMocks.adminGetPlatformEarningsBySubscription).toHaveBeenCalled();
     });
   });
 });
