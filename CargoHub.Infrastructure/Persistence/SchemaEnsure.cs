@@ -19,6 +19,7 @@ public static class SchemaEnsure
         EnsureBookingsCompanyId(db);
         EnsureCompaniesName(db);
         EnsureCompaniesInitialAdminInviteEmailsJson(db);
+        EnsureCompaniesBookingFieldRulesJson(db);
         EnsureDropBookingCustomFields(db);
     }
 
@@ -49,6 +50,22 @@ public static class SchemaEnsure
                 WHERE table_schema = 'companies' AND table_name = 'Companies' AND column_name = 'InitialAdminInviteEmailsJson'
               ) THEN
                 ALTER TABLE companies."Companies" ADD COLUMN "InitialAdminInviteEmailsJson" text NULL;
+              END IF;
+            END $$;
+            """);
+    }
+
+    /// <summary>Adds owned Configurations JSON column for portal booking field rules. Idempotent.</summary>
+    private static void EnsureCompaniesBookingFieldRulesJson(ApplicationDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'companies' AND table_name = 'Companies' AND column_name = 'Configurations_BookingFieldRulesJson'
+              ) THEN
+                ALTER TABLE companies."Companies" ADD COLUMN "Configurations_BookingFieldRulesJson" text NULL;
               END IF;
             END $$;
             """);

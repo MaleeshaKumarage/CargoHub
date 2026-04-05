@@ -181,6 +181,7 @@
     "saveDraftFailed": "Luonnoksen tallennus epäonnistui",
     "quickBooking": "Pikavaraus",
     "quickBookingDescription": "Kun käytössä, näytetään vain pakolliset kentät jokaisessa osiossa; valinnaiset kentät piilotetaan.",
+    "fieldRequired": "Tämä kenttä on pakollinen.",
     "optional": "Valinnainen",
     "sections": {
       "header": "Otsikko",
@@ -301,7 +302,17 @@
     "placeholderAddress": "Katuosoite",
     "placeholderPostalCode": "Postinumero",
     "placeholderCity": "Kaupunki",
-    "placeholderCountry": "Maakoodi (esim. FI)"
+    "placeholderCountry": "Maakoodi (esim. FI)",
+    "bookingFieldRulesTitle": "Varauslomakkeen pakollisuus",
+    "bookingFieldRulesDescription": "Valitse, ovatko osiot ja kentät pakollisia vai valinnaisia varauksia luotaessa. Koskee koko yritystä. Tarkistus tehdään vain portaalissa.",
+    "sectionRequirement": "Koko osio",
+    "mandatory": "Pakollinen",
+    "optional": "Valinnainen",
+    "saveRules": "Tallenna vaatimukset",
+    "savingRules": "Tallennetaan…",
+    "rulesSaved": "Vaatimukset tallennettu.",
+    "rulesLoadFailed": "Vaatimuksia ei voitu ladata.",
+    "rulesAdminOnly": "Vain yrityksen ylläpitäjä voi muuttaa varauslomakkeen vaatimuksia."
   },
   "courierContracts": {
     "title": "Kuljetussopimukset",
