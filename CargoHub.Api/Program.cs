@@ -4,11 +4,13 @@ using CargoHub.Api.Options;
 using CargoHub.Api.Services;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Handlers;
+using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings;
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Company;
 using CargoHub.Infrastructure.Auth;
 using CargoHub.Infrastructure.Company;
+using CargoHub.Infrastructure.Billing;
 using CargoHub.Infrastructure.Couriers;
 using CargoHub.Infrastructure.Identity;
 using CargoHub.Infrastructure.Options;
@@ -109,6 +111,7 @@ builder.Services.AddScoped<IAcceptCompanyAdminInviteRunner, AcceptCompanyAdminIn
 builder.Services.AddScoped<AdminCompanyUserPolicy>();
 builder.Services.AddScoped<IAdminCompanyLimitUserOperations, AdminCompanyLimitUserOperations>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<ISubscriptionBillingOrchestrator, SubscriptionBillingOrchestrator>();
 builder.Services.AddScoped<IImportFileMappingRepository, ImportFileMappingRepository>();
 builder.Services.AddSingleton<BookingImportService>();
 builder.Services.AddSingleton<BookingExportService>();
@@ -273,6 +276,8 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
     // Ensure critical columns exist even if a migration was skipped or DB was restored (idempotent).
     db.EnsureCriticalSchema();
+
+    SubscriptionPlanSeed.EnsureDefaultTrialPlanAsync(db).GetAwaiter().GetResult();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var roleName in new[] { CargoHub.Application.Auth.RoleNames.SuperAdmin, CargoHub.Application.Auth.RoleNames.Admin, CargoHub.Application.Auth.RoleNames.User })

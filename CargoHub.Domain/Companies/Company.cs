@@ -94,6 +94,9 @@ public class Company
     /// Additional configuration values influencing booking defaults.
     /// </summary>
     public CompanyConfiguration? Configurations { get; set; }
+
+    /// <summary>Optional subscription template for portal billing (see <c>CargoHub.Domain.Billing</c>).</summary>
+    public Guid? SubscriptionPlanId { get; set; }
 }
 
 /// <summary>

@@ -34,4 +34,5 @@ public sealed class AdminCompanyDetailDto
     public IReadOnlyList<string>? InitialAdminInviteEmails { get; init; }
     public int ActiveUserCount { get; init; }
     public int AdminCount { get; init; }
+    public Guid? SubscriptionPlanId { get; init; }
 }

@@ -63,7 +63,8 @@ public class AdminController : ControllerBase
                 MaxAdminAccounts = c.MaxAdminAccounts,
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
                 ActiveUserCount = users,
-                AdminCount = admins
+                AdminCount = admins,
+                SubscriptionPlanId = c.SubscriptionPlanId
             });
         }
 
@@ -76,7 +77,7 @@ public class AdminController : ControllerBase
     {
         var initialEmails = MergeInitialAdminEmails(body);
         var result = await _mediator.Send(
-            new CreateAdminCompanyCommand(body.Name, body.BusinessId, body.MaxUserAccounts, body.MaxAdminAccounts, initialEmails),
+            new CreateAdminCompanyCommand(body.Name, body.BusinessId, body.MaxUserAccounts, body.MaxAdminAccounts, initialEmails, body.SubscriptionPlanId),
             cancellationToken);
         if (!result.Success)
             return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
@@ -95,7 +96,8 @@ public class AdminController : ControllerBase
                 body.MaxAdminAccounts,
                 body.ResendAdminInvite,
                 body.DeactivateUserIds,
-                body.DemoteAdminUserIds),
+                body.DemoteAdminUserIds,
+                body.SubscriptionPlanId),
             cancellationToken);
         if (!result.Success)
         {
@@ -235,6 +237,7 @@ public class AdminController : ControllerBase
         public List<string>? InitialAdminInviteEmails { get; set; }
         public int ActiveUserCount { get; set; }
         public int AdminCount { get; set; }
+        public Guid? SubscriptionPlanId { get; set; }
     }
 
     public sealed class CreateAdminCompanyRequest
@@ -246,6 +249,7 @@ public class AdminController : ControllerBase
         /// <summary>Legacy single email; ignored when <see cref="InitialAdminEmails"/> is non-empty.</summary>
         public string? InitialAdminEmail { get; set; }
         public List<string>? InitialAdminEmails { get; set; }
+        public Guid? SubscriptionPlanId { get; set; }
     }
 
     public sealed class TestEmailRequest
@@ -260,6 +264,7 @@ public class AdminController : ControllerBase
         public bool ResendAdminInvite { get; set; }
         public List<string>? DeactivateUserIds { get; set; }
         public List<string>? DemoteAdminUserIds { get; set; }
+        public Guid? SubscriptionPlanId { get; set; }
     }
 
     public sealed class AdminUserDto
