@@ -21,7 +21,8 @@ export function buildPeriodBarOption(
     grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow" },
+      // Shadow default z is above series and hides bars; keep highlight behind bars.
+      axisPointer: { type: "shadow", z: 0 },
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
@@ -118,7 +119,7 @@ export function buildLast7DaysGroupedBarOption(
     },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow" },
+      axisPointer: { type: "shadow", z: 0 },
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
@@ -241,7 +242,7 @@ export function buildCityBarOption(
     grid: { left: 4, right: 8, top: 4, bottom: 4, containLabel: true },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow" },
+      axisPointer: { type: "shadow", z: 0 },
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
