@@ -79,6 +79,15 @@ This runs `gh secret set --env-file .env`, which creates/updates one GitHub secr
 | `Courier__HameenTavarataxi__TestEmail` | Test override email |
 | `Branding__*` | App name, logo, colors (optional) |
 
+### GitHub Actions only (repository secrets, not in `.env`)
+
+| Secret | Used For |
+|--------|----------|
+| `DOCKERHUB_USERNAME` | **Docker — build & push** workflow: registry namespace for `cargohub` image |
+| `DOCKERHUB_TOKEN` | **Docker — build & push**: Docker Hub access token (or password) paired with `DOCKERHUB_USERNAME` |
+
+If either is missing, the workflow still **builds** the image to verify `Dockerfile.all-in-one` but does **not** push. Mac deploy expects a pushed image — set both secrets for full pipeline.
+
 ---
 
 ## Deployment (Render / Vercel)
