@@ -22,20 +22,25 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-vi.mock("@/lib/api", () => ({
-  getMe: vi.fn().mockResolvedValue({ companyName: "Test Co", roles: [] }),
-  getAddressBook: vi.fn(),
-  getBookingFieldRules: vi.fn().mockResolvedValue({ version: 1, sections: {}, fields: {} }),
-  getCouriers: vi.fn(),
-  bookingCreate: vi.fn(),
-  draftCreate: vi.fn(),
-  addSender: vi.fn(),
-  addReceiver: vi.fn(),
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    getMe: vi.fn().mockResolvedValue({ companyName: "Test Co", roles: [] }),
+    getAddressBook: vi.fn(),
+    getBookingFieldRules: vi.fn().mockResolvedValue({ version: 1, sections: {}, fields: {} }),
+    getCouriers: vi.fn(),
+    bookingCreate: vi.fn(),
+    draftCreate: vi.fn(),
+    addSender: vi.fn(),
+    addReceiver: vi.fn(),
+  };
+});
 
 const getAddressBook = await import("@/lib/api").then((m) => m.getAddressBook);
 const getCouriers = await import("@/lib/api").then((m) => m.getCouriers);
 const bookingCreate = await import("@/lib/api").then((m) => m.bookingCreate);
+const { SubscriptionBillingConflictError } = await import("@/lib/api");
 
 describe("CreateBookingPage", () => {
   beforeEach(() => {
@@ -75,5 +80,21 @@ describe("CreateBookingPage", () => {
     await screen.findByRole("button", { name: /createTitle/i });
     fireEvent.click(screen.getByRole("button", { name: /createTitle/i }));
     await expect(screen.findByRole("alert")).resolves.toHaveTextContent("Validation failed");
+  });
+
+  it("shows top trial limit banner when bookingCreate returns trial exhausted", async () => {
+    vi.mocked(bookingCreate).mockRejectedValue(
+      new SubscriptionBillingConflictError(
+        "TrialBookingLimitExceeded",
+        "Trial booking allowance has been used.",
+      ),
+    );
+    render(<CreateBookingPage />);
+    await screen.findByRole("button", { name: /createTitle/i });
+    fireEvent.click(screen.getByRole("button", { name: /createTitle/i }));
+    const alerts = await screen.findAllByRole("alert");
+    const banner = alerts.find((el) => el.textContent?.includes("trialLimitBannerTitle"));
+    expect(banner).toBeDefined();
+    expect(banner).toHaveTextContent("Trial booking allowance has been used.");
   });
 });

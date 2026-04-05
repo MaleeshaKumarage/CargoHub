@@ -1757,6 +1757,36 @@ function apiError(res: Response, data: Record<string, unknown>, fallback: string
   return status === 400 ? 'Invalid request. Check receiver details.' : fallback;
 }
 
+/** HTTP 409 from subscription billing (trial exhausted, company required, etc.). */
+export class SubscriptionBillingConflictError extends Error {
+  readonly errorCode: string;
+
+  constructor(errorCode: string, message: string) {
+    super(message);
+    this.name = 'SubscriptionBillingConflictError';
+    this.errorCode = errorCode;
+  }
+
+  get isTrialBookingLimitExceeded(): boolean {
+    return this.errorCode === 'TrialBookingLimitExceeded';
+  }
+}
+
+function readSubscriptionBillingConflict(
+  res: Response,
+  data: Record<string, unknown>,
+): SubscriptionBillingConflictError | null {
+  if (res.status !== 409) return null;
+  const code = String(data.errorCode ?? data.ErrorCode ?? '').trim();
+  if (code !== 'TrialBookingLimitExceeded' && code !== 'CompanyRequiredForBooking') return null;
+  const msg =
+    String(data.message ?? data.Message ?? '').trim() ||
+    (code === 'TrialBookingLimitExceeded'
+      ? 'Trial booking allowance has been used.'
+      : 'A company subscription is required to create bookings.');
+  return new SubscriptionBillingConflictError(code, msg);
+}
+
 export async function bookingCreate(token: string, body: CreateBookingBody): Promise<BookingDetail> {
   const res = await fetch(`${portalBase()}/bookings`, {
     method: 'POST',
@@ -1765,6 +1795,8 @@ export async function bookingCreate(token: string, body: CreateBookingBody): Pro
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const billing = readSubscriptionBillingConflict(res, data);
+    if (billing) throw billing;
     const message = apiError(res, data, 'Create failed');
     if (message.includes('IsDraft') || message.includes('column') || res.status === 500) {
       throw new Error(`${message} If this persists, apply the database migration (Scope/apply-IsDraft-migration.sql).`);
@@ -1831,8 +1863,10 @@ export async function draftConfirm(token: string, id: string): Promise<BookingDe
   });
   if (!res.ok) {
     if (res.status === 404) throw new Error('Draft not found');
-    const data = await res.json().catch(() => ({}));
-    throw new Error((data as { message?: string }).message ?? 'Confirm failed');
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const billing = readSubscriptionBillingConflict(res, data);
+    if (billing) throw billing;
+    throw new Error((data.message as string) ?? (data.Message as string) ?? 'Confirm failed');
   }
   return res.json();
 }

@@ -195,7 +195,10 @@
     "noCouriersBannerUser": "Your company has not configured courier contracts yet. Ask a company administrator to set them up.",
     "goToCourierContracts": "Open courier contracts",
     "fieldRequired": "Dette felt er påkrævet.",
-    "validationActionBanner": "Nogle påkrævede felter mangler. Rul op til de fremhævede fejl og prøv igen."
+    "validationActionBanner": "Nogle påkrævede felter mangler. Rul op til de fremhævede fejl og prøv igen.",
+    "trialLimitBannerTitle": "Prøvegrænsen for bookinger er nået",
+    "trialLimitBannerHint": "Opgrader dit abonnement eller bed en administrator om at tildele en betalt plan, så du kan fortsætte med at oprette bookinger.",
+    "trialLimitBannerDismiss": "Luk"
   },
   "actions": {
     "title": "Handlinger",

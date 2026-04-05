@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
 import {
   bookingCreate,
+  SubscriptionBillingConflictError,
   draftCreate,
   getAddressBook,
   getBookingFieldRules,
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TrialBookingLimitBanner } from "@/components/TrialBookingLimitBanner";
 
 const defaultParty = (): CreateBookingParty => ({
   name: "",
@@ -238,6 +240,8 @@ export default function CreateBookingPage() {
   const [packages, setPackages] = useState<CreateBookingPackage[]>([defaultPackage()]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trialBannerOpen, setTrialBannerOpen] = useState(false);
+  const [trialBannerMessage, setTrialBannerMessage] = useState("");
   const [quickBooking, setQuickBooking] = useState(false);
   const [payerSource, setPayerSource] = useState<PayerSource>("other");
   const [addressBook, setAddressBook] = useState<AddressBookResponse | null>(null);
@@ -469,6 +473,7 @@ export default function CreateBookingPage() {
     }
     setFieldErrors({});
     setError(null);
+    setTrialBannerOpen(false);
     setSubmitting(true);
     try {
       const created = await bookingCreate(token, buildBody());
@@ -486,7 +491,13 @@ export default function CreateBookingPage() {
       }
       router.push(`/bookings/${created.id}?printWaybill=1`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("createFailed"));
+      if (e instanceof SubscriptionBillingConflictError && e.isTrialBookingLimitExceeded) {
+        setTrialBannerMessage(e.message);
+        setTrialBannerOpen(true);
+        setError(null);
+      } else {
+        setError(e instanceof Error ? e.message : t("createFailed"));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -525,7 +536,13 @@ export default function CreateBookingPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <TrialBookingLimitBanner
+        open={trialBannerOpen}
+        onDismiss={() => setTrialBannerOpen(false)}
+        detailMessage={trialBannerMessage}
+      />
+      <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/bookings">
           <Button variant="ghost">{t("back")}</Button>
@@ -1110,5 +1127,6 @@ export default function CreateBookingPage() {
         </div>
       </form>
     </div>
+    </>
   );
 }
