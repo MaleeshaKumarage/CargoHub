@@ -403,6 +403,25 @@ export async function putBookingFieldRules(
 
 // --- Admin API (Super Admin only; pass JWT from auth) ---
 
+function normalizeAdminCompany(raw: Record<string, unknown>): AdminCompany {
+  const ac = raw.activeUserCount ?? raw.ActiveUserCount;
+  const ad = raw.adminCount ?? raw.AdminCount;
+  const sid = raw.subscriptionPlanId ?? raw.SubscriptionPlanId;
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    name: (raw.name ?? raw.Name ?? null) as string | null,
+    businessId: (raw.businessId ?? raw.BusinessId ?? null) as string | null,
+    companyId: String(raw.companyId ?? raw.CompanyId ?? ''),
+    maxUserAccounts: (raw.maxUserAccounts ?? raw.MaxUserAccounts ?? null) as number | null,
+    maxAdminAccounts: (raw.maxAdminAccounts ?? raw.MaxAdminAccounts ?? null) as number | null,
+    initialAdminInviteEmail: (raw.initialAdminInviteEmail ?? raw.InitialAdminInviteEmail ?? null) as string | null,
+    initialAdminInviteEmails: (raw.initialAdminInviteEmails ?? raw.InitialAdminInviteEmails ?? null) as string[] | null,
+    ...(ac !== undefined && ac !== null ? { activeUserCount: Number(ac) } : {}),
+    ...(ad !== undefined && ad !== null ? { adminCount: Number(ad) } : {}),
+    subscriptionPlanId: sid != null && String(sid).length > 0 ? String(sid) : null,
+  };
+}
+
 export type AdminCompany = {
   id: string;
   name?: string | null;
@@ -414,6 +433,8 @@ export type AdminCompany = {
   initialAdminInviteEmails?: string[] | null;
   activeUserCount?: number;
   adminCount?: number;
+  /** Assigned subscription template id (from admin API). */
+  subscriptionPlanId?: string | null;
 };
 
 export type AdminCreateCompanyBody = {
@@ -424,6 +445,8 @@ export type AdminCreateCompanyBody = {
   /** Legacy single field; ignored when initialAdminEmails is non-empty. */
   initialAdminEmail?: string | null;
   initialAdminEmails?: string[] | null;
+  /** Omit or empty to use server default (trial). */
+  subscriptionPlanId?: string | null;
 };
 
 export type AdminPatchCompanyBody = {
@@ -434,6 +457,7 @@ export type AdminPatchCompanyBody = {
   demoteAdminUserIds?: string[];
   /** Super Admin lowering caps: user IDs to deactivate. */
   deactivateUserIds?: string[];
+  subscriptionPlanId?: string | null;
 };
 
 /** Returned with HTTP 409 when lowering limits requires choosing users first. */
@@ -474,7 +498,9 @@ export async function adminGetCompanies(token: string): Promise<AdminCompany[]> 
     const msg = (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
     throw new Error(`Failed to load companies (${res.status}): ${msg}`);
   }
-  return res.json();
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => normalizeAdminCompany(x as Record<string, unknown>));
 }
 
 export async function adminCreateCompany(token: string, body: AdminCreateCompanyBody): Promise<AdminCompany> {
@@ -489,7 +515,7 @@ export async function adminCreateCompany(token: string, body: AdminCreateCompany
       (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
     throw new Error(msg || `Create failed (${res.status})`);
   }
-  return data as AdminCompany;
+  return normalizeAdminCompany(data as Record<string, unknown>);
 }
 
 /** Super Admin: send a test message to verify SMTP configuration. */
@@ -548,7 +574,477 @@ export async function adminPatchCompany(
       (data as { message?: string }).message ?? (data as { title?: string }).title ?? res.statusText;
     throw new Error(msg || `Update failed (${res.status})`);
   }
-  return data as unknown as AdminCompany;
+  return normalizeAdminCompany(data as Record<string, unknown>);
+}
+
+export type AdminSubscriptionPlanSummary = {
+  id: string;
+  name: string;
+  kind: string;
+  currency: string;
+  isActive: boolean;
+};
+
+function normalizeSubscriptionPlan(raw: Record<string, unknown>): AdminSubscriptionPlanSummary {
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    name: String(raw.name ?? raw.Name ?? ''),
+    kind: String(raw.kind ?? raw.Kind ?? ''),
+    currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
+    isActive: Boolean(raw.isActive ?? raw.IsActive ?? false),
+  };
+}
+
+export async function adminGetSubscriptionPlans(token: string): Promise<AdminSubscriptionPlanSummary[]> {
+  const res = await fetch(`${adminBase()}/subscription-plans`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load subscription plans (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => normalizeSubscriptionPlan(x as Record<string, unknown>));
+}
+
+export type CompanyBillingPeriodSummary = {
+  id: string;
+  companyId: string;
+  yearUtc: number;
+  monthUtc: number;
+  currency: string;
+  status: string;
+  lineItemCount: number;
+  payableTotal: number;
+};
+
+function normalizeBillingPeriodSummary(raw: Record<string, unknown>): CompanyBillingPeriodSummary {
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    companyId: String(raw.companyId ?? raw.CompanyId ?? ''),
+    yearUtc: Number(raw.yearUtc ?? raw.YearUtc ?? 0),
+    monthUtc: Number(raw.monthUtc ?? raw.MonthUtc ?? 0),
+    currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
+    status: String(raw.status ?? raw.Status ?? ''),
+    lineItemCount: Number(raw.lineItemCount ?? raw.LineItemCount ?? 0),
+    payableTotal: Number(raw.payableTotal ?? raw.PayableTotal ?? 0),
+  };
+}
+
+export async function adminGetCompanyBillingPeriods(
+  token: string,
+  companyId: string
+): Promise<CompanyBillingPeriodSummary[]> {
+  const res = await fetch(
+    `${adminBase()}/companies/${encodeURIComponent(companyId)}/billing-periods`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load billing periods (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => normalizeBillingPeriodSummary(x as Record<string, unknown>));
+}
+
+export type BillingPeriodLineItem = {
+  id: string;
+  bookingId?: string | null;
+  lineType: string;
+  component?: string | null;
+  amount: number;
+  currency: string;
+  excludedFromInvoice: boolean;
+  createdAtUtc: string;
+};
+
+export type BillingPeriodDetail = {
+  id: string;
+  companyId: string;
+  yearUtc: number;
+  monthUtc: number;
+  currency: string;
+  status: string;
+  payableTotal: number;
+  lineItems: BillingPeriodLineItem[];
+};
+
+export async function adminGetBillingPeriodDetail(token: string, periodId: string): Promise<BillingPeriodDetail> {
+  const res = await fetch(`${adminBase()}/billing-periods/${encodeURIComponent(periodId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load billing period (${res.status})`);
+  }
+  const raw = (await res.json()) as Record<string, unknown>;
+  const linesRaw = raw.lineItems ?? raw.LineItems;
+  const lines: BillingPeriodLineItem[] = Array.isArray(linesRaw)
+    ? linesRaw.map((item) => {
+        const l = item as Record<string, unknown>;
+        const bid = l.bookingId ?? l.BookingId;
+        return {
+          id: String(l.id ?? l.Id ?? ''),
+          bookingId: bid != null && String(bid) ? String(bid) : null,
+          lineType: String(l.lineType ?? l.LineType ?? ''),
+          component: (l.component ?? l.Component ?? null) as string | null,
+          amount: Number(l.amount ?? l.Amount ?? 0),
+          currency: String(l.currency ?? l.Currency ?? 'EUR'),
+          excludedFromInvoice: Boolean(l.excludedFromInvoice ?? l.ExcludedFromInvoice ?? false),
+          createdAtUtc: String(l.createdAtUtc ?? l.CreatedAtUtc ?? ''),
+        };
+      })
+    : [];
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    companyId: String(raw.companyId ?? raw.CompanyId ?? ''),
+    yearUtc: Number(raw.yearUtc ?? raw.YearUtc ?? 0),
+    monthUtc: Number(raw.monthUtc ?? raw.MonthUtc ?? 0),
+    currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
+    status: String(raw.status ?? raw.Status ?? ''),
+    payableTotal: Number(raw.payableTotal ?? raw.PayableTotal ?? 0),
+    lineItems: lines,
+  };
+}
+
+export async function adminDownloadBillingPeriodInvoicePdf(token: string, periodId: string): Promise<Blob> {
+  const res = await fetch(
+    `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/invoice.pdf`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to download invoice PDF (${res.status})`);
+  }
+  return res.blob();
+}
+
+export async function adminSendBillingPeriodInvoiceEmail(
+  token: string,
+  periodId: string,
+  recipientAdminUserId: string
+): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/send-invoice-email`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ recipientAdminUserId }),
+    }
+  );
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Send invoice email failed (${res.status})`);
+  }
+}
+
+export async function adminPatchBillingLineItem(
+  token: string,
+  lineId: string,
+  excludedFromInvoice: boolean
+): Promise<void> {
+  const res = await fetch(`${adminBase()}/billing-line-items/${encodeURIComponent(lineId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ excludedFromInvoice }),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Update line failed (${res.status})`);
+  }
+}
+
+export type AdminPricingTierDetail = {
+  id: string;
+  ordinal: number;
+  inclusiveMaxBookingsInPeriod: number | null;
+  chargePerBooking: number | null;
+  monthlyFee: number | null;
+};
+
+export type AdminPricingPeriodDetail = {
+  id: string;
+  effectiveFromUtc: string;
+  chargePerBooking: number | null;
+  monthlyFee: number | null;
+  includedBookingsPerMonth: number | null;
+  overageChargePerBooking: number | null;
+  tiers: AdminPricingTierDetail[];
+};
+
+export type AdminSubscriptionPlanDetail = {
+  id: string;
+  name: string;
+  kind: string;
+  chargeTimeAnchor: string;
+  trialBookingAllowance: number | null;
+  currency: string;
+  isActive: boolean;
+  pricingPeriods: AdminPricingPeriodDetail[];
+};
+
+function normalizeTier(raw: Record<string, unknown>): AdminPricingTierDetail {
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    ordinal: Number(raw.ordinal ?? raw.Ordinal ?? 0),
+    inclusiveMaxBookingsInPeriod:
+      raw.inclusiveMaxBookingsInPeriod != null || raw.InclusiveMaxBookingsInPeriod != null
+        ? Number(raw.inclusiveMaxBookingsInPeriod ?? raw.InclusiveMaxBookingsInPeriod)
+        : null,
+    chargePerBooking:
+      raw.chargePerBooking != null || raw.ChargePerBooking != null
+        ? Number(raw.chargePerBooking ?? raw.ChargePerBooking)
+        : null,
+    monthlyFee:
+      raw.monthlyFee != null || raw.MonthlyFee != null
+        ? Number(raw.monthlyFee ?? raw.MonthlyFee)
+        : null,
+  };
+}
+
+function normalizePricingPeriodDetail(raw: Record<string, unknown>): AdminPricingPeriodDetail {
+  const tiersRaw = raw.tiers ?? raw.Tiers;
+  const tiers: AdminPricingTierDetail[] = Array.isArray(tiersRaw)
+    ? tiersRaw.map((t) => normalizeTier(t as Record<string, unknown>))
+    : [];
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    effectiveFromUtc: String(raw.effectiveFromUtc ?? raw.EffectiveFromUtc ?? ''),
+    chargePerBooking:
+      raw.chargePerBooking != null || raw.ChargePerBooking != null
+        ? Number(raw.chargePerBooking ?? raw.ChargePerBooking)
+        : null,
+    monthlyFee:
+      raw.monthlyFee != null || raw.MonthlyFee != null
+        ? Number(raw.monthlyFee ?? raw.MonthlyFee)
+        : null,
+    includedBookingsPerMonth:
+      raw.includedBookingsPerMonth != null || raw.IncludedBookingsPerMonth != null
+        ? Number(raw.includedBookingsPerMonth ?? raw.IncludedBookingsPerMonth)
+        : null,
+    overageChargePerBooking:
+      raw.overageChargePerBooking != null || raw.OverageChargePerBooking != null
+        ? Number(raw.overageChargePerBooking ?? raw.OverageChargePerBooking)
+        : null,
+    tiers,
+  };
+}
+
+function normalizePlanDetail(raw: Record<string, unknown>): AdminSubscriptionPlanDetail {
+  const ppRaw = raw.pricingPeriods ?? raw.PricingPeriods;
+  const pricingPeriods: AdminPricingPeriodDetail[] = Array.isArray(ppRaw)
+    ? ppRaw.map((p) => normalizePricingPeriodDetail(p as Record<string, unknown>))
+    : [];
+  const trial = raw.trialBookingAllowance ?? raw.TrialBookingAllowance;
+  return {
+    id: String(raw.id ?? raw.Id ?? ''),
+    name: String(raw.name ?? raw.Name ?? ''),
+    kind: String(raw.kind ?? raw.Kind ?? ''),
+    chargeTimeAnchor: String(raw.chargeTimeAnchor ?? raw.ChargeTimeAnchor ?? ''),
+    trialBookingAllowance: trial != null && trial !== '' ? Number(trial) : null,
+    currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
+    isActive: Boolean(raw.isActive ?? raw.IsActive ?? false),
+    pricingPeriods,
+  };
+}
+
+export async function adminGetSubscriptionPlanDetail(token: string, planId: string): Promise<AdminSubscriptionPlanDetail> {
+  const res = await fetch(`${adminBase()}/subscription-plans/${encodeURIComponent(planId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load plan (${res.status})`);
+  }
+  const raw = (await res.json()) as Record<string, unknown>;
+  return normalizePlanDetail(raw);
+}
+
+export async function adminCreateSubscriptionPlan(
+  token: string,
+  body: {
+    name: string;
+    kind: string;
+    chargeTimeAnchor: string;
+    trialBookingAllowance?: number | null;
+    currency: string;
+    isActive: boolean;
+  }
+): Promise<{ id: string }> {
+  const res = await fetch(`${adminBase()}/subscription-plans`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Create plan failed (${res.status})`);
+  }
+  const id = String(data.id ?? data.Id ?? '');
+  if (!id) throw new Error('Create plan response missing id');
+  return { id };
+}
+
+export async function adminUpdateSubscriptionPlan(
+  token: string,
+  planId: string,
+  body: {
+    name: string;
+    kind: string;
+    chargeTimeAnchor: string;
+    trialBookingAllowance?: number | null;
+    currency: string;
+    isActive: boolean;
+  }
+): Promise<void> {
+  const res = await fetch(`${adminBase()}/subscription-plans/${encodeURIComponent(planId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Update plan failed (${res.status})`);
+  }
+}
+
+export async function adminDeleteSubscriptionPlan(token: string, planId: string): Promise<void> {
+  const res = await fetch(`${adminBase()}/subscription-plans/${encodeURIComponent(planId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 204) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Delete plan failed (${res.status})`);
+  }
+}
+
+export type AdminPricingPeriodMutationBody = {
+  effectiveFromUtc: string;
+  chargePerBooking?: number | null;
+  monthlyFee?: number | null;
+  includedBookingsPerMonth?: number | null;
+  overageChargePerBooking?: number | null;
+};
+
+export async function adminAddSubscriptionPlanPricingPeriod(
+  token: string,
+  planId: string,
+  body: AdminPricingPeriodMutationBody
+): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/subscription-plans/${encodeURIComponent(planId)}/pricing-periods`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Add pricing period failed (${res.status})`);
+  }
+}
+
+export async function adminUpdateSubscriptionPlanPricingPeriod(
+  token: string,
+  periodId: string,
+  body: AdminPricingPeriodMutationBody
+): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/subscription-plans/pricing-periods/${encodeURIComponent(periodId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Update pricing period failed (${res.status})`);
+  }
+}
+
+export async function adminDeleteSubscriptionPlanPricingPeriod(token: string, periodId: string): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/subscription-plans/pricing-periods/${encodeURIComponent(periodId)}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!res.ok && res.status !== 204) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Delete pricing period failed (${res.status})`);
+  }
+}
+
+export async function adminReplaceSubscriptionPlanPricingTiers(
+  token: string,
+  periodId: string,
+  tiers: Array<{
+    id?: string | null;
+    ordinal: number;
+    inclusiveMaxBookingsInPeriod?: number | null;
+    chargePerBooking?: number | null;
+    monthlyFee?: number | null;
+  }>
+): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/subscription-plans/pricing-periods/${encodeURIComponent(periodId)}/tiers`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tiers }),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Replace tiers failed (${res.status})`);
+  }
 }
 
 /** Anonymous: accept Super Admin–sent company admin invite (returns JWT like register). */

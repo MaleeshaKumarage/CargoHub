@@ -111,6 +111,9 @@ export function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/manage/companies">{tNav("companies")}</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/manage/invoices">{tNav("invoices")}</Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
