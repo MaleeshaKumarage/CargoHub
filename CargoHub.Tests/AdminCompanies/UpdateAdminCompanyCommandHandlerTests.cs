@@ -1,4 +1,5 @@
 using CargoHub.Application.AdminCompanies;
+using CargoHub.Application.Billing.AdminPlans;
 using CargoHub.Application.Company;
 using Moq;
 using Xunit;
@@ -12,13 +13,23 @@ public class UpdateAdminCompanyCommandHandlerTests
         out Mock<ICompanyRepository> repo,
         out Mock<ICompanyAdminInviteIssuer> invites,
         out Mock<ICompanyUserMetrics> metrics,
-        out Mock<IAdminCompanyLimitUserOperations> limits)
+        out Mock<IAdminCompanyLimitUserOperations> limits,
+        out Mock<ISubscriptionPlanAdminRepository> planRepo)
     {
         repo = new Mock<ICompanyRepository>();
         invites = new Mock<ICompanyAdminInviteIssuer>();
         metrics = new Mock<ICompanyUserMetrics>();
         limits = new Mock<IAdminCompanyLimitUserOperations>();
-        return new UpdateAdminCompanyCommandHandler(repo.Object, invites.Object, metrics.Object, limits.Object);
+        planRepo = new Mock<ISubscriptionPlanAdminRepository>();
+        planRepo
+            .Setup(x => x.PlanExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        return new UpdateAdminCompanyCommandHandler(
+            repo.Object,
+            invites.Object,
+            metrics.Object,
+            limits.Object,
+            planRepo.Object);
     }
 
     private static CompanyEntity TrackedCompany(Guid id, string bid = "BIZ-1") => new()
@@ -34,7 +45,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     [Fact]
     public async Task Handle_MaxUsersBelowOne_Fails()
     {
-        var h = CreateHandler(out _, out _, out _, out _);
+        var h = CreateHandler(out _, out _, out _, out _, out _);
         var r = await h.Handle(new UpdateAdminCompanyCommand(Guid.NewGuid(), 0, null, false, null, null), default);
         Assert.False(r.Success);
         Assert.Equal("InvalidMaxUsers", r.ErrorCode);
@@ -43,7 +54,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     [Fact]
     public async Task Handle_MaxAdminsBelowOne_Fails()
     {
-        var h = CreateHandler(out _, out _, out _, out _);
+        var h = CreateHandler(out _, out _, out _, out _, out _);
         var r = await h.Handle(new UpdateAdminCompanyCommand(Guid.NewGuid(), null, 0, false, null, null), default);
         Assert.False(r.Success);
         Assert.Equal("InvalidMaxAdmins", r.ErrorCode);
@@ -52,7 +63,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     [Fact]
     public async Task Handle_CompanyNotFound_Fails()
     {
-        var h = CreateHandler(out var repo, out _, out _, out _);
+        var h = CreateHandler(out var repo, out _, out _, out _, out _);
         var id = Guid.NewGuid();
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync((CompanyEntity?)null);
 
@@ -65,7 +76,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_LimitReduction_NeedsMoreDemotions_ReturnsConflict()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(3);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(4);
@@ -82,7 +93,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_LimitReduction_NeedsMoreDeactivations_ReturnsConflict()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(12);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -98,7 +109,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_UnexpectedDemotions_Fails()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -115,7 +126,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_UnexpectedDeactivations_Fails()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -132,7 +143,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_DemoteFails_ReturnsError()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out var limits);
+        var h = CreateHandler(out var repo, out _, out var metrics, out var limits, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(4);
@@ -152,7 +163,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     public async Task Handle_DeactivateFails_ReturnsError()
     {
         var id = Guid.NewGuid();
-        var h = CreateHandler(out var repo, out _, out var metrics, out var limits);
+        var h = CreateHandler(out var repo, out _, out var metrics, out var limits, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(TrackedCompany(id));
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(12);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -173,7 +184,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id);
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -192,7 +203,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id, "");
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("", default)).ReturnsAsync(0);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("", default)).ReturnsAsync(0);
@@ -209,7 +220,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id);
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -227,7 +238,7 @@ public class UpdateAdminCompanyCommandHandlerTests
         var id = Guid.NewGuid();
         var company = TrackedCompany(id);
         company.InitialAdminInviteEmail = "a@test.com";
-        var h = CreateHandler(out var repo, out var invites, out var metrics, out _);
+        var h = CreateHandler(out var repo, out var invites, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.SetupSequence(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default))
@@ -251,7 +262,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id);
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -269,7 +280,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id, "");
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         repo.Setup(x => x.UpdateAsync(company, default)).ReturnsAsync(company);
         repo.Setup(x => x.GetByIdAsync(id, default)).ReturnsAsync(company);
@@ -285,7 +296,7 @@ public class UpdateAdminCompanyCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var company = TrackedCompany(id);
-        var h = CreateHandler(out var repo, out _, out var metrics, out _);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
         repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
         metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
         metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
@@ -296,5 +307,37 @@ public class UpdateAdminCompanyCommandHandlerTests
         Assert.True(r.Success);
         Assert.Equal(newPlan, company.SubscriptionPlanId);
         Assert.Equal(newPlan, r.Company!.SubscriptionPlanId);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownSubscriptionPlanId_Fails()
+    {
+        var id = Guid.NewGuid();
+        var company = TrackedCompany(id);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out var planRepo);
+        planRepo.Setup(x => x.PlanExistsAsync(It.IsAny<Guid>(), default)).ReturnsAsync(false);
+        repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
+        metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        var badPlan = Guid.NewGuid();
+        var r = await h.Handle(new UpdateAdminCompanyCommand(id, null, null, false, null, null, badPlan), default);
+        Assert.False(r.Success);
+        Assert.Equal("SubscriptionPlanNotFound", r.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyGuidSubscriptionPlan_Fails()
+    {
+        var id = Guid.NewGuid();
+        var company = TrackedCompany(id);
+        var h = CreateHandler(out var repo, out _, out var metrics, out _, out _);
+        repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
+        metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        var r = await h.Handle(
+            new UpdateAdminCompanyCommand(id, null, null, false, null, null, Guid.Empty),
+            default);
+        Assert.False(r.Success);
+        Assert.Equal("InvalidSubscriptionPlan", r.ErrorCode);
     }
 }

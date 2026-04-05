@@ -403,6 +403,9 @@ export async function putBookingFieldRules(
 
 // --- Admin API (Super Admin only; pass JWT from auth) ---
 
+/** Matches backend `SubscriptionBillingConstants.DefaultTrialPlanId` (seeded "Trial" plan). */
+export const DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
+
 function normalizeAdminCompany(raw: Record<string, unknown>): AdminCompany {
   const ac = raw.activeUserCount ?? raw.ActiveUserCount;
   const ad = raw.adminCount ?? raw.AdminCount;
