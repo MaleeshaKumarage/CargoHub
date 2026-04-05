@@ -506,6 +506,96 @@ export async function adminGetCompanies(token: string): Promise<AdminCompany[]> 
   return data.map((x) => normalizeAdminCompany(x as Record<string, unknown>));
 }
 
+export type PlatformEarningsMonth = { yearUtc: number; monthUtc: number; totalEur: number };
+export type PlatformEarningsCompany = { companyId: string; companyName: string; amountEur: number };
+export type PlatformEarningsSubscription = { planId: string; planName: string; amountEur: number; percent: number };
+
+/** Super Admin: platform payable EUR per UTC month (invoice-eligible lines only). */
+export async function adminGetPlatformEarningsMonthly(
+  token: string,
+  months = 24,
+  signal?: AbortSignal,
+): Promise<PlatformEarningsMonth[]> {
+  const res = await fetch(`${adminBase()}/dashboard/earnings/monthly?months=${months}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = (data as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load earnings (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => {
+    const r = x as Record<string, unknown>;
+    return {
+      yearUtc: Number(r.yearUtc ?? r.YearUtc ?? 0),
+      monthUtc: Number(r.monthUtc ?? r.MonthUtc ?? 0),
+      totalEur: Number(r.totalEur ?? r.TotalEur ?? 0),
+    };
+  });
+}
+
+/** Super Admin: per-company EUR for one UTC month. */
+export async function adminGetPlatformEarningsByCompany(
+  token: string,
+  yearUtc: number,
+  monthUtc: number,
+  signal?: AbortSignal,
+): Promise<PlatformEarningsCompany[]> {
+  const q = new URLSearchParams({ yearUtc: String(yearUtc), monthUtc: String(monthUtc) });
+  const res = await fetch(`${adminBase()}/dashboard/earnings/by-company?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = (data as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load company earnings (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => {
+    const r = x as Record<string, unknown>;
+    return {
+      companyId: String(r.companyId ?? r.CompanyId ?? ''),
+      companyName: String(r.companyName ?? r.CompanyName ?? ''),
+      amountEur: Number(r.amountEur ?? r.AmountEur ?? 0),
+    };
+  });
+}
+
+/** Super Admin: payable EUR by subscription plan for one UTC month. */
+export async function adminGetPlatformEarningsBySubscription(
+  token: string,
+  yearUtc: number,
+  monthUtc: number,
+  signal?: AbortSignal,
+): Promise<PlatformEarningsSubscription[]> {
+  const q = new URLSearchParams({ yearUtc: String(yearUtc), monthUtc: String(monthUtc) });
+  const res = await fetch(`${adminBase()}/dashboard/earnings/by-subscription?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = (data as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load subscription earnings (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => {
+    const r = x as Record<string, unknown>;
+    return {
+      planId: String(r.planId ?? r.PlanId ?? ''),
+      planName: String(r.planName ?? r.PlanName ?? ''),
+      amountEur: Number(r.amountEur ?? r.AmountEur ?? 0),
+      percent: Number(r.percent ?? r.Percent ?? 0),
+    };
+  });
+}
+
 export async function adminCreateCompany(token: string, body: AdminCreateCompanyBody): Promise<AdminCompany> {
   const res = await fetch(`${adminBase()}/companies`, {
     method: 'POST',

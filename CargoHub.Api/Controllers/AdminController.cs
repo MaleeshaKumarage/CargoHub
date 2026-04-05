@@ -199,6 +199,42 @@ public class AdminController : ControllerBase
         return File(bytes, "application/pdf", $"invoice-{model.YearUtc}-{model.MonthUtc:00}.pdf");
     }
 
+    /// <summary>Platform payable totals per UTC month (EUR line items only, excludes invoice-excluded lines).</summary>
+    [HttpGet("dashboard/earnings/monthly")]
+    public async Task<ActionResult<IReadOnlyList<PlatformEarningsMonthDto>>> GetPlatformEarningsMonthly(
+        [FromQuery] int months = 24,
+        CancellationToken cancellationToken = default)
+    {
+        var list = await _mediator.Send(new GetPlatformEarningsMonthlyQuery(months), cancellationToken);
+        return Ok(list);
+    }
+
+    /// <summary>Per-company EUR for a UTC month (sorted descending).</summary>
+    [HttpGet("dashboard/earnings/by-company")]
+    public async Task<ActionResult<IReadOnlyList<PlatformEarningsCompanyDto>>> GetPlatformEarningsByCompany(
+        [FromQuery] int yearUtc,
+        [FromQuery] int monthUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (monthUtc is < 1 or > 12)
+            return BadRequest(new { message = "monthUtc must be 1–12." });
+        var list = await _mediator.Send(new GetPlatformEarningsByCompanyQuery(yearUtc, monthUtc), cancellationToken);
+        return Ok(list);
+    }
+
+    /// <summary>Payable EUR by subscription plan for a UTC month (from line items).</summary>
+    [HttpGet("dashboard/earnings/by-subscription")]
+    public async Task<ActionResult<IReadOnlyList<PlatformEarningsSubscriptionDto>>> GetPlatformEarningsBySubscription(
+        [FromQuery] int yearUtc,
+        [FromQuery] int monthUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (monthUtc is < 1 or > 12)
+            return BadRequest(new { message = "monthUtc must be 1–12." });
+        var list = await _mediator.Send(new GetPlatformEarningsBySubscriptionQuery(yearUtc, monthUtc), cancellationToken);
+        return Ok(list);
+    }
+
     /// <summary>Email invoice PDF to a company admin.</summary>
     [HttpPost("billing-periods/{periodId:guid}/send-invoice-email")]
     public async Task<ActionResult> SendBillingInvoiceEmail(
