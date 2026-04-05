@@ -30,6 +30,7 @@ describe("buildPeriodBarOption", () => {
     expect(data[0].itemStyle.color).toBe("#a00");
     expect(data[1].value).toBe(7);
     expect(opt.xAxis).toMatchObject({ type: "category", data: ["A", "B"] });
+    expect(opt.tooltip?.axisPointer).toMatchObject({ type: "line" });
   });
 });
 
