@@ -15,8 +15,13 @@ import {
   getCourierContracts,
   putCourierContracts,
   adminGetCompanies,
+  adminCreateCompany,
   adminGetSubscriptionPlans,
+  adminPatchCompany,
+  adminSendTestEmail,
   adminGetCompanyBillingPeriods,
+  AdminCompanyLimitReductionRequiredError,
+  DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
   adminGetBillingPeriodDetail,
   adminGetUsers,
   adminPatchUser,
@@ -576,6 +581,93 @@ describe("api", () => {
       const list = await adminGetCompanies("token");
       expect(list[0].subscriptionPlanId).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1");
     });
+
+    it("returns empty list when response body is not an array", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [] }),
+      });
+      const list = await adminGetCompanies("token");
+      expect(list).toEqual([]);
+    });
+
+    it("normalizes PascalCase counts, invites, and empty subscription id", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            Id: "1",
+            CompanyId: "cid",
+            ActiveUserCount: 4,
+            AdminCount: 2,
+            InitialAdminInviteEmail: "adm@co.com",
+            InitialAdminInviteEmails: ["a1@co.com", "a2@co.com"],
+            SubscriptionPlanId: "",
+          },
+        ],
+      });
+      const list = await adminGetCompanies("token");
+      expect(list[0].activeUserCount).toBe(4);
+      expect(list[0].adminCount).toBe(2);
+      expect(list[0].initialAdminInviteEmail).toBe("adm@co.com");
+      expect(list[0].initialAdminInviteEmails).toEqual(["a1@co.com", "a2@co.com"]);
+      expect(list[0].subscriptionPlanId).toBeNull();
+    });
+  });
+
+  describe("adminCreateCompany", () => {
+    it("returns normalized company when API succeeds", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "new1",
+          name: "NewCo",
+          companyId: "nc",
+          businessId: "B-9",
+          subscriptionPlanId: DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
+        }),
+      });
+      const c = await adminCreateCompany("jwt", {
+        name: "NewCo",
+        businessId: "B-9",
+        subscriptionPlanId: DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
+      });
+      expect(c.id).toBe("new1");
+      expect(c.subscriptionPlanId).toBe(DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/companies"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    it("throws with message when API returns 400", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: "BusinessIdExists" }),
+      });
+      await expect(adminCreateCompany("jwt", { name: "X", businessId: "dup" })).rejects.toThrow("BusinessIdExists");
+    });
+
+    it("throws with status fallback when error body has no message", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: "Nope",
+        json: async () => ({}),
+      });
+      await expect(adminCreateCompany("jwt", { name: "X", businessId: "y" })).rejects.toThrow("Nope");
+    });
+
+    it("throws generic create failed when message and title are missing", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 418,
+        statusText: "",
+        json: async () => ({}),
+      });
+      await expect(adminCreateCompany("jwt", { name: "X", businessId: "y" })).rejects.toThrow(/Create failed \(418\)/);
+    });
   });
 
   describe("adminGetSubscriptionPlans", () => {
@@ -606,6 +698,157 @@ describe("api", () => {
         json: async () => ({ message: "Server error" }),
       });
       await expect(adminGetSubscriptionPlans("token")).rejects.toThrow(/Server error|500/);
+    });
+  });
+
+  describe("DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID", () => {
+    it("matches backend default trial plan id", () => {
+      expect(DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1");
+    });
+  });
+
+  describe("adminPatchCompany", () => {
+    it("returns normalized company on success", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "c1",
+          name: "Acme",
+          companyId: "x",
+          businessId: "B1",
+          subscriptionPlanId: DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
+        }),
+      });
+      const c = await adminPatchCompany("jwt", "c1", { subscriptionPlanId: DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID });
+      expect(c.id).toBe("c1");
+      expect(c.subscriptionPlanId).toBe(DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/companies/c1"),
+        expect.objectContaining({ method: "PATCH" })
+      );
+    });
+
+    it("throws AdminCompanyLimitReductionRequiredError on 409 LimitReductionRequired", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          errorCode: "LimitReductionRequired",
+          message: "Pick users",
+          activeUserCount: 5,
+          proposedMaxUserAccounts: 2,
+          adminCount: 2,
+          proposedMaxAdminAccounts: 1,
+          minimumUsersToDeactivate: 3,
+          minimumAdminsToDemote: 1,
+          businessId: "BIZ",
+        }),
+      });
+      await expect(adminPatchCompany("jwt", "c1", { maxUserAccounts: 2 })).rejects.toMatchObject({
+        name: "AdminCompanyLimitReductionRequiredError",
+        details: expect.objectContaining({
+          businessId: "BIZ",
+          minimumUsersToDeactivate: 3,
+          minimumAdminsToDemote: 1,
+        }),
+      });
+    });
+
+    it("throws AdminCompanyLimitReductionRequiredError with PascalCase conflict payload", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          ErrorCode: "LimitReductionRequired",
+          ActiveUserCount: 1,
+          MinimumUsersToDeactivate: 0,
+          MinimumAdminsToDemote: 0,
+          BusinessId: "X",
+        }),
+      });
+      try {
+        await adminPatchCompany("jwt", "c1", { maxAdminAccounts: 1 });
+        expect.fail("expected throw");
+      } catch (e) {
+        expect(e).toBeInstanceOf(AdminCompanyLimitReductionRequiredError);
+        expect((e as AdminCompanyLimitReductionRequiredError).details.activeUserCount).toBe(1);
+        expect((e as AdminCompanyLimitReductionRequiredError).details.businessId).toBe("X");
+      }
+    });
+
+    it("throws generic Error on 409 with other errorCode", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({ errorCode: "Conflict", message: "Other" }),
+      });
+      await expect(adminPatchCompany("jwt", "c1", {})).rejects.toThrow("Other");
+    });
+
+    it("uses title fallback when message missing on error", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ title: "Bad" }),
+      });
+      await expect(adminPatchCompany("jwt", "c1", {})).rejects.toThrow("Bad");
+    });
+
+    it("normalizes PascalCase fields on success", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          Id: "c9",
+          Name: "Pascal Co",
+          CompanyId: "cid9",
+          BusinessId: "B9",
+          SubscriptionPlanId: null,
+        }),
+      });
+      const c = await adminPatchCompany("jwt", "c9", { maxUserAccounts: 5 });
+      expect(c.id).toBe("c9");
+      expect(c.name).toBe("Pascal Co");
+      expect(c.subscriptionPlanId).toBeNull();
+    });
+  });
+
+  describe("adminSendTestEmail", () => {
+    it("returns payload when API succeeds", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, message: "sent" }),
+      });
+      const r = await adminSendTestEmail("jwt", "a@b.com");
+      expect(r.ok).toBe(true);
+      expect(r.message).toBe("sent");
+    });
+
+    it("throws with message when API fails", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: "SMTP down" }),
+      });
+      await expect(adminSendTestEmail("jwt", "a@b.com")).rejects.toThrow("SMTP down");
+    });
+
+    it("throws with title when message missing", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ title: "Unavailable" }),
+      });
+      await expect(adminSendTestEmail("jwt", "a@b.com")).rejects.toThrow("Unavailable");
+    });
+
+    it("throws generic test email failed when no message, title, or statusText", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: "",
+        json: async () => ({}),
+      });
+      await expect(adminSendTestEmail("jwt", "a@b.com")).rejects.toThrow(/Test email failed \(502\)/);
     });
   });
 

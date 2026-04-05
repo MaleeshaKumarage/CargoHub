@@ -11,6 +11,7 @@ import {
   adminPatchCompany,
   adminSendTestEmail,
   AdminCompanyLimitReductionRequiredError,
+  DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
   type AdminCompany,
   type AdminPatchCompanyBody,
   type AdminSubscriptionPlanSummary,
@@ -67,7 +68,8 @@ export default function ManageCompaniesPage() {
   const [editMaxUsers, setEditMaxUsers] = useState("");
   const [editMaxAdmins, setEditMaxAdmins] = useState("");
   const [editSubscriptionPlanId, setEditSubscriptionPlanId] = useState("");
-  const [editSubscriptionInitial, setEditSubscriptionInitial] = useState("");
+  /** Value from API when the edit dialog opened (`null` = company had no plan yet). */
+  const [editSubscriptionFromServer, setEditSubscriptionFromServer] = useState<string | null>(null);
   const [savingLimitsId, setSavingLimitsId] = useState<string | null>(null);
   const [savingSubscriptionId, setSavingSubscriptionId] = useState<string | null>(null);
   const [limitsError, setLimitsError] = useState<string | null>(null);
@@ -250,26 +252,27 @@ export default function ManageCompaniesPage() {
     setEditLimitsCompany(c);
     setEditMaxUsers(c.maxUserAccounts != null ? String(c.maxUserAccounts) : "");
     setEditMaxAdmins(c.maxAdminAccounts != null ? String(c.maxAdminAccounts) : "");
-    const sid = c.subscriptionPlanId ?? "";
-    setEditSubscriptionPlanId(sid);
-    setEditSubscriptionInitial(sid);
+    const raw = c.subscriptionPlanId?.trim() ?? "";
+    setEditSubscriptionFromServer(raw.length > 0 ? raw : null);
+    setEditSubscriptionPlanId(raw.length > 0 ? raw : DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID);
   };
 
   const handleSaveSubscriptionOnly = async () => {
     if (!token || !editLimitsCompany) return;
-    if (!editSubscriptionPlanId.trim()) {
+    const desired = editSubscriptionPlanId.trim();
+    if (!desired) {
       setLimitsError(tMc("subscriptionSelectRequired"));
       return;
     }
-    if (editSubscriptionPlanId === editSubscriptionInitial) {
+    if (editSubscriptionFromServer !== null && editSubscriptionFromServer === desired) {
       setLimitsError(null);
       return;
     }
     setSavingSubscriptionId(editLimitsCompany.id);
     setLimitsError(null);
     try {
-      await adminPatchCompany(token, editLimitsCompany.id, { subscriptionPlanId: editSubscriptionPlanId });
-      setEditSubscriptionInitial(editSubscriptionPlanId);
+      await adminPatchCompany(token, editLimitsCompany.id, { subscriptionPlanId: desired });
+      setEditSubscriptionFromServer(desired);
       refetchCompanies();
     } catch (e) {
       setLimitsError(e instanceof Error ? e.message : "Update failed");
@@ -297,11 +300,12 @@ export default function ManageCompaniesPage() {
       }
       body.maxAdminAccounts = p;
     }
+    const desiredSub = editSubscriptionPlanId.trim();
     if (
-      editSubscriptionPlanId.trim() &&
-      editSubscriptionPlanId !== editSubscriptionInitial
+      desiredSub &&
+      !(editSubscriptionFromServer !== null && editSubscriptionFromServer === desiredSub)
     ) {
-      body.subscriptionPlanId = editSubscriptionPlanId;
+      body.subscriptionPlanId = desiredSub;
     }
     if (Object.keys(body).length === 0) {
       setLimitsError("Change at least one limit, subscription, or cancel.");
@@ -311,7 +315,7 @@ export default function ManageCompaniesPage() {
     setLimitsError(null);
     try {
       await adminPatchCompany(token, editLimitsCompany.id, body);
-      if (body.subscriptionPlanId) setEditSubscriptionInitial(body.subscriptionPlanId);
+      if (body.subscriptionPlanId) setEditSubscriptionFromServer(body.subscriptionPlanId);
       setEditLimitsCompany(null);
       refetchCompanies();
     } catch (e) {
@@ -679,11 +683,9 @@ export default function ManageCompaniesPage() {
                   onChange={(e) => setEditSubscriptionPlanId(e.target.value)}
                   disabled={!!savingLimitsId || !!savingSubscriptionId}
                 >
-                  {editLimitsCompany?.subscriptionPlanId &&
-                    !subscriptionPlans.some((p) => p.id === editLimitsCompany.subscriptionPlanId) && (
-                      <option value={editLimitsCompany.subscriptionPlanId}>
-                        {planDisplayName(editLimitsCompany.subscriptionPlanId)}
-                      </option>
+                  {editSubscriptionPlanId &&
+                    !subscriptionPlans.some((p) => p.id === editSubscriptionPlanId) && (
+                      <option value={editSubscriptionPlanId}>{planDisplayName(editSubscriptionPlanId)}</option>
                     )}
                   {subscriptionPlans.map((p) => (
                     <option key={p.id} value={p.id}>

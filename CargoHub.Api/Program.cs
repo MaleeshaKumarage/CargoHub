@@ -287,6 +287,7 @@ using (var scope = app.Services.CreateScope())
     db.EnsureCriticalSchema();
 
     SubscriptionPlanSeed.EnsureDefaultTrialPlanAsync(db).GetAwaiter().GetResult();
+    SubscriptionPlanSeed.AssignDefaultTrialToCompaniesWithoutPlanAsync(db).GetAwaiter().GetResult();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var roleName in new[] { CargoHub.Application.Auth.RoleNames.SuperAdmin, CargoHub.Application.Auth.RoleNames.Admin, CargoHub.Application.Auth.RoleNames.User })
