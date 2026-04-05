@@ -23,8 +23,9 @@ describe("buildPeriodBarOption", () => {
       theme,
       "bookings",
     );
-    const series = opt.series?.[0];
+    const series = opt.series?.[0] as { type: string; emphasis?: { focus?: string } };
     expect(series?.type).toBe("bar");
+    expect(series?.emphasis?.focus).toBe("none");
     const data = series?.data as { value: number; itemStyle: { color: string } }[];
     expect(data[0].value).toBe(3);
     expect(data[0].itemStyle.color).toBe("#a00");

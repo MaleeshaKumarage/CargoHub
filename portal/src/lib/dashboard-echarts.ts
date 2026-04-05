@@ -23,6 +23,12 @@ function barTooltipAxisPointer(theme: ThemeSlice) {
 }
 
 /**
+ * Default axis emphasis uses `focus: 'self'`, which blurs other bars in the same grid and looks
+ * like a grey layer hiding columns. `focus: 'none'` keeps all bars visible while the tooltip shows.
+ */
+const barSeriesEmphasisNoBlur = { emphasis: { focus: "none" as const } };
+
+/**
  * Period comparison: vertical bars, one color per category.
  */
 export function buildPeriodBarOption(
@@ -60,6 +66,7 @@ export function buildPeriodBarOption(
       {
         type: "bar",
         name: bookingsLabel,
+        ...barSeriesEmphasisNoBlur,
         data: values.map((value, i) => ({
           value,
           itemStyle: { color: barColors[i % barColors.length], borderRadius: [14, 14, 0, 0] },
@@ -172,6 +179,7 @@ export function buildLast7DaysGroupedBarOption(
       {
         name: actualLabel,
         type: "bar",
+        ...barSeriesEmphasisNoBlur,
         data: counts.map((value) => ({
           value,
           itemStyle: { color: primaryBarColor, borderRadius: [12, 12, 0, 0] },
@@ -182,6 +190,7 @@ export function buildLast7DaysGroupedBarOption(
       {
         name: weekdayAvgLabel,
         type: "bar",
+        ...barSeriesEmphasisNoBlur,
         data: weekdayAverages.map((value) => ({
           value,
           itemStyle: { color: benchmarkBarColor, borderRadius: [12, 12, 0, 0] },
@@ -282,6 +291,7 @@ export function buildCityBarOption(
       {
         type: "bar",
         name: bookingsLabel,
+        ...barSeriesEmphasisNoBlur,
         data: counts.map((value) => ({
           value,
           itemStyle: { color: barColor, borderRadius: [0, 10, 10, 0] },
@@ -552,6 +562,7 @@ export function buildTodayVsAverageBulletOption(
     series: [
       {
         type: "bar",
+        ...barSeriesEmphasisNoBlur,
         data: [today],
         barWidth: 40,
         itemStyle: { color: "var(--chart-1)", borderRadius: [4, 4, 0, 0] },
