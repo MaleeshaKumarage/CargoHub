@@ -158,6 +158,22 @@
       "dowFri": "Pe",
       "dowSat": "La"
     },
+    "earnings": {
+      "title": "Alustan tuotot (EUR)",
+      "description": "Maksettavat summat laskutuksesta UTC-kuukausittain. Rivit, jotka on jätetty laskun ulkopuolelle, eivät näy.",
+      "monthLabel": "Kuukausi",
+      "trendTitle": "Kuukausittainen summa (EUR)",
+      "companiesTitle": "Yrityksittäin (valittu kuukausi)",
+      "subscriptionTitle": "Tilaussopimuksen mukaan",
+      "tableTitle": "Kaikki yritykset",
+      "tableCompany": "Yritys",
+      "tableAmount": "Summa (EUR)",
+      "tablePercent": "Osuus",
+      "otherCompanies": "Muut yritykset",
+      "otherPlans": "Muut sopimukset",
+      "loading": "Ladataan…",
+      "noData": "Ei laskutustietoja tälle jaksolle."
+    },
     "cards": {
       "createDescription": "Luo uusi varaus",
       "actionsDescription": "Sopimusnumerot, lähettäjä, osoitekirja",

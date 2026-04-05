@@ -251,6 +251,169 @@ export function buildCourierPieOption(
 }
 
 /**
+ * Donut for currency amounts (e.g. earnings by subscription plan). Same geometry as courier pie.
+ */
+export function buildCurrencyDonutOption(
+  rows: KeyCount[],
+  seriesColors: string[],
+  theme: ThemeSlice,
+  formatEur: (n: number) => string,
+): EChartsOption {
+  return {
+    tooltip: {
+      trigger: "item",
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      borderWidth: 1,
+      textStyle: { color: theme.foreground },
+      formatter: (params: unknown) => {
+        const p = params as { name?: string; value?: number; percent?: number };
+        const name = p.name ?? "";
+        const amt = formatEur(Number(p.value ?? 0));
+        const pct = typeof p.percent === "number" ? p.percent.toFixed(1) : "";
+        return `${name}<br/>${amt} (${pct}%)`;
+      },
+    },
+    legend: {
+      bottom: 4,
+      left: "center",
+      type: "scroll",
+      textStyle: { color: theme.mutedForeground, fontSize: 10 },
+      itemWidth: 10,
+      itemHeight: 10,
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["44%", "72%"],
+        center: ["50%", "44%"],
+        padAngle: 2,
+        itemStyle: { borderRadius: 6, borderColor: theme.card, borderWidth: 2 },
+        label: {
+          color: theme.mutedForeground,
+          formatter: (p: { name?: string; percent?: number }) =>
+            `${p.name ?? ""}\n${typeof p.percent === "number" ? p.percent.toFixed(1) : ""}%`,
+          fontSize: 10,
+        },
+        data: rows.map((r, i) => ({
+          name: r.key,
+          value: r.count,
+          itemStyle: { color: seriesColors[i % seriesColors.length] },
+        })),
+      },
+    ],
+  };
+}
+
+/** Line chart for monthly EUR totals (decimals allowed on Y axis). */
+export function buildMonthlyEarningsLineOption(
+  points: { label: string; totalEur: number }[],
+  lineColor: string,
+  theme: ThemeSlice,
+  formatEur: (n: number) => string,
+): EChartsOption | null {
+  if (!points.length) return null;
+  const cats = points.map((p) => p.label);
+  const vals = points.map((p) => p.totalEur);
+  return {
+    grid: { left: 8, right: 12, top: 28, bottom: 48, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      borderWidth: 1,
+      textStyle: { color: theme.foreground },
+      valueFormatter: (v) => formatEur(Number(v)),
+    },
+    dataZoom: [
+      { type: "inside", xAxisIndex: 0, filterMode: "none" },
+      { type: "slider", xAxisIndex: 0, height: 22, bottom: 8, filterMode: "none" },
+    ],
+    xAxis: {
+      type: "category",
+      data: cats,
+      boundaryGap: false,
+      axisLabel: { color: theme.mutedForeground, fontSize: 10, rotate: 35 },
+      axisLine: { lineStyle: { color: theme.border } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: {
+        color: theme.mutedForeground,
+        formatter: (v: number) => formatEur(v),
+      },
+      splitLine: { lineStyle: { color: theme.border, opacity: 0.4 } },
+    },
+    series: [
+      {
+        type: "line",
+        smooth: true,
+        showSymbol: true,
+        symbolSize: 6,
+        areaStyle: { opacity: 0.18 },
+        lineStyle: { width: 2.5, color: lineColor },
+        itemStyle: { color: lineColor },
+        data: vals,
+      },
+    ],
+  };
+}
+
+/** Horizontal bars for monetary amounts (e.g. top companies by EUR). */
+export function buildMonetaryHorizontalBarOption(
+  rows: KeyCount[],
+  barColor: string,
+  theme: ThemeSlice,
+  formatEur: (n: number) => string,
+  seriesName: string,
+): EChartsOption {
+  const keys = rows.map((r) => r.key);
+  const amounts = rows.map((r) => r.count);
+  return {
+    grid: { left: 4, right: 8, top: 4, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: barTooltipAxisPointer(theme),
+      backgroundColor: theme.card,
+      borderColor: theme.border,
+      borderWidth: 1,
+      textStyle: { color: theme.foreground },
+      valueFormatter: (v) => formatEur(Number(v)),
+    },
+    xAxis: {
+      type: "value",
+      axisLine: { show: false },
+      axisLabel: {
+        color: theme.mutedForeground,
+        fontSize: 11,
+        formatter: (v: number) => formatEur(v),
+      },
+      splitLine: { lineStyle: { color: theme.border, opacity: 0.45 } },
+    },
+    yAxis: {
+      type: "category",
+      data: keys,
+      inverse: true,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: theme.mutedForeground, fontSize: 11, width: 100, overflow: "truncate" },
+    },
+    series: [
+      {
+        type: "bar",
+        name: seriesName,
+        ...barSeriesEmphasisNoBlur,
+        data: amounts.map((value) => ({
+          value,
+          itemStyle: { color: barColor, borderRadius: [0, 10, 10, 0] },
+        })),
+        barMaxWidth: 28,
+      },
+    ],
+  };
+}
+
+/**
  * Horizontal bars: top cities (origin or destination).
  */
 export function buildCityBarOption(

@@ -5,6 +5,9 @@ import {
   buildCityBarOption,
   aggregateCouriersForPie,
   buildLast7DaysGroupedBarOption,
+  buildCurrencyDonutOption,
+  buildMonthlyEarningsLineOption,
+  buildMonetaryHorizontalBarOption,
 } from "./dashboard-echarts";
 
 const theme = {
@@ -137,6 +140,58 @@ describe("buildCityBarOption", () => {
     const data = series?.data as { value: number; itemStyle: { color: string } }[];
     expect(data[0].value).toBe(4);
     expect(data[0].itemStyle.color).toBe("#00f");
+  });
+});
+
+describe("buildCurrencyDonutOption", () => {
+  it("builds pie series with EUR formatter hook", () => {
+    const fmt = (n: number) => `€${n.toFixed(2)}`;
+    const opt = buildCurrencyDonutOption(
+      [{ key: "Plan A", count: 60 }],
+      ["#c1"],
+      theme,
+      fmt,
+    );
+    const s = opt.series?.[0] as { type: string; data: { name: string; value: number }[] };
+    expect(s?.type).toBe("pie");
+    expect(s?.data[0]).toMatchObject({ name: "Plan A", value: 60 });
+  });
+});
+
+describe("buildMonthlyEarningsLineOption", () => {
+  it("returns null for empty points", () => {
+    expect(buildMonthlyEarningsLineOption([], "#f00", theme, (n) => String(n))).toBeNull();
+  });
+
+  it("builds line series for EUR trend", () => {
+    const opt = buildMonthlyEarningsLineOption(
+      [
+        { label: "2026-01", totalEur: 100 },
+        { label: "2026-02", totalEur: 250.5 },
+      ],
+      "#0a0",
+      theme,
+      (n) => n.toFixed(2),
+    );
+    const s = opt?.series?.[0] as { type: string; data: number[] };
+    expect(s?.type).toBe("line");
+    expect(s?.data).toEqual([100, 250.5]);
+  });
+});
+
+describe("buildMonetaryHorizontalBarOption", () => {
+  it("maps amounts to horizontal bars", () => {
+    const opt = buildMonetaryHorizontalBarOption(
+      [{ key: "Acme", count: 99.5 }],
+      "#b00",
+      theme,
+      (n) => `€${n}`,
+      "EUR",
+    );
+    expect(opt.yAxis).toMatchObject({ type: "category", data: ["Acme"], inverse: true });
+    const series = opt.series?.[0];
+    const data = series?.data as { value: number }[];
+    expect(data[0].value).toBe(99.5);
   });
 });
 

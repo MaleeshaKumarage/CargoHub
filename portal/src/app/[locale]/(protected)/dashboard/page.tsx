@@ -7,12 +7,17 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDashboardStats,
+  adminGetPlatformEarningsMonthly,
+  adminGetPlatformEarningsByCompany,
+  adminGetPlatformEarningsBySubscription,
   type DailyCount,
   type DashboardScope,
   type DashboardStats,
+  type PlatformEarningsMonth,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ThemedECharts } from "@/components/charts/ThemedECharts";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import {
@@ -24,6 +29,9 @@ import {
   buildDayHourHeatmapOption,
   buildLast7DaysGroupedBarOption,
   buildCourierPieOption,
+  buildCurrencyDonutOption,
+  buildMonthlyEarningsLineOption,
+  buildMonetaryHorizontalBarOption,
 } from "@/lib/dashboard-echarts";
 import { buildWordCloudOption } from "@/lib/dashboard-wordcloud";
 import { cn } from "@/lib/utils";
@@ -65,6 +73,7 @@ export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const tStats = useTranslations("dashboard.stats");
   const tCards = useTranslations("dashboard.cards");
+  const tEarnings = useTranslations("dashboard.earnings");
   const name = user?.displayName || user?.email || "";
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -76,6 +85,34 @@ export default function DashboardPage() {
   const [avgMode, setAvgMode] = useState<"roll30" | "month" | "year">("roll30");
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
   const chartTheme = useChartTheme();
+
+  const [earningsMonthly, setEarningsMonthly] = useState<PlatformEarningsMonth[]>([]);
+  const [earningsMonthlyError, setEarningsMonthlyError] = useState<string | null>(null);
+  const [earningsMonthPick, setEarningsMonthPick] = useState<{ y: number; m: number } | null>(null);
+  const [earningsByCompany, setEarningsByCompany] = useState<
+    { companyId: string; companyName: string; amountEur: number }[]
+  >([]);
+  const [earningsBySub, setEarningsBySub] = useState<
+    { planId: string; planName: string; amountEur: number; percent: number }[]
+  >([]);
+  const [earningsDetailError, setEarningsDetailError] = useState<string | null>(null);
+  const [earningsDetailLoading, setEarningsDetailLoading] = useState(false);
+
+  const formatEur = useCallback(
+    (n: number) =>
+      new Intl.NumberFormat(locale, { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(n),
+    [locale],
+  );
+
+  const earningsMonthLabelFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    [locale],
+  );
 
   const dayLabels = useMemo(
     () => [
@@ -319,6 +356,101 @@ export default function DashboardPage() {
     return () => ac.abort();
   }, [token, isAuthenticated, isLoading, router, scope, heatmapUtc]);
 
+  const selectedMonthTotalEur = useMemo(() => {
+    if (!earningsMonthPick) return 0;
+    const row = earningsMonthly.find(
+      (r) => r.yearUtc === earningsMonthPick.y && r.monthUtc === earningsMonthPick.m,
+    );
+    return row?.totalEur ?? 0;
+  }, [earningsMonthly, earningsMonthPick]);
+
+  const earningsLineOption = useMemo(() => {
+    if (!earningsMonthly.length) return null;
+    const points = earningsMonthly.map((r) => ({
+      label: `${r.yearUtc}-${String(r.monthUtc).padStart(2, "0")}`,
+      totalEur: r.totalEur,
+    }));
+    return buildMonthlyEarningsLineOption(points, chartTheme.chart[0], themeSlice, formatEur);
+  }, [earningsMonthly, chartTheme.chart, themeSlice, formatEur]);
+
+  const earningsCompanyBarOption = useMemo(() => {
+    if (!earningsByCompany.length) return null;
+    const rows = aggregateCouriersForPie(
+      earningsByCompany.map((c) => ({ key: c.companyName || c.companyId, count: c.amountEur })),
+      15,
+      tEarnings("otherCompanies"),
+    );
+    if (!rows.length) return null;
+    return buildMonetaryHorizontalBarOption(
+      rows,
+      chartTheme.chart[1],
+      themeSlice,
+      formatEur,
+      tEarnings("tableAmount"),
+    );
+  }, [earningsByCompany, chartTheme.chart, themeSlice, formatEur, tEarnings]);
+
+  const earningsSubDonutOption = useMemo(() => {
+    if (!earningsBySub.length) return null;
+    const rows = aggregateCouriersForPie(
+      earningsBySub.map((s) => ({ key: s.planName, count: s.amountEur })),
+      5,
+      tEarnings("otherPlans"),
+    );
+    if (!rows.length) return null;
+    return buildCurrencyDonutOption(rows, [...chartTheme.chart], themeSlice, formatEur);
+  }, [earningsBySub, chartTheme.chart, themeSlice, formatEur, tEarnings]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !token) return;
+    const ac = new AbortController();
+    setEarningsMonthlyError(null);
+    adminGetPlatformEarningsMonthly(token, 24, ac.signal)
+      .then((rows) => {
+        setEarningsMonthly(rows);
+        const withData = [...rows].reverse().find((r) => r.totalEur > 0);
+        const last = rows.length > 0 ? rows[rows.length - 1] : null;
+        const pick = withData
+          ? { y: withData.yearUtc, m: withData.monthUtc }
+          : last
+            ? { y: last.yearUtc, m: last.monthUtc }
+            : null;
+        setEarningsMonthPick((prev) => (prev === null && pick ? pick : prev));
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setEarningsMonthlyError(e instanceof Error ? e.message : "Failed to load earnings");
+      });
+    return () => ac.abort();
+  }, [isSuperAdmin, token]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !token || !earningsMonthPick) return;
+    const { y, m } = earningsMonthPick;
+    const ac = new AbortController();
+    setEarningsDetailLoading(true);
+    setEarningsDetailError(null);
+    Promise.all([
+      adminGetPlatformEarningsByCompany(token, y, m, ac.signal),
+      adminGetPlatformEarningsBySubscription(token, y, m, ac.signal),
+    ])
+      .then(([co, sub]) => {
+        if (ac.signal.aborted) return;
+        setEarningsByCompany(co);
+        setEarningsBySub(sub);
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (!ac.signal.aborted) {
+          setEarningsDetailError(e instanceof Error ? e.message : "Failed to load breakdown");
+        }
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setEarningsDetailLoading(false);
+      });
+    return () => ac.abort();
+  }, [isSuperAdmin, token, earningsMonthPick]);
+
   if (!isAuthenticated || isLoading) return null;
 
   return (
@@ -327,6 +459,119 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">{t("greeting", { name })}</h1>
         <p className="text-muted-foreground mt-1">{t("signedIn")}</p>
       </div>
+
+      {isSuperAdmin && token ? (
+        <Card className="overflow-hidden rounded-3xl border-border/70 shadow-md dark:border-amber-500/15">
+          <CardHeader>
+            <CardTitle>{tEarnings("title")}</CardTitle>
+            <CardDescription>{tEarnings("description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {earningsMonthlyError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {earningsMonthlyError}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              <label htmlFor="earnings-month" className="text-sm font-medium text-muted-foreground">
+                {tEarnings("monthLabel")}
+              </label>
+              <select
+                id="earnings-month"
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={!earningsMonthly.length}
+                value={earningsMonthPick ? `${earningsMonthPick.y}-${earningsMonthPick.m}` : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const i = v.indexOf("-");
+                  if (i <= 0) return;
+                  const y = Number(v.slice(0, i));
+                  const m = Number(v.slice(i + 1));
+                  if (!Number.isFinite(y) || !Number.isFinite(m)) return;
+                  setEarningsMonthPick({ y, m });
+                }}
+              >
+                {earningsMonthly.map((row) => (
+                  <option key={`${row.yearUtc}-${row.monthUtc}`} value={`${row.yearUtc}-${row.monthUtc}`}>
+                    {earningsMonthLabelFmt.format(new Date(Date.UTC(row.yearUtc, row.monthUtc - 1, 1)))}
+                  </option>
+                ))}
+              </select>
+              {earningsDetailLoading ? (
+                <span className="text-sm text-muted-foreground">{tEarnings("loading")}</span>
+              ) : null}
+            </div>
+            {earningsDetailError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {earningsDetailError}
+              </p>
+            ) : null}
+
+            <ChartPanel title={tEarnings("trendTitle")}>
+              {earningsLineOption ? (
+                <div className="h-64 w-full min-h-[256px]">
+                  <ThemedECharts option={earningsLineOption} height={256} />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{tEarnings("noData")}</p>
+              )}
+            </ChartPanel>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ChartPanel title={tEarnings("companiesTitle")}>
+                {earningsCompanyBarOption ? (
+                  <div className="h-[min(28rem,70vh)] w-full min-h-[240px]">
+                    <ThemedECharts option={earningsCompanyBarOption} height={320} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{tEarnings("noData")}</p>
+                )}
+              </ChartPanel>
+              <ChartPanel title={tEarnings("subscriptionTitle")}>
+                {earningsSubDonutOption ? (
+                  <div className="h-56 w-full min-h-[224px]">
+                    <ThemedECharts option={earningsSubDonutOption} height={224} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{tEarnings("noData")}</p>
+                )}
+              </ChartPanel>
+            </div>
+
+            {earningsByCompany.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">{tEarnings("tableTitle")}</h4>
+                <div className="max-h-96 overflow-auto rounded-md border border-border/70">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{tEarnings("tableCompany")}</TableHead>
+                        <TableHead className="text-right">{tEarnings("tableAmount")}</TableHead>
+                        <TableHead className="text-right">{tEarnings("tablePercent")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {earningsByCompany.map((c) => {
+                        const pct =
+                          selectedMonthTotalEur > 0 ? (c.amountEur / selectedMonthTotalEur) * 100 : 0;
+                        return (
+                          <TableRow key={c.companyId}>
+                            <TableCell className="font-medium">{c.companyName || c.companyId}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatEur(c.amountEur)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                              {pct.toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Company booking stats */}
       <Card className="overflow-hidden rounded-3xl border-border/70 shadow-md dark:border-blue-500/20">
