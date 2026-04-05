@@ -668,7 +668,14 @@ export default function CreateBookingPage() {
                 </select>
               </div>
             )}
-            <PartyFields title="" state={receiver} setState={setReceiver} quickBooking={quickBooking} />
+            <PartyFields
+              title=""
+              state={receiver}
+              setState={setReceiver}
+              quickBooking={quickBooking}
+              fieldKeyPrefix="receiver"
+              fieldErrors={fieldErrors}
+            />
           </CardContent>
         </Card>
 
