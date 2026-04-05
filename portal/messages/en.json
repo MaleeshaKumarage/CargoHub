@@ -319,6 +319,8 @@
     "title": "Actions",
     "description": "Agreement numbers, default shipper, address book and other company-related actions.",
     "comingSoon": "Coming soon when backend endpoints are available.",
+    "tabAddressBook": "Address book",
+    "tabManageBooking": "Manage booking page",
     "addressBook": "Address book",
     "addressBookDescription": "Senders and receivers per company. Use these when creating bookings. Not shared between companies.",
     "company": "Company",

@@ -180,6 +180,8 @@
     "title": "Aðgerðir",
     "description": "Samningsnúmer, sjálfgefinn sendandi, vistfangaskrá og aðrar fyrirtækjatengdar aðgerðir.",
     "comingSoon": "Kemur fljótlega þegar backend endapunktar eru tiltækir.",
+    "tabAddressBook": "Vistfangaskrá",
+    "tabManageBooking": "Stjórna bókunarsíðu",
     "addressBook": "Vistfangaskrá",
     "addressBookDescription": "Sendendur og viðtakendur fyrir hvert fyrirtæki. Notaðu þetta þegar þú býrð til bókanir. Ekki deilt milli fyrirtækja.",
     "company": "Fyrirtæki",
