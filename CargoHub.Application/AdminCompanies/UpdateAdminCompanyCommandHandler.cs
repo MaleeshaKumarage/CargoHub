@@ -1,3 +1,4 @@
+using CargoHub.Application.Billing.AdminPlans;
 using CargoHub.Application.Company;
 using MediatR;
 
@@ -9,17 +10,20 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
     private readonly ICompanyAdminInviteIssuer _inviteIssuer;
     private readonly ICompanyUserMetrics _metrics;
     private readonly IAdminCompanyLimitUserOperations _limitUserOperations;
+    private readonly ISubscriptionPlanAdminRepository _subscriptionPlans;
 
     public UpdateAdminCompanyCommandHandler(
         ICompanyRepository companies,
         ICompanyAdminInviteIssuer inviteIssuer,
         ICompanyUserMetrics metrics,
-        IAdminCompanyLimitUserOperations limitUserOperations)
+        IAdminCompanyLimitUserOperations limitUserOperations,
+        ISubscriptionPlanAdminRepository subscriptionPlans)
     {
         _companies = companies;
         _inviteIssuer = inviteIssuer;
         _metrics = metrics;
         _limitUserOperations = limitUserOperations;
+        _subscriptionPlans = subscriptionPlans;
     }
 
     public async Task<AdminCompanyMutationResult> Handle(UpdateAdminCompanyCommand request, CancellationToken cancellationToken)
@@ -28,6 +32,14 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
             return Fail("InvalidMaxUsers", "Max user accounts must be at least 1 when set.");
         if (request.MaxAdminAccounts is < 1)
             return Fail("InvalidMaxAdmins", "Max admin accounts must be at least 1 when set.");
+
+        if (request.SubscriptionPlanId is { } planId)
+        {
+            if (planId == Guid.Empty)
+                return Fail("InvalidSubscriptionPlan", "Subscription plan id is invalid.");
+            if (!await _subscriptionPlans.PlanExistsAsync(planId, cancellationToken))
+                return Fail("SubscriptionPlanNotFound", "Subscription plan was not found.");
+        }
 
         var company = await _companies.GetByIdForUpdateAsync(request.CompanyId, cancellationToken);
         if (company == null)

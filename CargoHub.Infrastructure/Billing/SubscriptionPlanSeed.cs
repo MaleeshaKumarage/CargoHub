@@ -33,4 +33,22 @@ public static class SubscriptionPlanSeed
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Companies created before billing used a null plan; assign the seeded default Trial plan so billing and admin UI behave consistently.
+    /// </summary>
+    public static async Task AssignDefaultTrialToCompaniesWithoutPlanAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken = default)
+    {
+        var trialId = SubscriptionBillingConstants.DefaultTrialPlanId;
+        var rows = await db.Companies
+            .Where(c => c.SubscriptionPlanId == null)
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+            return;
+        foreach (var c in rows)
+            c.SubscriptionPlanId = trialId;
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
