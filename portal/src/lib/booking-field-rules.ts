@@ -1,4 +1,10 @@
-import type { BookingFieldRulesApi, CreateBookingPackage, CreateBookingParty } from "@/lib/api";
+import type {
+  BookingDetail,
+  BookingDetailParty,
+  BookingFieldRulesApi,
+  CreateBookingPackage,
+  CreateBookingParty,
+} from "@/lib/api";
 
 export type BookingSectionId =
   | "courier"
@@ -327,4 +333,130 @@ export function applySectionRequirement(
     }
   }
   return { ...prev, sections, fields };
+}
+
+const emptyParty = (): CreateBookingParty => ({
+  name: "",
+  address1: "",
+  address2: "",
+  postalCode: "",
+  city: "",
+  country: "FI",
+  email: "",
+  phoneNumber: "",
+  phoneNumberMobile: "",
+  contactPersonName: "",
+  vatNo: "",
+  customerNumber: "",
+});
+
+function detailPartyToParty(p?: BookingDetailParty | null): CreateBookingParty {
+  if (!p) return emptyParty();
+  return {
+    name: p.name ?? "",
+    address1: p.address1 ?? "",
+    address2: p.address2 ?? "",
+    postalCode: p.postalCode ?? "",
+    city: p.city ?? "",
+    country: p.country ?? "FI",
+    email: p.email ?? "",
+    phoneNumber: p.phoneNumber ?? "",
+    phoneNumberMobile: p.phoneNumberMobile ?? "",
+    contactPersonName: p.contactPersonName ?? "",
+    vatNo: p.vatNo ?? "",
+    customerNumber: p.customerNumber ?? "",
+  };
+}
+
+function partyIsEmptyForPayerInference(p: CreateBookingParty): boolean {
+  return (
+    !(p.name ?? "").trim() &&
+    !(p.address1 ?? "").trim() &&
+    !(p.postalCode ?? "").trim() &&
+    !(p.city ?? "").trim()
+  );
+}
+
+function partiesEqualForPayer(a: CreateBookingParty, b: CreateBookingParty): boolean {
+  const f = (s: string | null | undefined) => (s ?? "").trim();
+  return (
+    f(a.name) === f(b.name) &&
+    f(a.address1) === f(b.address1) &&
+    f(a.address2) === f(b.address2) &&
+    f(a.postalCode) === f(b.postalCode) &&
+    f(a.city) === f(b.city) &&
+    f(a.country) === f(b.country) &&
+    f(a.email) === f(b.email) &&
+    f(a.phoneNumber) === f(b.phoneNumber) &&
+    f(a.phoneNumberMobile) === f(b.phoneNumberMobile) &&
+    f(a.contactPersonName) === f(b.contactPersonName) &&
+    f(a.vatNo) === f(b.vatNo) &&
+    f(a.customerNumber) === f(b.customerNumber)
+  );
+}
+
+/** Infer payer source from stored draft (no explicit flag on booking). */
+export function inferPayerSourceFromBookingDetail(detail: BookingDetail): PayerSource {
+  const shipper = detailPartyToParty(detail.shipper);
+  const receiver = detailPartyToParty(detail.receiver);
+  const payer = detailPartyToParty(detail.payer);
+  if (partyIsEmptyForPayerInference(payer)) return "sender";
+  if (partiesEqualForPayer(payer, shipper)) return "sender";
+  if (partiesEqualForPayer(payer, receiver)) return "receiver";
+  return "other";
+}
+
+/**
+ * Build validation context from API booking/draft detail. Uses `quickBooking: false` so all
+ * non–quick-booking mandatory fields are checked when confirming a draft.
+ */
+export function validationContextFromBookingDetail(
+  detail: BookingDetail,
+  quickBooking = false
+): BookingValidationContext {
+  const packages: CreateBookingPackage[] =
+    detail.packages && detail.packages.length > 0
+      ? detail.packages.map((p) => ({
+          weight: p.weight ?? "",
+          volume: p.volume ?? "",
+          packageType: p.packageType ?? "",
+          description: p.description ?? "",
+          length: p.length ?? "",
+          width: p.width ?? "",
+          height: p.height ?? "",
+        }))
+      : [
+          {
+            weight: "",
+            volume: "",
+            packageType: "",
+            description: "",
+            length: "",
+            width: "",
+            height: "",
+          },
+        ];
+
+  return {
+    postalService: detail.header?.postalService ?? "",
+    shipper: detailPartyToParty(detail.shipper),
+    receiver: detailPartyToParty(detail.receiver),
+    payer: detailPartyToParty(detail.payer),
+    pickUpAddress: detailPartyToParty(detail.pickUpAddress),
+    deliveryPoint: detailPartyToParty(detail.deliveryPoint),
+    payerSource: inferPayerSourceFromBookingDetail(detail),
+    quickBooking,
+    service: detail.shipment?.service ?? "",
+    senderReference: detail.shipment?.senderReference ?? "",
+    receiverReference: detail.shipment?.receiverReference ?? "",
+    freightPayer: detail.shipment?.freightPayer ?? "",
+    handlingInstructions: detail.shipment?.handlingInstructions ?? "",
+    grossWeight: detail.shippingInfo?.grossWeight ?? "",
+    grossVolume: detail.shippingInfo?.grossVolume ?? "",
+    packageQuantity: detail.shippingInfo?.packageQuantity ?? "",
+    pickupHandlingInstructions: detail.shippingInfo?.pickupHandlingInstructions ?? "",
+    deliveryHandlingInstructions: detail.shippingInfo?.deliveryHandlingInstructions ?? "",
+    generalInstructions: detail.shippingInfo?.generalInstructions ?? "",
+    packages,
+  };
 }

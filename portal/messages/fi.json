@@ -182,6 +182,7 @@
     "quickBooking": "Pikavaraus",
     "quickBookingDescription": "Kun käytössä, näytetään vain pakolliset kentät jokaisessa osiossa; valinnaiset kentät piilotetaan.",
     "fieldRequired": "Tämä kenttä on pakollinen.",
+    "validationActionBanner": "Joitakin pakollisia kenttiä puuttuu. Tarkista yläpuolella korostetut virheet ja yritä uudelleen.",
     "optional": "Valinnainen",
     "sections": {
       "header": "Otsikko",
