@@ -1,0 +1,154 @@
+using CargoHub.Application.Billing.Admin;
+using CargoHub.Domain.Billing;
+using CargoHub.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CargoHub.Infrastructure.Billing;
+
+public sealed class AdminBillingReader : IAdminBillingReader
+{
+    private readonly ApplicationDbContext _db;
+
+    public AdminBillingReader(ApplicationDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<AdminSubscriptionPlanSummaryDto>> ListSubscriptionPlansAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _db.SubscriptionPlans.AsNoTracking()
+            .OrderBy(p => p.Name)
+            .Select(p => new AdminSubscriptionPlanSummaryDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Kind = p.Kind.ToString(),
+                Currency = p.Currency,
+                IsActive = p.IsActive
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CompanyBillingPeriodSummaryDto>> ListBillingPeriodsForCompanyAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _db.CompanyBillingPeriods.AsNoTracking()
+            .Where(p => p.CompanyId == companyId)
+            .OrderByDescending(p => p.YearUtc)
+            .ThenByDescending(p => p.MonthUtc)
+            .Select(p => new CompanyBillingPeriodSummaryDto
+            {
+                Id = p.Id,
+                CompanyId = p.CompanyId,
+                YearUtc = p.YearUtc,
+                MonthUtc = p.MonthUtc,
+                Currency = p.Currency,
+                Status = p.Status == CompanyBillingPeriodStatus.Open ? "Open" : "Closed",
+                LineItemCount = p.LineItems.Count,
+                PayableTotal = p.LineItems.Where(l => !l.ExcludedFromInvoice).Sum(l => (decimal?)l.Amount) ?? 0m
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<BillingPeriodDetailDto?> GetBillingPeriodDetailAsync(Guid periodId, CancellationToken cancellationToken = default)
+    {
+        var header = await _db.CompanyBillingPeriods.AsNoTracking()
+            .Where(p => p.Id == periodId)
+            .Select(p => new
+            {
+                p.Id,
+                p.CompanyId,
+                p.YearUtc,
+                p.MonthUtc,
+                p.Currency,
+                p.Status
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (header == null)
+            return null;
+
+        var lines = await _db.BillingLineItems.AsNoTracking()
+            .Where(l => l.CompanyBillingPeriodId == periodId)
+            .OrderBy(l => l.CreatedAtUtc)
+            .Select(l => new BillingPeriodLineItemDto
+            {
+                Id = l.Id,
+                BookingId = l.BookingId,
+                LineType = l.LineType.ToString(),
+                Component = l.Component,
+                Amount = l.Amount,
+                Currency = l.Currency,
+                ExcludedFromInvoice = l.ExcludedFromInvoice,
+                CreatedAtUtc = l.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        var payable = lines.Where(l => !l.ExcludedFromInvoice).Sum(l => l.Amount);
+
+        return new BillingPeriodDetailDto
+        {
+            Id = header.Id,
+            CompanyId = header.CompanyId,
+            YearUtc = header.YearUtc,
+            MonthUtc = header.MonthUtc,
+            Currency = header.Currency,
+            Status = header.Status == CompanyBillingPeriodStatus.Open ? "Open" : "Closed",
+            PayableTotal = payable,
+            LineItems = lines
+        };
+    }
+
+    public async Task<BillingInvoicePdfModel?> GetInvoicePdfModelAsync(Guid periodId, CancellationToken cancellationToken = default)
+    {
+        var header = await _db.CompanyBillingPeriods.AsNoTracking()
+            .Where(p => p.Id == periodId)
+            .Select(p => new
+            {
+                p.Id,
+                p.CompanyId,
+                p.YearUtc,
+                p.MonthUtc,
+                p.Currency,
+                p.Status
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (header == null)
+            return null;
+
+        var company = await _db.Companies.AsNoTracking()
+            .Where(c => c.Id == header.CompanyId)
+            .Select(c => new { c.Name, c.BusinessId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var lines = await _db.BillingLineItems.AsNoTracking()
+            .Where(l => l.CompanyBillingPeriodId == periodId)
+            .OrderBy(l => l.CreatedAtUtc)
+            .Select(l => new BillingInvoicePdfLineModel
+            {
+                LineType = l.LineType.ToString(),
+                Component = l.Component,
+                Amount = l.Amount,
+                ExcludedFromInvoice = l.ExcludedFromInvoice,
+                BookingId = l.BookingId
+            })
+            .ToListAsync(cancellationToken);
+
+        var ledger = lines.Sum(l => l.Amount);
+        var payable = lines.Where(l => !l.ExcludedFromInvoice).Sum(l => l.Amount);
+
+        return new BillingInvoicePdfModel
+        {
+            PeriodId = header.Id,
+            CompanyId = header.CompanyId,
+            CompanyName = company?.Name ?? "",
+            BusinessId = company?.BusinessId,
+            YearUtc = header.YearUtc,
+            MonthUtc = header.MonthUtc,
+            Currency = header.Currency,
+            Status = header.Status == CompanyBillingPeriodStatus.Open ? "Open" : "Closed",
+            PayableTotal = payable,
+            LedgerTotal = ledger,
+            Lines = lines
+        };
+    }
+}

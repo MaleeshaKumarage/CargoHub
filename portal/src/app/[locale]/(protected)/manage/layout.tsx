@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getMe } from "@/lib/api";
 import { getRolesFromToken } from "@/lib/jwt";
 import { useRouter, usePathname, Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +16,7 @@ export default function ManageLayout({
   const { user, token, updateUserRoles } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
   const [accessAllowed, setAccessAllowed] = useState<boolean | null>(null);
 
   const rolesFromUser = user?.roles ?? (user as { Roles?: string[] })?.Roles ?? [];
@@ -71,7 +73,7 @@ export default function ManageLayout({
             variant={pathname?.startsWith("/manage/users") ? "secondary" : "ghost"}
             size="sm"
           >
-            Users
+            {tNav("users")}
           </Button>
         </Link>
         <Link href="/manage/companies">
@@ -79,7 +81,23 @@ export default function ManageLayout({
             variant={pathname?.startsWith("/manage/companies") ? "secondary" : "ghost"}
             size="sm"
           >
-            Companies
+            {tNav("companies")}
+          </Button>
+        </Link>
+        <Link href="/manage/invoices">
+          <Button
+            variant={pathname?.startsWith("/manage/invoices") ? "secondary" : "ghost"}
+            size="sm"
+          >
+            {tNav("invoices")}
+          </Button>
+        </Link>
+        <Link href="/manage/subscription-plans">
+          <Button
+            variant={pathname?.startsWith("/manage/subscription-plans") ? "secondary" : "ghost"}
+            size="sm"
+          >
+            {tNav("subscriptionPlans")}
           </Button>
         </Link>
       </nav>
