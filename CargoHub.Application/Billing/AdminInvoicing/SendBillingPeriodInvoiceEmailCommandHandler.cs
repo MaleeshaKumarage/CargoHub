@@ -17,5 +17,7 @@ public sealed class SendBillingPeriodInvoiceEmailCommandHandler
             request.PeriodId,
             request.RecipientAdminUserId,
             request.SuperAdminUserId,
-            cancellationToken);
+            cancellationToken,
+            request.InvoiceRangeStartUtc,
+            request.InvoiceRangeEndExclusiveUtc);
 }

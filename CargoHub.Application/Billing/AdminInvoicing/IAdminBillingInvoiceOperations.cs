@@ -6,7 +6,9 @@ public interface IAdminBillingInvoiceOperations
         Guid periodId,
         string recipientAdminUserId,
         string sentBySuperAdminUserId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        DateTime? invoiceRangeStartUtc = null,
+        DateTime? invoiceRangeEndExclusiveUtc = null);
 
     Task<UpdateLineExcludedResult> UpdateLineExcludedAsync(
         Guid lineItemId,

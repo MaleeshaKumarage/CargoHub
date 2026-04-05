@@ -132,4 +132,50 @@ describe('buildSubscriptionPricingLines', () => {
     const lines = buildSubscriptionPricingLines(sub, t);
     expect(lines[0]).toContain('subscriptionPerBooking');
   });
+
+  it('returns none and unknown plan lines', () => {
+    expect(
+      buildSubscriptionPricingLines({ planName: '', planKind: 'None', currency: 'EUR' } as PortalCompanySubscriptionDto, t),
+    ).toEqual(['subscriptionNonePlan']);
+    expect(
+      buildSubscriptionPricingLines(
+        { planName: '', planKind: 'Unknown', currency: 'EUR' } as PortalCompanySubscriptionDto,
+        t,
+      ),
+    ).toEqual(['subscriptionUnknownPlan']);
+  });
+
+  it('MonthlyBundle omits overage when included count is missing', () => {
+    const sub: PortalCompanySubscriptionDto = {
+      planName: 'MB',
+      planKind: 'MonthlyBundle',
+      currency: 'EUR',
+      monthlyFee: 10,
+      overageChargePerBooking: 9,
+    };
+    const spy = vi.fn(t);
+    const lines = buildSubscriptionPricingLines(sub, spy);
+    expect(lines).toHaveLength(1);
+    expect(spy).toHaveBeenCalledWith('subscriptionMonthlyBase', expect.any(Object));
+    expect(spy).not.toHaveBeenCalledWith('subscriptionOverageEach', expect.any(Object));
+  });
+
+  it('TieredMonthlyByUsage returns open band when monthly fee is null', () => {
+    const sub: PortalCompanySubscriptionDto = {
+      planName: 'TM',
+      planKind: 'TieredMonthlyByUsage',
+      currency: 'EUR',
+      tiers: [{ ordinal: 1, inclusiveMaxBookingsInPeriod: null, chargePerBooking: null, monthlyFee: null }],
+    };
+    expect(buildSubscriptionPricingLines(sub, t)).toEqual(['subscriptionTierBandOpen']);
+  });
+
+  it('falls back to pending for unrecognized planKind', () => {
+    const sub = {
+      planName: 'X',
+      planKind: 'FuturePlan',
+      currency: 'EUR',
+    } as PortalCompanySubscriptionDto;
+    expect(buildSubscriptionPricingLines(sub, t)).toEqual(['subscriptionRatesPending']);
+  });
 });

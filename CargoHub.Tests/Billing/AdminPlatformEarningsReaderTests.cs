@@ -275,4 +275,295 @@ public class AdminPlatformEarningsReaderTests : IDisposable
         var sumPct = list.Sum(x => x.Percent);
         Assert.InRange(sumPct, 99.9m, 100.1m);
     }
+
+    [Fact]
+    public async Task GetMonthlyTotalsAsync_ClampsMonthsToRange()
+    {
+        using var ctx = _fixture.CreateContext();
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var many = await reader.GetMonthlyTotalsAsync(500);
+        Assert.Equal(120, many.Count);
+        var one = await reader.GetMonthlyTotalsAsync(0);
+        Assert.Single(one);
+    }
+
+    [Fact]
+    public async Task GetMonthlyTotalsAsync_SkipsNonEurLines()
+    {
+        using var ctx = _fixture.CreateContext();
+        var planId = Guid.NewGuid();
+        var pricingId = Guid.NewGuid();
+        ctx.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "P1",
+            Kind = SubscriptionPlanKind.PayPerBooking,
+            Currency = "EUR",
+            IsActive = true,
+        });
+        ctx.SubscriptionPlanPricingPeriods.Add(new SubscriptionPlanPricingPeriod
+        {
+            Id = pricingId,
+            SubscriptionPlanId = planId,
+            EffectiveFromUtc = DateTime.UtcNow.AddDays(-1),
+        });
+
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = "c",
+            Name = "Co",
+            BusinessId = "1",
+            CustomerId = "u",
+            SubscriptionPlanId = planId,
+        });
+
+        var now = DateTime.UtcNow;
+        var end = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodId = Guid.NewGuid();
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = end.Year,
+            MonthUtc = end.Month,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.PerBooking,
+            Amount = 99m,
+            Currency = "USD",
+            SubscriptionPlanId = planId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExcludedFromInvoice = false,
+        });
+
+        await ctx.SaveChangesAsync();
+
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var months = await reader.GetMonthlyTotalsAsync(1);
+        Assert.Contains(months, x => x.YearUtc == end.Year && x.MonthUtc == end.Month && x.TotalEur == 0m);
+    }
+
+    [Fact]
+    public async Task GetMonthlyTotalsAsync_IncludesCaseInsensitiveEurCurrencyCode()
+    {
+        using var ctx = _fixture.CreateContext();
+        var planId = Guid.NewGuid();
+        var pricingId = Guid.NewGuid();
+        ctx.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "P1",
+            Kind = SubscriptionPlanKind.PayPerBooking,
+            Currency = "EUR",
+            IsActive = true,
+        });
+        ctx.SubscriptionPlanPricingPeriods.Add(new SubscriptionPlanPricingPeriod
+        {
+            Id = pricingId,
+            SubscriptionPlanId = planId,
+            EffectiveFromUtc = DateTime.UtcNow.AddDays(-1),
+        });
+
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = "c",
+            Name = "Co",
+            BusinessId = "1",
+            CustomerId = "u",
+            SubscriptionPlanId = planId,
+        });
+
+        var now = DateTime.UtcNow;
+        var end = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodId = Guid.NewGuid();
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = end.Year,
+            MonthUtc = end.Month,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.PerBooking,
+            Amount = 12.5m,
+            Currency = "eur",
+            SubscriptionPlanId = planId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExcludedFromInvoice = false,
+        });
+
+        await ctx.SaveChangesAsync();
+
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var months = await reader.GetMonthlyTotalsAsync(1);
+        Assert.Contains(months, x => x.YearUtc == end.Year && x.MonthUtc == end.Month && x.TotalEur == 12.5m);
+    }
+
+    [Fact]
+    public async Task GetBySubscriptionForMonthAsync_ReturnsEmpty_WhenNoLines()
+    {
+        using var ctx = _fixture.CreateContext();
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var list = await reader.GetBySubscriptionForMonthAsync(2020, 1);
+        Assert.Empty(list);
+    }
+
+    [Fact]
+    public async Task GetBySubscriptionForMonthAsync_ReturnsEmpty_WhenOnlyNonPositiveTotal()
+    {
+        using var ctx = _fixture.CreateContext();
+        var planId = Guid.NewGuid();
+        var pricingId = Guid.NewGuid();
+        ctx.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "P1",
+            Kind = SubscriptionPlanKind.PayPerBooking,
+            Currency = "EUR",
+            IsActive = true,
+        });
+        ctx.SubscriptionPlanPricingPeriods.Add(new SubscriptionPlanPricingPeriod
+        {
+            Id = pricingId,
+            SubscriptionPlanId = planId,
+            EffectiveFromUtc = DateTime.UtcNow.AddDays(-1),
+        });
+
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = "c",
+            Name = "Co",
+            BusinessId = "1",
+            CustomerId = "u",
+            SubscriptionPlanId = planId,
+        });
+
+        var periodId = Guid.NewGuid();
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = 2022,
+            MonthUtc = 3,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.Adjustment,
+            Amount = -10m,
+            Currency = "EUR",
+            SubscriptionPlanId = planId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExcludedFromInvoice = false,
+        });
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.Adjustment,
+            Amount = 5m,
+            Currency = "EUR",
+            SubscriptionPlanId = planId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExcludedFromInvoice = false,
+        });
+
+        await ctx.SaveChangesAsync();
+
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var list = await reader.GetBySubscriptionForMonthAsync(2022, 3);
+        Assert.Empty(list);
+    }
+
+    [Fact]
+    public async Task GetBySubscriptionForMonthAsync_UsesUnknownPlan_WhenPlanRowMissing()
+    {
+        using var ctx = _fixture.CreateContext();
+        var orphanPlanId = Guid.NewGuid();
+        var knownPlanId = Guid.NewGuid();
+        var pricingId = Guid.NewGuid();
+        ctx.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = knownPlanId,
+            Name = "Other",
+            Kind = SubscriptionPlanKind.PayPerBooking,
+            Currency = "EUR",
+            IsActive = true,
+        });
+        ctx.SubscriptionPlanPricingPeriods.Add(new SubscriptionPlanPricingPeriod
+        {
+            Id = pricingId,
+            SubscriptionPlanId = knownPlanId,
+            EffectiveFromUtc = DateTime.UtcNow.AddDays(-1),
+        });
+
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = "c",
+            Name = "Co",
+            BusinessId = "1",
+            CustomerId = "u",
+            SubscriptionPlanId = knownPlanId,
+        });
+
+        var periodId = Guid.NewGuid();
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = 2023,
+            MonthUtc = 5,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.PerBooking,
+            Amount = 50m,
+            Currency = "EUR",
+            SubscriptionPlanId = orphanPlanId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = DateTime.UtcNow,
+            ExcludedFromInvoice = false,
+        });
+
+        await ctx.SaveChangesAsync();
+
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var list = await reader.GetBySubscriptionForMonthAsync(2023, 5);
+        Assert.Single(list);
+        Assert.Equal("Unknown plan", list[0].PlanName);
+        Assert.Equal(100m, list[0].Percent);
+    }
 }

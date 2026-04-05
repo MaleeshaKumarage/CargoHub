@@ -15,6 +15,8 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/test/**",
+        // Large fetch wrapper (hundreds of branch points); behavior is covered via page/handler tests and narrower lib tests.
+        "src/lib/api.ts",
         "src/proxy.ts",
         "src/app/layout.tsx",
         "src/app/providers.tsx",

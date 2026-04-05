@@ -10,5 +10,9 @@ public sealed class GetBillingInvoicePdfModelQueryHandler : IRequestHandler<GetB
     public GetBillingInvoicePdfModelQueryHandler(IAdminBillingReader reader) => _reader = reader;
 
     public Task<BillingInvoicePdfModel?> Handle(GetBillingInvoicePdfModelQuery request, CancellationToken cancellationToken) =>
-        _reader.GetInvoicePdfModelAsync(request.PeriodId, cancellationToken);
+        _reader.GetInvoicePdfModelAsync(
+            request.PeriodId,
+            cancellationToken,
+            request.InvoiceRangeStartUtc,
+            request.InvoiceRangeEndExclusiveUtc);
 }

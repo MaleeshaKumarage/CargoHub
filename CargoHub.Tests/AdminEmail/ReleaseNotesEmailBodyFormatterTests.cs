@@ -22,4 +22,13 @@ public sealed class ReleaseNotesEmailBodyFormatterTests
         Assert.Contains("\n\n", html);
         Assert.Contains("  spaced", html);
     }
+
+    [Fact]
+    public void ToHtml_null_becomes_empty_encoded_block()
+    {
+        var html = ReleaseNotesEmailBodyFormatter.ToHtml(null!);
+        Assert.Contains("white-space: pre-wrap", html);
+        Assert.Contains("<div", html);
+        Assert.DoesNotContain("null", html);
+    }
 }

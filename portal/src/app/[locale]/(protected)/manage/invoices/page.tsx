@@ -160,7 +160,10 @@ export default function ManageInvoicesPage() {
     setPdfBusy(true);
     setError(null);
     try {
-      const blob = await adminDownloadBillingPeriodInvoicePdf(token, invoicePeriodId);
+      const blob = await adminDownloadBillingPeriodInvoicePdf(token, invoicePeriodId, {
+        from: dateFrom,
+        to: dateTo,
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -179,7 +182,10 @@ export default function ManageInvoicesPage() {
     setEmailBusy(true);
     setError(null);
     try {
-      await adminSendBillingPeriodInvoiceEmail(token, invoicePeriodId, emailRecipientId);
+      await adminSendBillingPeriodInvoiceEmail(token, invoicePeriodId, emailRecipientId, {
+        from: dateFrom,
+        to: dateTo,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send email failed");
     } finally {

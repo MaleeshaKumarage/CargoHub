@@ -224,6 +224,32 @@ public class BookingRepositoryTestDbTests : IDisposable
     }
 
     [Fact]
+    public async Task GetDashboardStats_NormalizesScopeWhitespace_AndUnknownScopeUsesCompletedOnly()
+    {
+        var customerId = "cust-dash-scope";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var draftStats = await repo.GetDashboardStatsAsync(customerId, "  DrAfTs  ", null, null, default);
+        Assert.Equal("drafts", draftStats.Scope);
+        Assert.True(draftStats.CountMonth >= 1);
+
+        var odd = await repo.GetDashboardStatsAsync(customerId, " CustomScope ", null, null, default);
+        Assert.Equal("customscope", odd.Scope);
+        Assert.True(odd.CountMonth >= 1);
+    }
+
+    [Fact]
     public async Task GetDashboardStats_WithDraftsScope_CountsOnlyDraftBookings()
     {
         var customerId = "cust-dash-drafts";
@@ -290,6 +316,155 @@ public class BookingRepositoryTestDbTests : IDisposable
         var now = DateTime.UtcNow;
         var stats = await repo.GetDashboardStatsAsync(customerId, null, now.Year, 13, default);
         Assert.Equal(DateTime.DaysInMonth(now.Year, now.Month), stats.BookingsPerDayCurrentMonth.Count);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_FutureHeatmapMonth_ClampsToCurrentMonth()
+    {
+        var customerId = "cust-heat-future";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+
+        var now = DateTime.UtcNow;
+        var stats = await repo.GetDashboardStatsAsync(customerId, null, now.Year + 1, 6, default);
+        Assert.Equal(DateTime.DaysInMonth(now.Year, now.Month), stats.BookingsPerDayCurrentMonth.Count);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WithDeliveredHistory_PopulatesDeliveryTimeDistribution()
+    {
+        var customerId = "cust-dash-delivery";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(created);
+        var booking = await context.Bookings.AsNoTracking().FirstAsync(b => b.Id == created.Id);
+        context.BookingStatusHistory.Add(new BookingStatusHistory
+        {
+            Id = Guid.NewGuid(),
+            BookingId = booking.Id,
+            Status = BookingStatus.Delivered,
+            OccurredAtUtc = booking.CreatedAtUtc.AddHours(12)
+        });
+        await context.SaveChangesAsync();
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, "all", null, null, default);
+        Assert.True(stats.DeliveryTime.SampleSize >= 1);
+        Assert.Equal(12.0, stats.DeliveryTime.MedianHours, precision: 5);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_WithTwoDeliverySamples_UsesInterpolatedPercentiles()
+    {
+        var customerId = "cust-dash-delivery-2";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        var ba = await context.Bookings.AsNoTracking().FirstAsync(x => x.Id == a.Id);
+        var bb = await context.Bookings.AsNoTracking().FirstAsync(x => x.Id == b.Id);
+        context.BookingStatusHistory.AddRange(
+            new BookingStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                BookingId = ba.Id,
+                Status = BookingStatus.Delivered,
+                OccurredAtUtc = ba.CreatedAtUtc.AddHours(10)
+            },
+            new BookingStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                BookingId = bb.Id,
+                Status = BookingStatus.Delivered,
+                OccurredAtUtc = bb.CreatedAtUtc.AddHours(20)
+            });
+        await context.SaveChangesAsync();
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, "all", null, null, default);
+        Assert.Equal(2, stats.DeliveryTime.SampleSize);
+        Assert.Equal(10.0, stats.DeliveryTime.MinHours, precision: 5);
+        Assert.Equal(20.0, stats.DeliveryTime.MaxHours, precision: 5);
+        Assert.InRange(stats.DeliveryTime.MedianHours, 10.0, 20.0);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_PossiblyStuckCount_IncludesOldCompletedWithoutDelivered()
+    {
+        var customerId = "cust-dash-stuck";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(created);
+        var b = await context.Bookings.FirstAsync(x => x.Id == created.Id);
+        b.CreatedAtUtc = DateTime.UtcNow.AddDays(-10);
+        await context.SaveChangesAsync();
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, "all", null, null, default);
+        Assert.True(stats.Kpi.PossiblyStuckCount >= 1);
+    }
+
+    [Fact]
+    public async Task GetDashboardStats_ExceptionHeatmap_CountsSignalStatusesOnUpdates()
+    {
+        var customerId = "cust-dash-exc";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI"
+        };
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(created);
+        var b = await repo.GetByIdWithTrackingAsync(created.Id, customerId, default);
+        Assert.NotNull(b);
+        b!.Updates.Add(new BookingUpdate
+        {
+            Status = "Carrier reported delay",
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+        });
+        await repo.UpdateAsync(b, default);
+
+        var stats = await repo.GetDashboardStatsAsync(customerId, "all", null, null, default);
+        Assert.True(stats.ExceptionSignalsHeatmap.MaxCount >= 1);
     }
 
     [Fact]
@@ -431,5 +606,132 @@ public class BookingRepositoryTestDbTests : IDisposable
         Assert.Equal("REF-001", updated.Header.ReferenceNumber);
         Assert.Equal("Updated R", updated.Receiver?.Name);
         Assert.Single(updated.Packages);
+    }
+
+    [Fact]
+    public async Task ConfirmDraftAsync_ReturnsFalse_WhenBookingMissing()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        Assert.False(await repo.ConfirmDraftAsync(Guid.NewGuid(), "cust", default));
+    }
+
+    [Fact]
+    public async Task ConfirmDraftAsync_ReturnsFalse_WhenAlreadyCompleted()
+    {
+        var customerId = "cust-conf";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI",
+        };
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+            .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(done);
+        Assert.False(await repo.ConfirmDraftAsync(done.Id, customerId, default));
+    }
+
+    [Fact]
+    public async Task GetByIdWithTracking_ReturnsNull_WhenCustomerIdMismatch()
+    {
+        var customerId = "cust-id";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI",
+        };
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+            .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(done);
+        Assert.Null(await repo.GetByIdWithTrackingAsync(done.Id, "other", default));
+    }
+
+    [Fact]
+    public async Task TryAddStatusEvent_ReturnsFalse_OnDuplicate()
+    {
+        var customerId = "cust-dup-st";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI",
+        };
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+            .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(done);
+        var first = await repo.TryAddStatusEventAsync(done.Id, "Custom", "t", default);
+        Assert.True(first);
+        var second = await repo.TryAddStatusEventAsync(done.Id, "Custom", "t", default);
+        Assert.False(second);
+    }
+
+    [Fact]
+    public async Task GetStatusHistoryForBookingIds_ReturnsEmptyDict_WhenNoIds()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var map = await repo.GetStatusHistoryForBookingIdsAsync(Array.Empty<Guid>(), default);
+        Assert.Empty(map);
+    }
+
+    [Fact]
+    public async Task GetStatusHistoryForBookingIds_GroupsByBooking()
+    {
+        var customerId = "cust-bulk-hist";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI",
+        };
+        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+            .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+            .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        await repo.TryAddStatusEventAsync(a.Id, "CustomA", "s", default);
+        await repo.TryAddStatusEventAsync(b.Id, "CustomB", "s", default);
+
+        var map = await repo.GetStatusHistoryForBookingIdsAsync(new[] { a.Id, b.Id }, default);
+        Assert.True(map[a.Id].Any(x => x.Status == "CustomA"));
+        Assert.True(map[b.Id].Any(x => x.Status == "CustomB"));
+    }
+
+    [Fact]
+    public async Task ListAllDrafts_ReturnsDraftRows()
+    {
+        var customerId = "cust-all-drafts";
+        using var context = _fixture.CreateContext();
+        var repo = new BookingRepository(context);
+        var request = new CreateBookingRequest
+        {
+            ReceiverName = "R",
+            ReceiverAddress1 = "A1",
+            ReceiverPostalCode = "00100",
+            ReceiverCity = "Helsinki",
+            ReceiverCountry = "FI",
+        };
+        await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var drafts = await repo.ListAllDraftsAsync(0, 50, default);
+        Assert.Contains(drafts, d => d.CustomerId == customerId);
     }
 }

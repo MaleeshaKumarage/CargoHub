@@ -103,7 +103,11 @@ public sealed class AdminBillingReader : IAdminBillingReader
         };
     }
 
-    public async Task<BillingInvoicePdfModel?> GetInvoicePdfModelAsync(Guid periodId, CancellationToken cancellationToken = default)
+    public async Task<BillingInvoicePdfModel?> GetInvoicePdfModelAsync(
+        Guid periodId,
+        CancellationToken cancellationToken = default,
+        DateTime? invoiceRangeStartUtc = null,
+        DateTime? invoiceRangeEndExclusiveUtc = null)
     {
         var header = await _db.CompanyBillingPeriods.AsNoTracking()
             .Where(p => p.Id == periodId)
@@ -120,18 +124,55 @@ public sealed class AdminBillingReader : IAdminBillingReader
         if (header == null)
             return null;
 
+        var monthStart = new DateTime(header.YearUtc, header.MonthUtc, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEndExclusive = monthStart.AddMonths(1);
+
+        DateTime windowStart;
+        DateTime windowEndExclusive;
+        var useCustomWindow = invoiceRangeStartUtc.HasValue || invoiceRangeEndExclusiveUtc.HasValue;
+        if (useCustomWindow)
+        {
+            if (invoiceRangeStartUtc is not { } wStart || invoiceRangeEndExclusiveUtc is not { } wEndEx)
+                return null;
+            if (wStart.Kind != DateTimeKind.Utc || wEndEx.Kind != DateTimeKind.Utc)
+                return null;
+            if (wStart < monthStart || wEndEx > monthEndExclusive || wStart >= wEndEx)
+                return null;
+            windowStart = wStart;
+            windowEndExclusive = wEndEx;
+        }
+        else
+        {
+            windowStart = monthStart;
+            windowEndExclusive = monthEndExclusive;
+        }
+
         var company = await _db.Companies.AsNoTracking()
             .Where(c => c.Id == header.CompanyId)
             .Select(c => new { c.Name, c.BusinessId })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var breakdown = await _breakdownReader.GetBreakdownAsync(
-            header.CompanyId,
-            header.YearUtc,
-            header.MonthUtc,
-            cancellationToken);
+        BillingMonthBreakdownDto? breakdown;
+        if (useCustomWindow)
+        {
+            breakdown = await _breakdownReader.GetBreakdownForDateRangeAsync(
+                header.CompanyId,
+                windowStart,
+                windowEndExclusive,
+                cancellationToken);
+            if (breakdown == null)
+                return null;
+        }
+        else
+        {
+            breakdown = await _breakdownReader.GetBreakdownAsync(
+                header.CompanyId,
+                header.YearUtc,
+                header.MonthUtc,
+                cancellationToken);
+        }
 
-        var lines = await _db.BillingLineItems.AsNoTracking()
+        var allLines = await _db.BillingLineItems.AsNoTracking()
             .Where(l => l.CompanyBillingPeriodId == periodId)
             .OrderBy(l => l.CreatedAtUtc)
             .Select(l => new BillingInvoicePdfLineModel
@@ -144,11 +185,24 @@ public sealed class AdminBillingReader : IAdminBillingReader
             })
             .ToListAsync(cancellationToken);
 
+        List<BillingInvoicePdfLineModel> lines;
+        if (breakdown != null && useCustomWindow)
+        {
+            var bookingIds = breakdown.Bookings.Select(b => b.BookingId).ToHashSet();
+            lines = allLines
+                .Where(l => l.BookingId == null || bookingIds.Contains(l.BookingId.Value))
+                .ToList();
+        }
+        else
+        {
+            lines = allLines;
+        }
+
         var ledger = lines.Sum(l => l.Amount);
         var payable = lines.Where(l => !l.ExcludedFromInvoice).Sum(l => l.Amount);
 
-        IReadOnlyList<BillingInvoicePdfSegmentModel> segments = Array.Empty<BillingInvoicePdfSegmentModel>();
-        IReadOnlyList<BillingInvoicePdfBookingRowModel> bookingRows = Array.Empty<BillingInvoicePdfBookingRowModel>();
+        IReadOnlyList<BillingInvoicePdfSegmentModel> segments;
+        IReadOnlyList<BillingInvoicePdfBookingRowModel> bookingRows;
         if (breakdown != null)
         {
             segments = breakdown.Segments
@@ -170,6 +224,11 @@ public sealed class AdminBillingReader : IAdminBillingReader
                 })
                 .ToList();
         }
+        else
+        {
+            segments = Array.Empty<BillingInvoicePdfSegmentModel>();
+            bookingRows = Array.Empty<BillingInvoicePdfBookingRowModel>();
+        }
 
         return new BillingInvoicePdfModel
         {
@@ -179,6 +238,8 @@ public sealed class AdminBillingReader : IAdminBillingReader
             BusinessId = company?.BusinessId,
             YearUtc = header.YearUtc,
             MonthUtc = header.MonthUtc,
+            InvoiceRangeStartUtc = windowStart,
+            InvoiceRangeEndExclusiveUtc = windowEndExclusive,
             Currency = header.Currency,
             Status = header.Status == CompanyBillingPeriodStatus.Open ? "Open" : "Closed",
             PayableTotal = payable,

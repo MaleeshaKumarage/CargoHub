@@ -41,7 +41,12 @@ public sealed class BillingPeriodInvoicePdfGenerator : IBillingInvoicePdfGenerat
                 {
                     content.Spacing(10);
 
-                    content.Item().Text($"{model.YearUtc}-{model.MonthUtc:00} (UTC)").SemiBold().FontSize(12);
+                    content.Item()
+                        .Text(BillingInvoicePeriodLabel.FormatUtcInclusiveRange(
+                            model.InvoiceRangeStartUtc,
+                            model.InvoiceRangeEndExclusiveUtc))
+                        .SemiBold()
+                        .FontSize(12);
                     content.Item().Text($"Company: {model.CompanyName}").FontSize(11);
                     if (!string.IsNullOrWhiteSpace(model.BusinessId))
                         content.Item().Text($"Business ID: {model.BusinessId}").FontSize(10).FontColor(Colors.Grey.Darken2);
