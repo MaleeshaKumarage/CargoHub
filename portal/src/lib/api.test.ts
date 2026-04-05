@@ -19,6 +19,7 @@ import {
   adminGetSubscriptionPlans,
   adminPatchCompany,
   adminSendTestEmail,
+  adminSendReleaseNotes,
   adminGetCompanyBillingPeriods,
   AdminCompanyLimitReductionRequiredError,
   DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
@@ -849,6 +850,64 @@ describe("api", () => {
         json: async () => ({}),
       });
       await expect(adminSendTestEmail("jwt", "a@b.com")).rejects.toThrow(/Test email failed \(502\)/);
+    });
+  });
+
+  describe("adminSendReleaseNotes", () => {
+    it("returns normalized result when API succeeds", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          recipientCount: 2,
+          sentCount: 2,
+          failures: [],
+        }),
+      });
+      const r = await adminSendReleaseNotes("jwt", {
+        subject: "S",
+        body: "B",
+        allCompanies: true,
+        allRoles: true,
+      });
+      expect(r.recipientCount).toBe(2);
+      expect(r.sentCount).toBe(2);
+      expect(r.failures).toEqual([]);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/email/release-notes"), expect.any(Object));
+    });
+
+    it("parses PascalCase failures", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          RecipientCount: 1,
+          SentCount: 0,
+          Failures: [{ Email: "a@b.com", Message: "bounce" }],
+        }),
+      });
+      const r = await adminSendReleaseNotes("jwt", {
+        subject: "S",
+        body: "B",
+        allCompanies: true,
+        allRoles: true,
+      });
+      expect(r.recipientCount).toBe(1);
+      expect(r.failures).toEqual([{ email: "a@b.com", message: "bounce" }]);
+    });
+
+    it("throws when API fails", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message: "No recipients" }),
+      });
+      await expect(
+        adminSendReleaseNotes("jwt", {
+          subject: "S",
+          body: "B",
+          allCompanies: true,
+          allRoles: true,
+        })
+      ).rejects.toThrow("No recipients");
     });
   });
 
