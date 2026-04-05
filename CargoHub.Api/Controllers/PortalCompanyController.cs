@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using CargoHub.Application.Auth;
 using CargoHub.Application.Company;
 using CargoHub.Application.Couriers;
@@ -185,6 +186,145 @@ public class PortalCompanyController : ControllerBase
         return Ok(new CourierContractsResponse { Contracts = list });
     }
 
+    /// <summary>Booking form field/section rules for the portal (JSON stored per company).</summary>
+    [HttpGet("booking-field-rules")]
+    public async Task<ActionResult<BookingFieldRulesResponse>> GetBookingFieldRules([FromQuery] Guid? companyId, CancellationToken cancellationToken)
+    {
+        var userId = UserId;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+
+        var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
+        Company? company;
+        if (isSuperAdmin)
+        {
+            if (!companyId.HasValue)
+                return BadRequest(new { message = "companyId is required for SuperAdmin." });
+            company = await _companyRepository.GetByIdAsync(companyId.Value, cancellationToken);
+            if (company == null) return NotFound(new { message = "Company not found." });
+        }
+        else
+        {
+            if (user.BusinessId == null) return NotFound(new { message = "User has no company (BusinessId)." });
+            await EnsureCompanyExistsForBusinessIdAsync(user.BusinessId, cancellationToken);
+            company = await _companyRepository.GetByBusinessIdAsync(user.BusinessId, cancellationToken);
+            if (company == null) return NotFound(new { message = "Company not found for your BusinessId." });
+        }
+
+        return Ok(ParseRulesFromCompany(company));
+    }
+
+    /// <summary>Replace booking field rules. Company Admin or SuperAdmin (with companyId).</summary>
+    [HttpPut("booking-field-rules")]
+    [Authorize(Roles = $"{RoleNames.Admin},{RoleNames.SuperAdmin}")]
+    public async Task<ActionResult<BookingFieldRulesResponse>> PutBookingFieldRules(
+        [FromBody] BookingFieldRulesResponse? body,
+        [FromQuery] Guid? companyId,
+        CancellationToken cancellationToken)
+    {
+        if (body == null)
+            return BadRequest(new { message = "Body is required." });
+
+        var validationError = ValidateBookingFieldRulesBody(body);
+        if (validationError != null)
+            return BadRequest(new { message = validationError });
+
+        var userId = UserId;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return Unauthorized();
+
+        var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
+        Guid targetCompanyGuid;
+        if (isSuperAdmin)
+        {
+            if (!companyId.HasValue)
+                return BadRequest(new { message = "companyId is required for SuperAdmin." });
+            targetCompanyGuid = companyId.Value;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(user.BusinessId))
+                return BadRequest(new { message = "User has no company (BusinessId)." });
+            await EnsureCompanyExistsForBusinessIdAsync(user.BusinessId, cancellationToken);
+            var c = await _companyRepository.GetByBusinessIdAsync(user.BusinessId, cancellationToken);
+            if (c == null) return BadRequest(new { message = "Company not found." });
+            targetCompanyGuid = c.Id;
+        }
+
+        var tracked = await _companyRepository.GetByIdForUpdateAsync(targetCompanyGuid, cancellationToken);
+        if (tracked == null) return NotFound(new { message = "Company not found." });
+
+        tracked.Configurations ??= new CompanyConfiguration();
+        tracked.Configurations.BookingFieldRulesJson = JsonSerializer.Serialize(NormalizeRulesForStorage(body));
+        await _companyRepository.UpdateAsync(tracked, cancellationToken);
+
+        return Ok(ParseRulesFromCompany(tracked));
+    }
+
+    private static BookingFieldRulesResponse ParseRulesFromCompany(Company company)
+    {
+        var json = company.Configurations?.BookingFieldRulesJson;
+        if (string.IsNullOrWhiteSpace(json))
+            return new BookingFieldRulesResponse { Version = 1, Sections = new Dictionary<string, string>(), Fields = new Dictionary<string, string>() };
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<BookingFieldRulesResponse>(json);
+            if (parsed == null)
+                return new BookingFieldRulesResponse { Version = 1, Sections = new Dictionary<string, string>(), Fields = new Dictionary<string, string>() };
+            return NormalizeRulesForStorage(parsed);
+        }
+        catch
+        {
+            return new BookingFieldRulesResponse { Version = 1, Sections = new Dictionary<string, string>(), Fields = new Dictionary<string, string>() };
+        }
+    }
+
+    private static BookingFieldRulesResponse NormalizeRulesForStorage(BookingFieldRulesResponse body)
+    {
+        static Dictionary<string, string> NormDict(Dictionary<string, string>? d)
+        {
+            var o = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (d == null) return o;
+            foreach (var kv in d)
+            {
+                var k = (kv.Key ?? "").Trim();
+                if (k.Length == 0) continue;
+                var v = (kv.Value ?? "").Trim().ToLowerInvariant();
+                if (v != "mandatory" && v != "optional") v = "optional";
+                o[k] = v;
+            }
+            return o;
+        }
+
+        return new BookingFieldRulesResponse
+        {
+            Version = body.Version <= 0 ? 1 : body.Version,
+            Sections = NormDict(body.Sections),
+            Fields = NormDict(body.Fields)
+        };
+    }
+
+    private static string? ValidateBookingFieldRulesBody(BookingFieldRulesResponse body)
+    {
+        if (body.Version > 1)
+            return "version must be 1.";
+        foreach (var kv in body.Sections ?? new Dictionary<string, string>())
+        {
+            var v = (kv.Value ?? "").Trim().ToLowerInvariant();
+            if (v != "mandatory" && v != "optional" && v.Length > 0)
+                return $"Invalid section value for '{kv.Key}'. Use mandatory or optional.";
+        }
+        foreach (var kv in body.Fields ?? new Dictionary<string, string>())
+        {
+            var v = (kv.Value ?? "").Trim().ToLowerInvariant();
+            if (v != "mandatory" && v != "optional" && v.Length > 0)
+                return $"Invalid field value for '{kv.Key}'. Use mandatory or optional.";
+        }
+        return null;
+    }
+
     private static CourierContractDto ToCourierContractDto(AgreementNumber a) =>
         new()
         {
@@ -331,6 +471,14 @@ public sealed class CourierContractMutationItem
     public string? CourierId { get; set; }
     public string? ContractId { get; set; }
     public string? Service { get; set; }
+}
+
+/// <summary>Portal booking form mandatory/optional rules (mirrors portal JSON contract).</summary>
+public sealed class BookingFieldRulesResponse
+{
+    public int Version { get; set; } = 1;
+    public Dictionary<string, string> Sections { get; set; } = new();
+    public Dictionary<string, string> Fields { get; set; } = new();
 }
 
 public class AddressEntryDto

@@ -133,4 +133,29 @@ public class CompanyRepositoryTestDbTests : IDisposable
         Assert.NotNull(withAgreements);
         Assert.Equal(2, withAgreements.AgreementNumbers.Count);
     }
+
+    [Fact]
+    public async Task UpdateAsync_PersistsBookingFieldRulesJson()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var company = new CompanyEntity
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = "rules-1",
+            Name = "Rules Co",
+            BusinessId = "2222222-2"
+        };
+        await repo.CreateAsync(company, default);
+        var tracked = await repo.GetByIdForUpdateAsync(company.Id, default);
+        Assert.NotNull(tracked);
+        tracked.Configurations ??= new CompanyConfiguration();
+        tracked.Configurations.BookingFieldRulesJson = """{"version":1,"sections":{"shipper":"mandatory"},"fields":{}}""";
+        await repo.UpdateAsync(tracked, default);
+
+        var loaded = await repo.GetByIdAsync(company.Id, default);
+        Assert.NotNull(loaded);
+        Assert.NotNull(loaded.Configurations?.BookingFieldRulesJson);
+        Assert.Contains("shipper", loaded.Configurations.BookingFieldRulesJson, StringComparison.Ordinal);
+    }
 }

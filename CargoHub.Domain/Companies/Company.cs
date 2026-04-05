@@ -158,5 +158,8 @@ public class CompanyConfiguration
     public string? FreightPayer { get; set; }
     public string? Service { get; set; }
     public string? PhoneNumber { get; set; }
+
+    /// <summary>JSON document for portal booking form mandatory/optional rules per section and field.</summary>
+    public string? BookingFieldRulesJson { get; set; }
 }
 
