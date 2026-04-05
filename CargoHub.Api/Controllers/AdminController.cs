@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CargoHub.Application.AdminCompanies;
+using CargoHub.Application.AdminEmail;
 using CargoHub.Application.Auth;
 using CargoHub.Application.Billing.Admin;
 using CargoHub.Application.Billing.AdminInvoicing;
@@ -27,19 +28,22 @@ public class AdminController : ControllerBase
     private readonly ICompanyUserMetrics _companyUserMetrics;
     private readonly AdminCompanyUserPolicy _companyUserPolicy;
     private readonly IMediator _mediator;
+    private readonly IAdminReleaseNotesBroadcaster _releaseNotesBroadcaster;
 
     public AdminController(
         UserManager<ApplicationUser> userManager,
         ICompanyRepository companyRepository,
         ICompanyUserMetrics companyUserMetrics,
         AdminCompanyUserPolicy companyUserPolicy,
-        IMediator mediator)
+        IMediator mediator,
+        IAdminReleaseNotesBroadcaster releaseNotesBroadcaster)
     {
         _userManager = userManager;
         _companyRepository = companyRepository;
         _companyUserMetrics = companyUserMetrics;
         _companyUserPolicy = companyUserPolicy;
         _mediator = mediator;
+        _releaseNotesBroadcaster = releaseNotesBroadcaster;
     }
 
     /// <summary>
@@ -219,6 +223,30 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Broadcast release notes to users filtered by company and role (Super Admin only).</summary>
+    [HttpPost("email/release-notes")]
+    public async Task<ActionResult> SendReleaseNotes([FromBody] ReleaseNotesEmailRequest body, CancellationToken cancellationToken)
+    {
+        var req = new ReleaseNotesBroadcastRequest
+        {
+            Subject = body.Subject ?? "",
+            BodyPlain = body.Body ?? "",
+            AllCompanies = body.AllCompanies,
+            CompanyIds = body.CompanyIds,
+            AllRoles = body.AllRoles,
+            Roles = body.Roles,
+        };
+        var (result, err) = await _releaseNotesBroadcaster.TryBroadcastAsync(req, cancellationToken);
+        if (err != null || result == null)
+            return BadRequest(new { message = err ?? "Broadcast failed." });
+        return Ok(new
+        {
+            recipientCount = result.RecipientCount,
+            sentCount = result.SentCount,
+            failures = result.Failures.Select(f => new { email = f.Email, message = f.Message }).ToList(),
+        });
+    }
+
     /// <summary>Send a simple HTML message to verify SMTP (Super Admin only).</summary>
     [HttpPost("email/test")]
     public async Task<ActionResult> SendTestEmail([FromBody] TestEmailRequest body, [FromServices] IEmailSender emailSender, CancellationToken cancellationToken)
@@ -276,6 +304,16 @@ public class AdminController : ControllerBase
         public string? InitialAdminEmail { get; set; }
         public List<string>? InitialAdminEmails { get; set; }
         public Guid? SubscriptionPlanId { get; set; }
+    }
+
+    public sealed class ReleaseNotesEmailRequest
+    {
+        public string? Subject { get; set; }
+        public string? Body { get; set; }
+        public bool AllCompanies { get; set; }
+        public List<Guid>? CompanyIds { get; set; }
+        public bool AllRoles { get; set; }
+        public List<string>? Roles { get; set; }
     }
 
     public sealed class TestEmailRequest
