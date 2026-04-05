@@ -8,6 +8,21 @@ export type ThemeSlice = {
 };
 
 /**
+ * `shadow` axis pointers are drawn as a full-band rect; ECharts often stacks them above bar
+ * geometry, which hides bars on hover. A thin line shows the active category without covering bars.
+ */
+function barTooltipAxisPointer(theme: ThemeSlice) {
+  return {
+    type: "line" as const,
+    lineStyle: {
+      color: theme.border,
+      width: 1.5,
+      opacity: 0.65,
+    },
+  };
+}
+
+/**
  * Period comparison: vertical bars, one color per category.
  */
 export function buildPeriodBarOption(
@@ -21,8 +36,7 @@ export function buildPeriodBarOption(
     grid: { left: 8, right: 8, top: 8, bottom: 8, containLabel: true },
     tooltip: {
       trigger: "axis",
-      // Shadow default z is above series and hides bars; keep highlight behind bars.
-      axisPointer: { type: "shadow", z: 0 },
+      axisPointer: barTooltipAxisPointer(theme),
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
@@ -119,7 +133,7 @@ export function buildLast7DaysGroupedBarOption(
     },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow", z: 0 },
+      axisPointer: barTooltipAxisPointer(theme),
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
@@ -242,7 +256,7 @@ export function buildCityBarOption(
     grid: { left: 4, right: 8, top: 4, bottom: 4, containLabel: true },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "shadow", z: 0 },
+      axisPointer: barTooltipAxisPointer(theme),
       backgroundColor: theme.card,
       borderColor: theme.border,
       borderWidth: 1,
