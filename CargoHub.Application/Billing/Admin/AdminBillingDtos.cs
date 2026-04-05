@@ -82,6 +82,13 @@ public sealed class BillingInvoicePdfModel
     public string? BusinessId { get; init; }
     public int YearUtc { get; init; }
     public int MonthUtc { get; init; }
+
+    /// <summary>Inclusive UTC start of the invoice window (matches SA date-range picker).</summary>
+    public DateTime InvoiceRangeStartUtc { get; init; }
+
+    /// <summary>Exclusive UTC end of the invoice window.</summary>
+    public DateTime InvoiceRangeEndExclusiveUtc { get; init; }
+
     public string Currency { get; init; } = "EUR";
     public string Status { get; init; } = "";
     public decimal PayableTotal { get; init; }

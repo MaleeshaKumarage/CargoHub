@@ -10,5 +10,9 @@ public interface IAdminBillingReader
 
     Task<BillingPeriodDetailDto?> GetBillingPeriodDetailAsync(Guid periodId, CancellationToken cancellationToken = default);
 
-    Task<BillingInvoicePdfModel?> GetInvoicePdfModelAsync(Guid periodId, CancellationToken cancellationToken = default);
+    Task<BillingInvoicePdfModel?> GetInvoicePdfModelAsync(
+        Guid periodId,
+        CancellationToken cancellationToken = default,
+        DateTime? invoiceRangeStartUtc = null,
+        DateTime? invoiceRangeEndExclusiveUtc = null);
 }

@@ -1042,9 +1042,17 @@ export async function adminGetBillingPeriodDetail(token: string, periodId: strin
   };
 }
 
-export async function adminDownloadBillingPeriodInvoicePdf(token: string, periodId: string): Promise<Blob> {
+export async function adminDownloadBillingPeriodInvoicePdf(
+  token: string,
+  periodId: string,
+  opts?: { from?: string; to?: string },
+): Promise<Blob> {
+  const q = new URLSearchParams();
+  if (opts?.from) q.set('from', opts.from);
+  if (opts?.to) q.set('to', opts.to);
+  const qs = q.toString();
   const res = await fetch(
-    `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/invoice.pdf`,
+    `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/invoice.pdf${qs ? `?${qs}` : ''}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) {
@@ -1058,14 +1066,18 @@ export async function adminDownloadBillingPeriodInvoicePdf(token: string, period
 export async function adminSendBillingPeriodInvoiceEmail(
   token: string,
   periodId: string,
-  recipientAdminUserId: string
+  recipientAdminUserId: string,
+  opts?: { from?: string; to?: string },
 ): Promise<void> {
+  const body: Record<string, string | undefined> = { recipientAdminUserId };
+  if (opts?.from) body.from = opts.from;
+  if (opts?.to) body.to = opts.to;
   const res = await fetch(
     `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/send-invoice-email`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ recipientAdminUserId }),
+      body: JSON.stringify(body),
     }
   );
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;

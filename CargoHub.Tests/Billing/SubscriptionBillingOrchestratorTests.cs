@@ -188,6 +188,35 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task ConfirmDraftWithBillingAsync_ReturnsFalse_WhenBookingMissing()
+    {
+        using var ctx = _fixture.CreateContext();
+        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var ok = await orch.ConfirmDraftWithBillingAsync(Guid.NewGuid(), "any-customer", default);
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task ConfirmDraftWithBillingAsync_ReturnsFalse_WhenCustomerIdMismatch()
+    {
+        using var ctx = _fixture.CreateContext();
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            Name = "Co",
+            BusinessId = "biz-mis",
+            CompanyId = companyId.ToString("N"),
+        });
+        var id = Guid.NewGuid();
+        ctx.Bookings.Add(MinimalBooking(id, "expected-cust", companyId, isDraft: true));
+        await ctx.SaveChangesAsync();
+        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var ok = await orch.ConfirmDraftWithBillingAsync(id, "other-cust", default);
+        Assert.False(ok);
+    }
+
+    [Fact]
     public async Task ConfirmDraftWithBillingAsync_ReturnsFalse_WhenNotDraft()
     {
         using var ctx = _fixture.CreateContext();
@@ -230,6 +259,13 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var b = await ctx.Bookings.AsNoTracking().FirstAsync(x => x.Id == id);
         Assert.False(b.IsDraft);
         Assert.NotNull(b.FirstBillableAtUtc);
+    }
+
+    [Fact]
+    public async Task PostBillingForNewCompletedBookingAsync_NoOp_WhenBookingIdUnknown()
+    {
+        using var ctx = _fixture.CreateContext();
+        await new SubscriptionBillingOrchestrator(ctx).PostBillingForNewCompletedBookingAsync(Guid.NewGuid(), default);
     }
 
     [Fact]

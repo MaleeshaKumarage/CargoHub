@@ -54,6 +54,8 @@ import {
   bookingsImportConfirm,
   bookingsWaybillsBulkDownload,
   bookingsExportDownload,
+  getBookingFieldRules,
+  putBookingFieldRules,
   type RegisterBody,
 } from "./api";
 
@@ -1092,6 +1094,44 @@ describe("api", () => {
         expect.any(Object)
       );
     });
+    it("appends from and to query when provided", async () => {
+      const blob = new Blob([new Uint8Array([1])], { type: "application/pdf" });
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        blob: async () => blob,
+      });
+      const { adminDownloadBillingPeriodInvoicePdf } = await import("@/lib/api");
+      await adminDownloadBillingPeriodInvoicePdf("token", "per1", { from: "2026-04-01", to: "2026-04-15" });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/billing-periods\/per1\/invoice\.pdf\?from=2026-04-01&to=2026-04-15$/),
+        expect.any(Object)
+      );
+    });
+
+    it("appends only from when to omitted", async () => {
+      const blob = new Blob([new Uint8Array([1])], { type: "application/pdf" });
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        blob: async () => blob,
+      });
+      const { adminDownloadBillingPeriodInvoicePdf } = await import("@/lib/api");
+      await adminDownloadBillingPeriodInvoicePdf("token", "per1", { from: "2026-04-01" });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/billing-periods\/per1\/invoice\.pdf\?from=2026-04-01$/),
+        expect.any(Object)
+      );
+    });
+
+    it("throws when PDF response not ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ message: "No access" }),
+      });
+      const { adminDownloadBillingPeriodInvoicePdf } = await import("@/lib/api");
+      await expect(adminDownloadBillingPeriodInvoicePdf("token", "per1")).rejects.toThrow("No access");
+    });
   });
 
   describe("adminSendBillingPeriodInvoiceEmail", () => {
@@ -1107,6 +1147,35 @@ describe("api", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
+    it("includes from and to in body when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true }),
+      });
+      const { adminSendBillingPeriodInvoiceEmail } = await import("@/lib/api");
+      await adminSendBillingPeriodInvoiceEmail("token", "per1", "u1", {
+        from: "2026-04-01",
+        to: "2026-04-15",
+      });
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const init = call[1] as RequestInit;
+      expect(JSON.parse(init.body as string)).toEqual({
+        recipientAdminUserId: "u1",
+        from: "2026-04-01",
+        to: "2026-04-15",
+      });
+    });
+
+    it("throws using PascalCase Message on failure", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad",
+        json: async () => ({ Message: "Not ready" }),
+      });
+      const { adminSendBillingPeriodInvoiceEmail } = await import("@/lib/api");
+      await expect(adminSendBillingPeriodInvoiceEmail("token", "per1", "u1")).rejects.toThrow("Not ready");
+    });
   });
 
   describe("adminPatchBillingLineItem", () => {
@@ -1118,6 +1187,39 @@ describe("api", () => {
         expect.stringContaining("/billing-line-items/line1"),
         expect.objectContaining({ method: "PATCH" })
       );
+    });
+
+    it("throws using message from error body", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Req",
+        json: async () => ({ message: "Line gone" }),
+      });
+      const { adminPatchBillingLineItem } = await import("@/lib/api");
+      await expect(adminPatchBillingLineItem("t", "x", false)).rejects.toThrow("Line gone");
+    });
+
+    it("throws using PascalCase Message when message missing", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad",
+        json: async () => ({ Message: "From server" }),
+      });
+      const { adminPatchBillingLineItem } = await import("@/lib/api");
+      await expect(adminPatchBillingLineItem("t", "x", false)).rejects.toThrow("From server");
+    });
+
+    it("throws using status text when JSON empty", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: "Bad Gateway",
+        json: async () => ({}),
+      });
+      const { adminPatchBillingLineItem } = await import("@/lib/api");
+      await expect(adminPatchBillingLineItem("t", "x", false)).rejects.toThrow("Bad Gateway");
     });
   });
 
@@ -1924,6 +2026,184 @@ describe("api", () => {
         json: async () => ({ message: "no rows" }),
       });
       await expect(bookingsExportDownload("tok", "xlsx")).rejects.toThrow("no rows");
+    });
+  });
+
+  describe("admin platform earnings", () => {
+    it("monthly maps PascalCase and passes months query", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ YearUtc: 2025, MonthUtc: 3, TotalEur: 1.5 }],
+      });
+      const r = await adminGetPlatformEarningsMonthly("tok", 12);
+      expect(r).toEqual([{ yearUtc: 2025, monthUtc: 3, totalEur: 1.5 }]);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/dashboard/earnings/monthly?months=12"),
+        expect.objectContaining({ headers: { Authorization: "Bearer tok" } }),
+      );
+    });
+
+    it("monthly returns empty when response is not an array", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ x: 1 }),
+      });
+      const r = await adminGetPlatformEarningsMonthly("tok");
+      expect(r).toEqual([]);
+    });
+
+    it("monthly throws with message from error body", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "forbidden" }),
+      });
+      await expect(adminGetPlatformEarningsMonthly("tok")).rejects.toThrow("forbidden");
+    });
+
+    it("by company maps fields and query params", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { CompanyId: "a1", CompanyName: "Acme", AmountEur: 42 },
+        ],
+      });
+      const r = await adminGetPlatformEarningsByCompany("tok", 2024, 7);
+      expect(r).toEqual([{ companyId: "a1", companyName: "Acme", amountEur: 42 }]);
+      const url = String((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] ?? "");
+      expect(url).toContain("yearUtc=2024");
+      expect(url).toContain("monthUtc=7");
+    });
+
+    it("by subscription maps plan fields", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { PlanId: "p1", PlanName: "Pro", AmountEur: 10, Percent: 50.5 },
+        ],
+      });
+      const r = await adminGetPlatformEarningsBySubscription("tok", 2023, 5);
+      expect(r[0].planId).toBe("p1");
+      expect(r[0].percent).toBe(50.5);
+    });
+  });
+
+  describe("booking field rules", () => {
+    it("get without companyId", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ version: 1, sections: {}, fields: {} }),
+      });
+      await getBookingFieldRules("tok");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/company\/booking-field-rules$/),
+        expect.objectContaining({ headers: { Authorization: "Bearer tok" } }),
+      );
+    });
+
+    it("get appends companyId when provided", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ version: 2, sections: { s: "x" }, fields: {} }),
+      });
+      const r = await getBookingFieldRules("tok", "co-1");
+      expect(r.version).toBe(2);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("companyId=co-1"), expect.any(Object));
+    });
+
+    it("put sends body and optional company query", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ version: 1, sections: { a: "m" }, fields: { f: "o" } }),
+      });
+      const body = { version: 1, sections: { a: "m" }, fields: { f: "o" } };
+      const r = await putBookingFieldRules("tok", body, "cid");
+      expect(r.fields.f).toBe("o");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("companyId=cid"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(body),
+        }),
+      );
+    });
+
+    it("put throws on failure", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: "bad" }),
+      });
+      await expect(
+        putBookingFieldRules("tok", { version: 1, sections: {}, fields: {} }),
+      ).rejects.toThrow("bad");
+    });
+  });
+
+  describe("adminGetSubscriptionPlanDetail normalization branches", () => {
+    it("handles missing tiers array and null numeric fields on periods", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "p1",
+          name: "P",
+          kind: "TieredPayPerBooking",
+          chargeTimeAnchor: "FirstBillableAtUtc",
+          trialBookingAllowance: "",
+          currency: "SEK",
+          isActive: false,
+          pricingPeriods: [
+            {
+              id: "pp1",
+              effectiveFromUtc: "2020-01-01T00:00:00Z",
+              tiers: null,
+            },
+          ],
+        }),
+      });
+      const { adminGetSubscriptionPlanDetail } = await import("@/lib/api");
+      const d = await adminGetSubscriptionPlanDetail("tok", "p1");
+      expect(d.pricingPeriods[0].tiers).toEqual([]);
+      expect(d.pricingPeriods[0].chargePerBooking).toBeNull();
+      expect(d.trialBookingAllowance).toBeNull();
+    });
+
+    it("normalizes tier with only monthly fee set", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "p2",
+          name: "P",
+          kind: "TieredMonthlyByUsage",
+          chargeTimeAnchor: "FirstBillableAtUtc",
+          currency: "EUR",
+          isActive: true,
+          pricingPeriods: [
+            {
+              id: "pp1",
+              effectiveFromUtc: "2020-01-01T00:00:00Z",
+              monthlyFee: 99,
+              includedBookingsPerMonth: 10,
+              overageChargePerBooking: 1.5,
+              tiers: [
+                {
+                  id: "t1",
+                  ordinal: 2,
+                  inclusiveMaxBookingsInPeriod: null,
+                  monthlyFee: 40,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      const { adminGetSubscriptionPlanDetail } = await import("@/lib/api");
+      const d = await adminGetSubscriptionPlanDetail("tok", "p2");
+      const tier = d.pricingPeriods[0].tiers[0];
+      expect(tier.inclusiveMaxBookingsInPeriod).toBeNull();
+      expect(tier.monthlyFee).toBe(40);
+      expect(tier.chargePerBooking).toBeNull();
+      expect(d.pricingPeriods[0].monthlyFee).toBe(99);
+      expect(d.pricingPeriods[0].includedBookingsPerMonth).toBe(10);
+      expect(d.pricingPeriods[0].overageChargePerBooking).toBe(1.5);
     });
   });
 });

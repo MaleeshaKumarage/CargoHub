@@ -36,12 +36,18 @@ public sealed class AdminBillingInvoiceOperations : IAdminBillingInvoiceOperatio
         Guid periodId,
         string recipientAdminUserId,
         string sentBySuperAdminUserId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateTime? invoiceRangeStartUtc = null,
+        DateTime? invoiceRangeEndExclusiveUtc = null)
     {
         if (string.IsNullOrWhiteSpace(recipientAdminUserId))
             return SendInvoiceEmailResult.Fail("RecipientRequired", "Recipient admin user id is required.");
 
-        var model = await _billingReader.GetInvoicePdfModelAsync(periodId, cancellationToken);
+        var model = await _billingReader.GetInvoicePdfModelAsync(
+            periodId,
+            cancellationToken,
+            invoiceRangeStartUtc,
+            invoiceRangeEndExclusiveUtc);
         if (model == null)
             return SendInvoiceEmailResult.Fail("NotFound", "Billing period not found.");
 
@@ -77,17 +83,29 @@ public sealed class AdminBillingInvoiceOperations : IAdminBillingInvoiceOperatio
             return SendInvoiceEmailResult.Fail("RecipientNoEmail", "Recipient has no email address.");
 
         var pdf = _pdfGenerator.GeneratePdf(model);
-        var fileName = $"invoice-{model.YearUtc}-{model.MonthUtc:00}.pdf";
-        var periodLabel = $"{model.YearUtc}-{model.MonthUtc:00} (UTC)";
+        var fileName = BillingInvoicePeriodLabel.FileNameStem(model.InvoiceRangeStartUtc, model.InvoiceRangeEndExclusiveUtc) + ".pdf";
+        var periodLabel = BillingInvoicePeriodLabel.FormatUtcInclusiveRange(
+            model.InvoiceRangeStartUtc,
+            model.InvoiceRangeEndExclusiveUtc);
         var subject = $"Invoice {periodLabel} — {model.CompanyName}";
+        var enc = (string s) => System.Net.WebUtility.HtmlEncode(s);
         var html =
             "<p>Hello,</p>" +
-            $"<p>Please find attached the invoice for <strong>{System.Net.WebUtility.HtmlEncode(model.CompanyName)}</strong>.</p>" +
-            $"<p>Billing period: <strong>{System.Net.WebUtility.HtmlEncode(periodLabel)}</strong>.</p>" +
-            $"<p>Amount due (invoice): <strong>{model.PayableTotal:N2} {model.Currency}</strong><br/>" +
-            $"Ledger total (all posted lines): <strong>{model.LedgerTotal:N2} {model.Currency}</strong></p>" +
-            "<p>The PDF includes segment summaries, per-booking rows, and detailed line items.</p>" +
+            $"<p><strong>Invoice date range (UTC):</strong> {enc(periodLabel)}</p>" +
+            $"<p>Please find attached the invoice for <strong>{enc(model.CompanyName)}</strong> for the date range above.</p>" +
+            $"<p>Amount due (invoice): <strong>{model.PayableTotal:N2} {enc(model.Currency)}</strong><br/>" +
+            $"Ledger total (all posted lines): <strong>{model.LedgerTotal:N2} {enc(model.Currency)}</strong></p>" +
+            "<p>The PDF attachment uses the same date range and includes segment summaries, per-booking rows, and detailed line items.</p>" +
             "<p>Regards</p>";
+
+        var plainText =
+            "Hello,\r\n\r\n" +
+            $"Invoice date range (UTC): {periodLabel}\r\n\r\n" +
+            $"Please find attached the invoice PDF for {model.CompanyName} for the date range above.\r\n\r\n" +
+            $"Amount due (invoice): {model.PayableTotal:N2} {model.Currency}\r\n" +
+            $"Ledger total (all posted lines): {model.LedgerTotal:N2} {model.Currency}\r\n\r\n" +
+            "The PDF uses the same date range and includes segment summaries, per-booking rows, and line items.\r\n\r\n" +
+            "Regards";
 
         await _emailSender.SendAsync(
             email,
@@ -102,7 +120,8 @@ public sealed class AdminBillingInvoiceOperations : IAdminBillingInvoiceOperatio
                     Content = pdf
                 }
             },
-            cancellationToken);
+            cancellationToken,
+            plainText);
 
         _db.SubscriptionInvoiceSends.Add(new SubscriptionInvoiceSend
         {

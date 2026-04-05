@@ -10,9 +10,6 @@ public sealed class AdminPlatformEarningsReader : IAdminPlatformEarningsReader
 
     public AdminPlatformEarningsReader(ApplicationDbContext db) => _db = db;
 
-    private static bool IsEur(string? currency) =>
-        string.Equals(currency, "EUR", StringComparison.OrdinalIgnoreCase);
-
     public async Task<IReadOnlyList<PlatformEarningsMonthDto>> GetMonthlyTotalsAsync(
         int months,
         CancellationToken cancellationToken = default)
@@ -25,7 +22,7 @@ public sealed class AdminPlatformEarningsReader : IAdminPlatformEarningsReader
         var aggregated = await (
             from l in _db.BillingLineItems.AsNoTracking()
             join p in _db.CompanyBillingPeriods.AsNoTracking() on l.CompanyBillingPeriodId equals p.Id
-            where !l.ExcludedFromInvoice && IsEur(l.Currency)
+            where !l.ExcludedFromInvoice && l.Currency.ToUpper() == "EUR"
             group l by new { p.YearUtc, p.MonthUtc } into g
             select new { g.Key.YearUtc, g.Key.MonthUtc, Total = g.Sum(x => x.Amount) }
         ).ToListAsync(cancellationToken);
@@ -53,7 +50,7 @@ public sealed class AdminPlatformEarningsReader : IAdminPlatformEarningsReader
             join p in _db.CompanyBillingPeriods.AsNoTracking() on l.CompanyBillingPeriodId equals p.Id
             join c in _db.Companies.AsNoTracking() on p.CompanyId equals c.Id
             where !l.ExcludedFromInvoice
-                  && IsEur(l.Currency)
+                  && l.Currency.ToUpper() == "EUR"
                   && p.YearUtc == yearUtc
                   && p.MonthUtc == monthUtc
             group l by new { p.CompanyId, c.Name } into g
@@ -77,7 +74,7 @@ public sealed class AdminPlatformEarningsReader : IAdminPlatformEarningsReader
             from l in _db.BillingLineItems.AsNoTracking()
             join p in _db.CompanyBillingPeriods.AsNoTracking() on l.CompanyBillingPeriodId equals p.Id
             where !l.ExcludedFromInvoice
-                  && IsEur(l.Currency)
+                  && l.Currency.ToUpper() == "EUR"
                   && p.YearUtc == yearUtc
                   && p.MonthUtc == monthUtc
             group l by l.SubscriptionPlanId into g

@@ -5,7 +5,9 @@ namespace CargoHub.Application.Billing.AdminInvoicing;
 public sealed record SendBillingPeriodInvoiceEmailCommand(
     Guid PeriodId,
     string RecipientAdminUserId,
-    string SuperAdminUserId) : IRequest<SendInvoiceEmailResult>;
+    string SuperAdminUserId,
+    DateTime? InvoiceRangeStartUtc = null,
+    DateTime? InvoiceRangeEndExclusiveUtc = null) : IRequest<SendInvoiceEmailResult>;
 
 public sealed class SendInvoiceEmailResult
 {

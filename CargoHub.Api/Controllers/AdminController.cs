@@ -189,14 +189,34 @@ public class AdminController : ControllerBase
     [HttpGet("billing-periods/{periodId:guid}/invoice.pdf")]
     public async Task<IActionResult> DownloadBillingInvoicePdf(
         Guid periodId,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
         [FromServices] IBillingInvoicePdfGenerator pdfGenerator,
         CancellationToken cancellationToken)
     {
-        var model = await _mediator.Send(new GetBillingInvoicePdfModelQuery(periodId), cancellationToken);
+        DateTime? rangeStart = null;
+        DateTime? rangeEndExclusive = null;
+        if (!string.IsNullOrWhiteSpace(from) || !string.IsNullOrWhiteSpace(to))
+        {
+            if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
+                return BadRequest(new { message = "Provide both from and to (yyyy-MM-dd, UTC) or omit both for the full period month." });
+            if (!DateOnly.TryParse(from, CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromDay) ||
+                !DateOnly.TryParse(to, CultureInfo.InvariantCulture, DateTimeStyles.None, out var toDay))
+                return BadRequest(new { message = "Invalid from or to; use yyyy-MM-dd." });
+            if (fromDay > toDay)
+                return BadRequest(new { message = "End date must be on or after start date." });
+            rangeStart = fromDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            rangeEndExclusive = toDay.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        }
+
+        var model = await _mediator.Send(
+            new GetBillingInvoicePdfModelQuery(periodId, rangeStart, rangeEndExclusive),
+            cancellationToken);
         if (model == null)
-            return NotFound(new { message = "Billing period not found." });
+            return NotFound(new { message = "Billing period not found or date range is outside this period." });
         var bytes = pdfGenerator.GeneratePdf(model);
-        return File(bytes, "application/pdf", $"invoice-{model.YearUtc}-{model.MonthUtc:00}.pdf");
+        var fileName = BillingInvoicePeriodLabel.FileNameStem(model.InvoiceRangeStartUtc, model.InvoiceRangeEndExclusiveUtc) + ".pdf";
+        return File(bytes, "application/pdf", fileName);
     }
 
     /// <summary>Platform payable totals per UTC month (EUR line items only, excludes invoice-excluded lines).</summary>
@@ -242,9 +262,24 @@ public class AdminController : ControllerBase
         [FromBody] SendInvoiceEmailRequest body,
         CancellationToken cancellationToken)
     {
+        DateTime? rangeStart = null;
+        DateTime? rangeEndExclusive = null;
+        if (!string.IsNullOrWhiteSpace(body.From) || !string.IsNullOrWhiteSpace(body.To))
+        {
+            if (string.IsNullOrWhiteSpace(body.From) || string.IsNullOrWhiteSpace(body.To))
+                return BadRequest(new { message = "Provide both from and to (yyyy-MM-dd, UTC) or omit both for the full period month." });
+            if (!DateOnly.TryParse(body.From, CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromDay) ||
+                !DateOnly.TryParse(body.To, CultureInfo.InvariantCulture, DateTimeStyles.None, out var toDay))
+                return BadRequest(new { message = "Invalid from or to; use yyyy-MM-dd." });
+            if (fromDay > toDay)
+                return BadRequest(new { message = "End date must be on or after start date." });
+            rangeStart = fromDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            rangeEndExclusive = toDay.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        }
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
         var result = await _mediator.Send(
-            new SendBillingPeriodInvoiceEmailCommand(periodId, body.RecipientAdminUserId ?? "", userId),
+            new SendBillingPeriodInvoiceEmailCommand(periodId, body.RecipientAdminUserId ?? "", userId, rangeStart, rangeEndExclusive),
             cancellationToken);
         if (!result.Success)
             return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
@@ -516,6 +551,11 @@ public class AdminController : ControllerBase
     public sealed class SendInvoiceEmailRequest
     {
         public string? RecipientAdminUserId { get; set; }
+
+        /// <summary>Optional UTC invoice window (yyyy-MM-dd). Both required when used; must fall inside the billing period month.</summary>
+        public string? From { get; set; }
+
+        public string? To { get; set; }
     }
 
     public sealed class PatchBillingLineItemRequest

@@ -184,6 +184,45 @@ describe("validationContextFromBookingDetail", () => {
     d.payer = { ...d.receiver! };
     expect(inferPayerSourceFromBookingDetail(d)).toBe("receiver");
   });
+
+  it("infers payer other when payer is set but differs from shipper and receiver", () => {
+    const d = minimalDetail();
+    d.payer = {
+      name: "Third",
+      address1: "P1",
+      postalCode: "99",
+      city: "X",
+      country: "SE",
+    };
+    expect(inferPayerSourceFromBookingDetail(d)).toBe("other");
+  });
+
+  it("builds default package slot when packages array is empty", () => {
+    const d = minimalDetail();
+    d.packages = [];
+    const ctx = validationContextFromBookingDetail(d, false);
+    expect(ctx.packages).toHaveLength(1);
+    expect(ctx.packages[0].packageType).toBe("");
+  });
+
+  it("maps package rows from detail", () => {
+    const d = minimalDetail();
+    d.packages = [
+      {
+        weight: "2",
+        volume: "",
+        packageType: "pallet",
+        description: "",
+        length: "",
+        width: "",
+        height: "",
+      },
+    ];
+    const ctx = validationContextFromBookingDetail(d, true);
+    expect(ctx.quickBooking).toBe(true);
+    expect(ctx.packages[0].weight).toBe("2");
+    expect(ctx.packages[0].packageType).toBe("pallet");
+  });
 });
 
 describe("applySectionRequirement", () => {
