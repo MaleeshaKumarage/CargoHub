@@ -180,6 +180,8 @@
     "title": "Åtgärder",
     "description": "Avtalsnummer, standardavsändare, adressbok och andra företagsrelaterade åtgärder.",
     "comingSoon": "Kommer snart när backend-endpoints är tillgängliga.",
+    "tabAddressBook": "Adressbok",
+    "tabManageBooking": "Hantera bokningssida",
     "addressBook": "Adressbok",
     "addressBookDescription": "Avsändare och mottagare per företag. Använd dessa när du skapar bokningar. Delas inte mellan företag.",
     "company": "Företag",

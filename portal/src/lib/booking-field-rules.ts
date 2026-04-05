@@ -70,9 +70,8 @@ function partyLabelKey(k: PartyFieldKey): string {
   return map[k];
 }
 
-/** All configurable fields in booking create form order (mirrors UI sections). */
+/** All configurable fields in booking create form order (mirrors UI sections). Courier is not configurable here. */
 export const BOOKING_RULE_FIELD_DEFINITIONS: BookingRuleFieldDef[] = [
-  { sectionId: "courier", fieldId: "courier.postalService", labelKey: "postalService" },
   ...partyDefs("shipper", "shipper"),
   ...partyDefs("receiver", "receiver"),
   ...partyDefs("payer", "payer"),
@@ -110,8 +109,8 @@ export const BOOKING_RULE_FIELD_DEFINITIONS: BookingRuleFieldDef[] = [
   { sectionId: "packages", fieldId: "package.height", labelKey: "height" },
 ];
 
+/** Sections shown in Actions → Manage booking (postal/courier is not included). */
 export const BOOKING_RULE_SECTION_ORDER: BookingSectionId[] = [
-  "courier",
   "shipper",
   "receiver",
   "payer",
@@ -152,6 +151,8 @@ export function parseBookingFieldRulesFromApi(data: unknown): BookingFieldRules 
       if (k.trim()) fields[k.trim()] = normLevel(v != null ? String(v) : undefined);
     }
   }
+  delete sections.courier;
+  delete fields["courier.postalService"];
   return { version, sections, fields };
 }
 
@@ -221,10 +222,6 @@ export function validateBookingCreateForm(
 
   const req = (sectionId: BookingSectionId, fieldId: string) =>
     isFieldRequired(sectionId, fieldId, rules);
-
-  if (req("courier", "courier.postalService") && isEmpty(ctx.postalService)) {
-    errors["courier.postalService"] = requiredMessage;
-  }
 
   const checkParty = (sectionId: BookingSectionId, prefix: string, party: CreateBookingParty) => {
     for (const key of partyKeysVisible(ctx.quickBooking)) {
@@ -314,4 +311,20 @@ export function validateBookingCreateForm(
 
 export function defsForSection(sectionId: BookingSectionId): BookingRuleFieldDef[] {
   return BOOKING_RULE_FIELD_DEFINITIONS.filter((d) => d.sectionId === sectionId);
+}
+
+/** When a whole section is set to mandatory, every field in that section is set to mandatory in draft state. */
+export function applySectionRequirement(
+  prev: BookingFieldRules,
+  sectionId: BookingSectionId,
+  level: RequirementLevel
+): BookingFieldRules {
+  const sections = { ...prev.sections, [sectionId]: level };
+  const fields = { ...prev.fields };
+  if (level === "mandatory") {
+    for (const def of defsForSection(sectionId)) {
+      fields[def.fieldId] = "mandatory";
+    }
+  }
+  return { ...prev, sections, fields };
 }
