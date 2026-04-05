@@ -25,6 +25,7 @@ vi.mock("next-intl", () => ({
 vi.mock("@/lib/api", () => ({
   getMe: vi.fn().mockResolvedValue({ companyName: "Test Co", roles: [] }),
   getAddressBook: vi.fn(),
+  getBookingFieldRules: vi.fn().mockResolvedValue({ version: 1, sections: {}, fields: {} }),
   getCouriers: vi.fn(),
   bookingCreate: vi.fn(),
   draftCreate: vi.fn(),

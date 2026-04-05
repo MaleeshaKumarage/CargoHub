@@ -4,7 +4,24 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-import { getAddressBook, addSender, addReceiver, type AddressEntry, type AddressBookResponse } from "@/lib/api";
+import {
+  getAddressBook,
+  addSender,
+  addReceiver,
+  getBookingFieldRules,
+  putBookingFieldRules,
+  type AddressEntry,
+  type AddressBookResponse,
+} from "@/lib/api";
+import {
+  BOOKING_RULE_SECTION_ORDER,
+  type BookingFieldRules,
+  type BookingSectionId,
+  bookingFieldRulesToApiBody,
+  defaultBookingFieldRules,
+  defsForSection,
+  parseBookingFieldRulesFromApi,
+} from "@/lib/booking-field-rules";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +41,60 @@ const emptyEntry: AddressEntry = {
   customerNumber: "",
 };
 
+function sectionTitle(
+  sectionId: BookingSectionId,
+  tSections: (key: string) => string,
+  tFields: (key: string) => string
+): string {
+  switch (sectionId) {
+    case "courier":
+      return tFields("postalService");
+    case "shipper":
+      return tSections("shipper");
+    case "receiver":
+      return tSections("receiver");
+    case "payer":
+      return tSections("payer");
+    case "pickupAddress":
+      return tSections("pickupAddress");
+    case "deliveryPoint":
+      return tSections("deliveryPoint");
+    case "shipment":
+      return tSections("shipment");
+    case "shippingInfo":
+      return tSections("shippingInfo");
+    case "packages":
+      return tSections("packages");
+  }
+}
+
+function sectionDescription(sectionId: BookingSectionId, tSections: (key: string) => string): string {
+  switch (sectionId) {
+    case "courier":
+      return tSections("headerDescription");
+    case "shipper":
+      return tSections("shipperDescription");
+    case "receiver":
+      return tSections("receiverDescription");
+    case "payer":
+      return tSections("payerDescription");
+    case "pickupAddress":
+      return tSections("pickupAddressDescription");
+    case "deliveryPoint":
+      return tSections("deliveryPointDescription");
+    case "shipment":
+      return tSections("shipmentDescription");
+    case "shippingInfo":
+      return tSections("shippingInfoDescription");
+    case "packages":
+      return tSections("packagesDescription");
+  }
+}
+
 export default function ActionsPage() {
   const t = useTranslations("actions");
+  const tSections = useTranslations("bookings.sections");
+  const tFields = useTranslations("bookings.fields");
   const { token, user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [listResponse, setListResponse] = useState<{ addressBooks: AddressBookResponse[] } | null>(null);
@@ -36,9 +105,16 @@ export default function ActionsPage() {
   const [receiverForm, setReceiverForm] = useState<AddressEntry>(emptyEntry);
   const [addingSender, setAddingSender] = useState(false);
   const [addingReceiver, setAddingReceiver] = useState(false);
+  const [rulesDraft, setRulesDraft] = useState<BookingFieldRules>(() => defaultBookingFieldRules());
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [rulesSavedHint, setRulesSavedHint] = useState(false);
 
   const roles = user?.roles ?? [];
   const isSuperAdmin = Array.isArray(roles) && roles.includes("SuperAdmin");
+  const isAdmin = Array.isArray(roles) && roles.includes("Admin");
+  const canEditBookingRules = isAdmin || isSuperAdmin;
   const addressBooks = listResponse?.addressBooks ?? [];
   const selectedBook: AddressBookResponse | null =
     selectedCompanyId
@@ -63,6 +139,49 @@ export default function ActionsPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [token, isAuthenticated, isLoading, router, isSuperAdmin]);
+
+  useEffect(() => {
+    if (!token || !canEditBookingRules) return;
+    if (isSuperAdmin && !selectedCompanyId) return;
+    let cancelled = false;
+    setRulesLoading(true);
+    setRulesError(null);
+    getBookingFieldRules(token, isSuperAdmin ? selectedCompanyId : undefined)
+      .then((api) => {
+        if (!cancelled) setRulesDraft(parseBookingFieldRulesFromApi(api));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRulesError(t("rulesLoadFailed"));
+          setRulesDraft(defaultBookingFieldRules());
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRulesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, canEditBookingRules, isSuperAdmin, selectedCompanyId, t]);
+
+  async function handleSaveBookingRules() {
+    if (!token || !canEditBookingRules) return;
+    if (isSuperAdmin && !selectedCompanyId) return;
+    setRulesSaving(true);
+    setRulesError(null);
+    setRulesSavedHint(false);
+    try {
+      const body = bookingFieldRulesToApiBody(rulesDraft);
+      const updated = await putBookingFieldRules(token, body, isSuperAdmin ? selectedCompanyId : undefined);
+      setRulesDraft(parseBookingFieldRulesFromApi(updated));
+      setRulesSavedHint(true);
+      setTimeout(() => setRulesSavedHint(false), 4000);
+    } catch (e) {
+      setRulesError(e instanceof Error ? e.message : t("rulesLoadFailed"));
+    } finally {
+      setRulesSaving(false);
+    }
+  }
 
   function isDuplicateEntry(newEntry: AddressEntry, existingList: AddressEntry[]): boolean {
     return existingList.some((existing) => 
@@ -364,6 +483,95 @@ export default function ActionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {canEditBookingRules && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("bookingFieldRulesTitle")}</CardTitle>
+            <CardDescription>{t("bookingFieldRulesDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isSuperAdmin && !selectedCompanyId ? (
+              <p className="text-sm text-muted-foreground">{t("loading")}</p>
+            ) : rulesLoading ? (
+              <p className="text-sm text-muted-foreground">{t("loading")}</p>
+            ) : (
+              <>
+                {rulesError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {rulesError}
+                  </p>
+                )}
+                {rulesSavedHint && (
+                  <p className="text-sm text-muted-foreground" role="status">
+                    {t("rulesSaved")}
+                  </p>
+                )}
+                <div className="space-y-6">
+                  {BOOKING_RULE_SECTION_ORDER.map((sectionId) => (
+                    <div key={sectionId} className="rounded-lg border p-4 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="font-semibold text-sm">{sectionTitle(sectionId, tSections, tFields)}</h3>
+                          <p className="text-xs text-muted-foreground">{sectionDescription(sectionId, tSections)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="text-xs whitespace-nowrap">{t("sectionRequirement")}</Label>
+                          <select
+                            className="flex h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                            value={rulesDraft.sections[sectionId] ?? "optional"}
+                            onChange={(e) =>
+                              setRulesDraft((prev) => ({
+                                ...prev,
+                                sections: {
+                                  ...prev.sections,
+                                  [sectionId]: e.target.value as "mandatory" | "optional",
+                                },
+                              }))
+                            }
+                          >
+                            <option value="optional">{t("optional")}</option>
+                            <option value="mandatory">{t("mandatory")}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2 pl-0 sm:pl-1">
+                        {defsForSection(sectionId).map((def) => (
+                          <div
+                            key={def.fieldId}
+                            className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-border/60 pt-2 first:border-t-0 first:pt-0"
+                          >
+                            <Label className="text-sm font-normal">{tFields(def.labelKey as "name")}</Label>
+                            <select
+                              className="flex h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm sm:shrink-0"
+                              value={rulesDraft.fields[def.fieldId] ?? "optional"}
+                              onChange={(e) =>
+                                setRulesDraft((prev) => ({
+                                  ...prev,
+                                  fields: {
+                                    ...prev.fields,
+                                    [def.fieldId]: e.target.value as "mandatory" | "optional",
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="optional">{t("optional")}</option>
+                              <option value="mandatory">{t("mandatory")}</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button type="button" onClick={() => void handleSaveBookingRules()} disabled={rulesSaving}>
+                  {rulesSaving ? t("savingRules") : t("saveRules")}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

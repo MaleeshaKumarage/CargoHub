@@ -5,7 +5,27 @@ import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
-import { bookingCreate, draftCreate, getAddressBook, getCouriers, getMe, addSender, addReceiver, type CreateBookingBody, type CreateBookingParty, type CreateBookingPackage, type AddressBookResponse, type AddressEntry } from "@/lib/api";
+import {
+  bookingCreate,
+  draftCreate,
+  getAddressBook,
+  getBookingFieldRules,
+  getCouriers,
+  getMe,
+  addSender,
+  addReceiver,
+  type CreateBookingBody,
+  type CreateBookingParty,
+  type CreateBookingPackage,
+  type AddressBookResponse,
+  type AddressEntry,
+} from "@/lib/api";
+import {
+  defaultBookingFieldRules,
+  parseBookingFieldRulesFromApi,
+  validateBookingCreateForm,
+  type BookingFieldRules,
+} from "@/lib/booking-field-rules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,16 +68,22 @@ function PartyFields({
   state,
   setState,
   quickBooking,
+  fieldKeyPrefix,
+  fieldErrors,
 }: {
   title: string;
   state: CreateBookingParty;
   setState: (p: CreateBookingParty) => void;
   quickBooking?: boolean;
+  fieldKeyPrefix: string;
+  fieldErrors?: Record<string, string>;
 }) {
   const f = useTranslations("bookings.fields");
   const tBookings = useTranslations("bookings");
   const optional = tBookings("optional");
   const update = (key: keyof CreateBookingParty, value: string) => setState({ ...state, [key]: value });
+  const errs = fieldErrors ?? {};
+  const err = (key: string) => errs[`${fieldKeyPrefix}.${key}`];
   return (
     <div className="space-y-3">
       {title ? <h4 className="font-medium text-sm">{title}</h4> : null}
@@ -65,54 +91,114 @@ function PartyFields({
         <div className="space-y-1">
           <Label>{f("name")}</Label>
           <Input value={state.name ?? ""} onChange={(e) => update("name", e.target.value)} placeholder={f("namePlaceholder")} />
+          {err("name") ? (
+            <p className="text-xs text-destructive" role="alert">
+              {err("name")}
+            </p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label>{f("address")}</Label>
           <Input value={state.address1 ?? ""} onChange={(e) => update("address1", e.target.value)} placeholder={f("addressPlaceholder")} />
+          {err("address1") ? (
+            <p className="text-xs text-destructive" role="alert">
+              {err("address1")}
+            </p>
+          ) : null}
         </div>
         {!quickBooking && (
           <div className="space-y-1">
             <Label>{f("address2")}</Label>
             <Input value={state.address2 ?? ""} onChange={(e) => update("address2", e.target.value)} placeholder={optional} />
+            {err("address2") ? (
+              <p className="text-xs text-destructive" role="alert">
+                {err("address2")}
+              </p>
+            ) : null}
           </div>
         )}
         <div className="space-y-1">
           <Label>{f("postalCode")}</Label>
           <Input value={state.postalCode ?? ""} onChange={(e) => update("postalCode", e.target.value)} placeholder={f("postalCodePlaceholder")} />
+          {err("postalCode") ? (
+            <p className="text-xs text-destructive" role="alert">
+              {err("postalCode")}
+            </p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label>{f("city")}</Label>
           <Input value={state.city ?? ""} onChange={(e) => update("city", e.target.value)} placeholder={f("cityPlaceholder")} />
+          {err("city") ? (
+            <p className="text-xs text-destructive" role="alert">
+              {err("city")}
+            </p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label>{f("country")}</Label>
           <Input value={state.country ?? ""} onChange={(e) => update("country", e.target.value)} placeholder={f("countryPlaceholder")} />
+          {err("country") ? (
+            <p className="text-xs text-destructive" role="alert">
+              {err("country")}
+            </p>
+          ) : null}
         </div>
         {!quickBooking && (
           <>
             <div className="space-y-1">
               <Label>{f("email")}</Label>
               <Input type="email" value={state.email ?? ""} onChange={(e) => update("email", e.target.value)} placeholder={optional} />
+              {err("email") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("email")}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>{f("phone")}</Label>
               <Input value={state.phoneNumber ?? ""} onChange={(e) => update("phoneNumber", e.target.value)} placeholder={optional} />
+              {err("phoneNumber") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("phoneNumber")}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>{f("mobile")}</Label>
               <Input value={state.phoneNumberMobile ?? ""} onChange={(e) => update("phoneNumberMobile", e.target.value)} placeholder={optional} />
+              {err("phoneNumberMobile") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("phoneNumberMobile")}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>{f("contactPerson")}</Label>
               <Input value={state.contactPersonName ?? ""} onChange={(e) => update("contactPersonName", e.target.value)} placeholder={optional} />
+              {err("contactPersonName") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("contactPersonName")}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>{f("vatNo")}</Label>
               <Input value={state.vatNo ?? ""} onChange={(e) => update("vatNo", e.target.value)} placeholder={optional} />
+              {err("vatNo") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("vatNo")}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>{f("customerNumber")}</Label>
               <Input value={state.customerNumber ?? ""} onChange={(e) => update("customerNumber", e.target.value)} placeholder={optional} />
+              {err("customerNumber") ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {err("customerNumber")}
+                </p>
+              ) : null}
             </div>
           </>
         )}
@@ -158,10 +244,19 @@ export default function CreateBookingPage() {
   const [courierIds, setCourierIds] = useState<string[]>([]);
   const [couriersReady, setCouriersReady] = useState(false);
   const [saveToAddressBook, setSaveToAddressBook] = useState(true);
+  const [bookingRules, setBookingRules] = useState<BookingFieldRules>(() => defaultBookingFieldRules());
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!token) return;
     getAddressBook(token).then((res) => setAddressBook(res.addressBooks?.[0] ?? null)).catch(() => setAddressBook(null));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    getBookingFieldRules(token)
+      .then((api) => setBookingRules(parseBookingFieldRulesFromApi(api)))
+      .catch(() => setBookingRules(defaultBookingFieldRules()));
   }, [token]);
 
   useEffect(() => {
@@ -241,6 +336,35 @@ export default function CreateBookingPage() {
   if (isSuperAdmin) {
     router.replace("/bookings");
     return null;
+  }
+
+  function runBookingValidation(): Record<string, string> {
+    return validateBookingCreateForm(
+      {
+        postalService,
+        shipper,
+        receiver,
+        payer,
+        pickUpAddress,
+        deliveryPoint,
+        payerSource,
+        quickBooking,
+        service,
+        senderReference,
+        receiverReference,
+        freightPayer,
+        handlingInstructions,
+        grossWeight,
+        grossVolume,
+        packageQuantity,
+        pickupHandlingInstructions,
+        deliveryHandlingInstructions,
+        generalInstructions,
+        packages,
+      },
+      bookingRules,
+      t("fieldRequired")
+    );
   }
 
   function buildBody(): CreateBookingBody {
@@ -331,6 +455,13 @@ export default function CreateBookingPage() {
       setError(t("noCouriersBannerTitle"));
       return;
     }
+    const validationErrors = runBookingValidation();
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setError(null);
+      return;
+    }
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     try {
@@ -362,6 +493,13 @@ export default function CreateBookingPage() {
       setError(t("noCouriersBannerTitle"));
       return;
     }
+    const validationErrors = runBookingValidation();
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setError(null);
+      return;
+    }
+    setFieldErrors({});
     setError(null);
     setSubmitting(true);
     try {
@@ -448,6 +586,11 @@ export default function CreateBookingPage() {
                   </option>
                 ))}
               </select>
+              {fieldErrors["courier.postalService"] ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {fieldErrors["courier.postalService"]}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="companyName">{tFields("companyName")}</Label>
@@ -487,7 +630,14 @@ export default function CreateBookingPage() {
                 </select>
               </div>
             )}
-            <PartyFields title="" state={shipper} setState={setShipper} quickBooking={quickBooking} />
+            <PartyFields
+              title=""
+              state={shipper}
+              setState={setShipper}
+              quickBooking={quickBooking}
+              fieldKeyPrefix="shipper"
+              fieldErrors={fieldErrors}
+            />
           </CardContent>
         </Card>
 
@@ -564,7 +714,14 @@ export default function CreateBookingPage() {
               </div>
             </div>
             {payerSource === "other" ? (
-              <PartyFields title="" state={payer} setState={setPayer} quickBooking={quickBooking} />
+              <PartyFields
+                title=""
+                state={payer}
+                setState={setPayer}
+                quickBooking={quickBooking}
+                fieldKeyPrefix="payer"
+                fieldErrors={fieldErrors}
+              />
             ) : (
               <p className="text-sm text-muted-foreground">
                 {tFields("payerUseDetails", { role: payerSource === "sender" ? tFields("shipper") : tFields("receiver") })}
@@ -579,7 +736,14 @@ export default function CreateBookingPage() {
             <CardDescription>{tSections("pickupAddressDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <PartyFields title="" state={pickUpAddress} setState={setPickUpAddress} quickBooking={quickBooking} />
+            <PartyFields
+              title=""
+              state={pickUpAddress}
+              setState={setPickUpAddress}
+              quickBooking={quickBooking}
+              fieldKeyPrefix="pickupAddress"
+              fieldErrors={fieldErrors}
+            />
           </CardContent>
         </Card>
 
@@ -589,7 +753,14 @@ export default function CreateBookingPage() {
             <CardDescription>{tSections("deliveryPointDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <PartyFields title="" state={deliveryPoint} setState={setDeliveryPoint} quickBooking={quickBooking} />
+            <PartyFields
+              title=""
+              state={deliveryPoint}
+              setState={setDeliveryPoint}
+              quickBooking={quickBooking}
+              fieldKeyPrefix="deliveryPoint"
+              fieldErrors={fieldErrors}
+            />
           </CardContent>
         </Card>
 
@@ -602,24 +773,49 @@ export default function CreateBookingPage() {
             <div className="space-y-2">
               <Label>{tFields("service")}</Label>
               <Input value={service} onChange={(e) => setService(e.target.value)} placeholder={t("optional")} />
+              {fieldErrors["shipment.service"] ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {fieldErrors["shipment.service"]}
+                </p>
+              ) : null}
             </div>
             {!quickBooking && (
               <>
                 <div className="space-y-2">
                   <Label>{tFields("senderReference")}</Label>
                   <Input value={senderReference} onChange={(e) => setSenderReference(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shipment.senderReference"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shipment.senderReference"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>{tFields("receiverReference")}</Label>
                   <Input value={receiverReference} onChange={(e) => setReceiverReference(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shipment.receiverReference"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shipment.receiverReference"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>{tFields("freightPayer")}</Label>
                   <Input value={freightPayer} onChange={(e) => setFreightPayer(e.target.value)} placeholder={tFields("freightPayerPlaceholder")} />
+                  {fieldErrors["shipment.freightPayer"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shipment.freightPayer"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>{tFields("handlingInstructions")}</Label>
                   <Input value={handlingInstructions} onChange={(e) => setHandlingInstructions(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shipment.handlingInstructions"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shipment.handlingInstructions"]}
+                    </p>
+                  ) : null}
                 </div>
               </>
             )}
@@ -636,16 +832,31 @@ export default function CreateBookingPage() {
               <div className="space-y-2">
                 <Label>{tFields("grossWeight")}</Label>
                 <Input value={grossWeight} onChange={(e) => setGrossWeight(e.target.value)} placeholder={tFields("grossWeightPlaceholder")} />
+                {fieldErrors["shippingInfo.grossWeight"] ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {fieldErrors["shippingInfo.grossWeight"]}
+                  </p>
+                ) : null}
               </div>
               {!quickBooking && (
                 <div className="space-y-2">
                   <Label>{tFields("grossVolume")}</Label>
                   <Input value={grossVolume} onChange={(e) => setGrossVolume(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shippingInfo.grossVolume"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shippingInfo.grossVolume"]}
+                    </p>
+                  ) : null}
                 </div>
               )}
               <div className="space-y-2">
                 <Label>{tFields("packageQuantity")}</Label>
                 <Input value={packageQuantity} onChange={(e) => setPackageQuantity(e.target.value)} placeholder={tFields("packageQuantityPlaceholder")} />
+                {fieldErrors["shippingInfo.packageQuantity"] ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {fieldErrors["shippingInfo.packageQuantity"]}
+                  </p>
+                ) : null}
               </div>
             </div>
             {!quickBooking && (
@@ -653,14 +864,29 @@ export default function CreateBookingPage() {
                 <div className="space-y-2">
                   <Label>{tFields("pickupHandlingInstructions")}</Label>
                   <Input value={pickupHandlingInstructions} onChange={(e) => setPickupHandlingInstructions(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shippingInfo.pickupHandlingInstructions"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shippingInfo.pickupHandlingInstructions"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>{tFields("deliveryHandlingInstructions")}</Label>
                   <Input value={deliveryHandlingInstructions} onChange={(e) => setDeliveryHandlingInstructions(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shippingInfo.deliveryHandlingInstructions"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shippingInfo.deliveryHandlingInstructions"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label>{tFields("generalInstructions")}</Label>
                   <Input value={generalInstructions} onChange={(e) => setGeneralInstructions(e.target.value)} placeholder={t("optional")} />
+                  {fieldErrors["shippingInfo.generalInstructions"] ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors["shippingInfo.generalInstructions"]}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
@@ -710,6 +936,11 @@ export default function CreateBookingPage() {
                       }
                       placeholder={tFields("weightPlaceholder")}
                     />
+                    {fieldErrors[`package.${index}.weight`] ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {fieldErrors[`package.${index}.weight`]}
+                      </p>
+                    ) : null}
                   </div>
                   {!quickBooking && (
                     <div className="space-y-1">
@@ -723,6 +954,11 @@ export default function CreateBookingPage() {
                         }
                         placeholder={t("optional")}
                       />
+                      {fieldErrors[`package.${index}.volume`] ? (
+                        <p className="text-xs text-destructive" role="alert">
+                          {fieldErrors[`package.${index}.volume`]}
+                        </p>
+                      ) : null}
                     </div>
                   )}
                   <div className="space-y-1">
@@ -736,6 +972,11 @@ export default function CreateBookingPage() {
                       }
                       placeholder={tFields("packageTypePlaceholder")}
                     />
+                    {fieldErrors[`package.${index}.packageType`] ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {fieldErrors[`package.${index}.packageType`]}
+                      </p>
+                    ) : null}
                   </div>
                   {!quickBooking && (
                     <>
@@ -750,6 +991,11 @@ export default function CreateBookingPage() {
                           }
                           placeholder={t("optional")}
                         />
+                        {fieldErrors[`package.${index}.description`] ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors[`package.${index}.description`]}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-1">
                         <Label>{tFields("length")}</Label>
@@ -762,6 +1008,11 @@ export default function CreateBookingPage() {
                           }
                           placeholder={t("optional")}
                         />
+                        {fieldErrors[`package.${index}.length`] ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors[`package.${index}.length`]}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-1">
                         <Label>{tFields("width")}</Label>
@@ -774,6 +1025,11 @@ export default function CreateBookingPage() {
                           }
                           placeholder={t("optional")}
                         />
+                        {fieldErrors[`package.${index}.width`] ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors[`package.${index}.width`]}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-1">
                         <Label>{tFields("height")}</Label>
@@ -786,6 +1042,11 @@ export default function CreateBookingPage() {
                           }
                           placeholder={t("optional")}
                         />
+                        {fieldErrors[`package.${index}.height`] ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors[`package.${index}.height`]}
+                          </p>
+                        ) : null}
                       </div>
                     </>
                   )}

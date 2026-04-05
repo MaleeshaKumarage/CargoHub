@@ -182,6 +182,7 @@
     "saveDraftFailed": "Save draft failed",
     "quickBooking": "Quick booking",
     "quickBookingDescription": "When enabled, only mandatory fields in each section are shown; optional fields are hidden.",
+    "fieldRequired": "This field is required.",
     "optional": "Optional",
     "sections": {
       "header": "Header",
@@ -346,7 +347,17 @@
     "placeholderAddress": "Street address",
     "placeholderPostalCode": "Postal code",
     "placeholderCity": "City",
-    "placeholderCountry": "Country code (e.g. FI)"
+    "placeholderCountry": "Country code (e.g. FI)",
+    "bookingFieldRulesTitle": "Booking form requirements",
+    "bookingFieldRulesDescription": "Choose whether each section and field is mandatory or optional for users creating bookings. Applies to everyone in your company. Validation runs in the portal only.",
+    "sectionRequirement": "Whole section",
+    "mandatory": "Mandatory",
+    "optional": "Optional",
+    "saveRules": "Save requirements",
+    "savingRules": "Saving…",
+    "rulesSaved": "Requirements saved.",
+    "rulesLoadFailed": "Could not load requirements.",
+    "rulesAdminOnly": "Only company administrators can change booking requirements."
   },
   "courierContracts": {
     "title": "Courier contracts",

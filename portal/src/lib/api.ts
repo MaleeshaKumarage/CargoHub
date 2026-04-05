@@ -288,6 +288,43 @@ export async function putCourierContracts(token: string, contracts: CourierContr
   return Array.isArray(list) ? list.map((row) => normalizeCourierContract(row as Record<string, unknown>)) : [];
 }
 
+/** Booking form rules (GET/PUT /api/v1/portal/company/booking-field-rules). */
+export type BookingFieldRulesApi = {
+  version: number;
+  sections: Record<string, string>;
+  fields: Record<string, string>;
+};
+
+export async function getBookingFieldRules(token: string, companyId?: string | null): Promise<BookingFieldRulesApi> {
+  const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+  const res = await fetch(`${portalBase()}/company/booking-field-rules${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? "Failed to load booking field rules");
+  }
+  return res.json() as Promise<BookingFieldRulesApi>;
+}
+
+export async function putBookingFieldRules(
+  token: string,
+  body: BookingFieldRulesApi,
+  companyId?: string | null
+): Promise<BookingFieldRulesApi> {
+  const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+  const res = await fetch(`${portalBase()}/company/booking-field-rules${q}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? "Save failed");
+  }
+  return res.json() as Promise<BookingFieldRulesApi>;
+}
+
 // --- Admin API (Super Admin only; pass JWT from auth) ---
 
 export type AdminCompany = {
