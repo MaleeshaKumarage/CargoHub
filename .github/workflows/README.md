@@ -57,3 +57,12 @@ Failure notification runs as a **separate job** (`notify-deploy-failure`) on Git
 Skipped jobs: In **Docker — build & push**, **Open issue on build failure** is skipped when the build **succeeds** — that is expected.
 
 The **workflow name** `Docker — build & push image` must stay in sync with `workflows:` in `docker-deploy-mac.yml`.
+
+## Common failures (Actions tab)
+
+| Symptom | Likely cause | What to do |
+|---------|----------------|------------|
+| **Docker — build & push** fails in seconds on “Log in to Docker Hub” | Missing or wrong `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | Add both under **Settings → Secrets and variables → Actions**. Without them, the workflow still **builds** but skips push (see `docker-build-push.yml`). |
+| **Automatic Dependency Submission (NuGet)** fails | GitHub-managed dependency workflow (org/repo policy, API, or billing) | **Settings → Code security** — review Dependency graph / submission settings, or disable the workflow if you do not use it. |
+| **PR Validation** fails on job 3 (coverage gates) | Line or branch coverage below 75% on backend or portal | Open the job logs for **1 — Portal** and **2 — Backend**; fix tests or coverage. |
+| **PR Validation** jobs 1–2 fail very quickly | Often a transient runner or checkout issue; re-run. If it persists, open the failed step log on GitHub. |
