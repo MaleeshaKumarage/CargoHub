@@ -3,6 +3,7 @@ import {
   login,
   register,
   getMe,
+  getCompanySubscription,
   updateTheme,
   getWaybillPdfBlobUrl,
   DESIGN_THEMES,
@@ -297,6 +298,36 @@ describe("api", () => {
       const me = await getMe("token");
 
       expect(me.theme).toBeNull();
+    });
+  });
+
+  describe("getCompanySubscription", () => {
+    it("normalizes PascalCase subscription payload", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          PlanName: "Trial",
+          PlanKind: "Trial",
+          Currency: "EUR",
+          TrialBookingAllowance: 5,
+        }),
+      });
+
+      const sub = await getCompanySubscription("token");
+
+      expect(sub.planName).toBe("Trial");
+      expect(sub.planKind).toBe("Trial");
+      expect(sub.currency).toBe("EUR");
+      expect(sub.trialBookingAllowance).toBe(5);
+    });
+
+    it("throws subscription_not_found on 404", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+      await expect(getCompanySubscription("token")).rejects.toThrow("subscription_not_found");
     });
   });
 

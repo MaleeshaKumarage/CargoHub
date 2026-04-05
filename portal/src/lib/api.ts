@@ -220,6 +220,82 @@ export async function updateTheme(token: string, theme: string): Promise<void> {
   }
 }
 
+/** Company subscription for More page (GET /api/v1/portal/company/subscription). */
+export type PortalSubscriptionTierDto = {
+  ordinal: number;
+  inclusiveMaxBookingsInPeriod?: number | null;
+  chargePerBooking?: number | null;
+  monthlyFee?: number | null;
+};
+
+export type PortalCompanySubscriptionDto = {
+  planName: string;
+  planKind: string;
+  currency: string;
+  trialBookingAllowance?: number | null;
+  chargePerBooking?: number | null;
+  monthlyFee?: number | null;
+  includedBookingsPerMonth?: number | null;
+  overageChargePerBooking?: number | null;
+  tiers?: PortalSubscriptionTierDto[] | null;
+};
+
+function normalizePortalCompanySubscription(data: Record<string, unknown>): PortalCompanySubscriptionDto {
+  const tiersRaw = data.tiers ?? data.Tiers;
+  const tiers = Array.isArray(tiersRaw)
+    ? tiersRaw.map((row) => {
+        const t = row as Record<string, unknown>;
+        return {
+          ordinal: Number(t.ordinal ?? t.Ordinal ?? 0),
+          inclusiveMaxBookingsInPeriod:
+            t.inclusiveMaxBookingsInPeriod != null || t.InclusiveMaxBookingsInPeriod != null
+              ? Number(t.inclusiveMaxBookingsInPeriod ?? t.InclusiveMaxBookingsInPeriod)
+              : null,
+          chargePerBooking:
+            t.chargePerBooking != null || t.ChargePerBooking != null
+              ? Number(t.chargePerBooking ?? t.ChargePerBooking)
+              : null,
+          monthlyFee:
+            t.monthlyFee != null || t.MonthlyFee != null ? Number(t.monthlyFee ?? t.MonthlyFee) : null,
+        };
+      })
+    : null;
+  return {
+    planName: String(data.planName ?? data.PlanName ?? ''),
+    planKind: String(data.planKind ?? data.PlanKind ?? ''),
+    currency: String(data.currency ?? data.Currency ?? 'EUR'),
+    trialBookingAllowance:
+      data.trialBookingAllowance != null || data.TrialBookingAllowance != null
+        ? Number(data.trialBookingAllowance ?? data.TrialBookingAllowance)
+        : null,
+    chargePerBooking:
+      data.chargePerBooking != null || data.ChargePerBooking != null
+        ? Number(data.chargePerBooking ?? data.ChargePerBooking)
+        : null,
+    monthlyFee:
+      data.monthlyFee != null || data.MonthlyFee != null ? Number(data.monthlyFee ?? data.MonthlyFee) : null,
+    includedBookingsPerMonth:
+      data.includedBookingsPerMonth != null || data.IncludedBookingsPerMonth != null
+        ? Number(data.includedBookingsPerMonth ?? data.IncludedBookingsPerMonth)
+        : null,
+    overageChargePerBooking:
+      data.overageChargePerBooking != null || data.OverageChargePerBooking != null
+        ? Number(data.overageChargePerBooking ?? data.OverageChargePerBooking)
+        : null,
+    tiers,
+  };
+}
+
+export async function getCompanySubscription(token: string): Promise<PortalCompanySubscriptionDto> {
+  const res = await fetch(`${portalBase()}/company/subscription`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) throw new Error('subscription_not_found');
+  if (!res.ok) throw new Error('Failed to load subscription');
+  const data = (await res.json()) as Record<string, unknown>;
+  return normalizePortalCompanySubscription(data);
+}
+
 /** Enabled courier IDs for the booking form (GET /api/v1/portal/couriers). */
 export async function getCouriers(token: string): Promise<string[]> {
   const res = await fetch(`${portalBase()}/couriers`, {

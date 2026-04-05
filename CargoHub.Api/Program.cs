@@ -8,6 +8,7 @@ using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings;
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Company;
+using CargoHub.Application.Subscriptions;
 using CargoHub.Infrastructure.Auth;
 using CargoHub.Infrastructure.Company;
 using CargoHub.Infrastructure.Billing;
@@ -104,6 +105,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IJwtTokenFactory, JwtTokenFactory>();
 builder.Services.Configure<PortalPublicOptions>(builder.Configuration.GetSection(PortalPublicOptions.SectionName));
 builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<IPortalCompanySubscriptionReader, PortalCompanySubscriptionReader>();
 builder.Services.AddScoped<ICompanyAdminInviteRepository, CompanyAdminInviteRepository>();
 builder.Services.AddScoped<ICompanyUserMetrics, CompanyUserMetrics>();
 builder.Services.AddScoped<ICompanyAdminInviteIssuer, CompanyAdminInviteIssuer>();

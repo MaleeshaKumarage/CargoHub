@@ -250,6 +250,26 @@
     "language": "Språk",
     "comingSoon": "Flere alternativer kommer snart.",
     "courierContracts": "Courier contracts",
-    "courierContractsHint": "Choose carriers and contract IDs for bookings."
+    "courierContractsHint": "Choose carriers and contract IDs for bookings.",
+    "signedInAs": "Logget inn som",
+    "companyLabel": "Bedrift",
+    "subscriptionTitle": "Abonnement",
+    "subscriptionPlanLabel": "Navn",
+    "subscriptionPricingLabel": "Priser",
+    "subscriptionUnnamedPlan": "Abonnementsplan",
+    "subscriptionNonePlan": "Ingen abonnementsplan er tildelt ennå.",
+    "subscriptionUnknownPlan": "Abonnementsinformasjon er ikke tilgjengelig.",
+    "subscriptionTrial": "Prøveabonnement.",
+    "subscriptionTrialBookings": "Opptil {count} bookinger inkludert i prøveperioden.",
+    "subscriptionPerBooking": "{amount} per fullført booking.",
+    "subscriptionRatesPending": "Detaljerte priser vises når de er konfigurert.",
+    "subscriptionMonthlyBase": "Månedlig grunnpris: {amount}.",
+    "subscriptionIncludedBookings": "{count} bookinger inkludert per måned.",
+    "subscriptionOverageEach": "Tilleggsbookinger: {amount} hver.",
+    "subscriptionTierBandMax": "Opptil {max} bookinger i perioden",
+    "subscriptionTierBandOpen": "Utover tidligere nivåer",
+    "subscriptionPerBookingShort": "per booking",
+    "subscriptionPerMonthShort": "per måned",
+    "subscriptionLoadError": "Kunne ikke laste abonnementet."
   }
 }

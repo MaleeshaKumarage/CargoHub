@@ -5,6 +5,8 @@ using CargoHub.Application.Auth.Commands;
 using CargoHub.Application.Auth.Dtos;
 using CargoHub.Application.Company;
 using CargoHub.Application.Couriers;
+using CargoHub.Application.Subscriptions;
+using CargoHub.Application.Subscriptions.Queries;
 using CargoHub.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -199,6 +201,23 @@ public class PortalController : ControllerBase
             return StatusCode(500, new { message = "Failed to update preferences" });
 
         return Ok(new { theme = user.Theme });
+    }
+
+    /// <summary>Current company subscription plan and pricing (active rate card at UTC now). User must be linked to a company.</summary>
+    [HttpGet("company/subscription")]
+    [Authorize]
+    public async Task<ActionResult<PortalCompanySubscriptionDto>> GetCompanySubscription(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+        var user = await _userManager.FindByIdAsync(userId);
+        if (string.IsNullOrWhiteSpace(user?.BusinessId))
+            return NotFound();
+        var dto = await _mediator.Send(new GetPortalCompanySubscriptionQuery(user.BusinessId.Trim()), cancellationToken);
+        if (dto == null)
+            return NotFound();
+        return Ok(dto);
     }
 
     /// <summary>Request password reset; sends token (email sending optional). Body: { email }.</summary>

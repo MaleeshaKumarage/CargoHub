@@ -250,6 +250,26 @@
     "language": "Tungumál",
     "comingSoon": "Fleiri valkostir koma fljótlega.",
     "courierContracts": "Courier contracts",
-    "courierContractsHint": "Choose carriers and contract IDs for bookings."
+    "courierContractsHint": "Choose carriers and contract IDs for bookings.",
+    "signedInAs": "Skráð(ur) inn sem",
+    "companyLabel": "Fyrirtæki",
+    "subscriptionTitle": "Áskrift",
+    "subscriptionPlanLabel": "Heiti",
+    "subscriptionPricingLabel": "Verðlagning",
+    "subscriptionUnnamedPlan": "Áskriftaráætlun",
+    "subscriptionNonePlan": "Engin áskriftaráætlun hefur verið úthlutað enn.",
+    "subscriptionUnknownPlan": "Áskriftarupplýsingar eru ekki tiltækar.",
+    "subscriptionTrial": "Prufuáskrift.",
+    "subscriptionTrialBookings": "Allt að {count} bókanir innifaldar á prufutímabilinu.",
+    "subscriptionPerBooking": "{amount} á hverja lokaða bókun.",
+    "subscriptionRatesPending": "Nánari verð birtast þegar þau hafa verið stillt.",
+    "subscriptionMonthlyBase": "Mánaðarleg grunnupphæð: {amount}.",
+    "subscriptionIncludedBookings": "{count} bókanir innifaldar á mánuði.",
+    "subscriptionOverageEach": "Viðbótarbókanir: {amount} hver.",
+    "subscriptionTierBandMax": "Allt að {max} bókanir á tímabilinu",
+    "subscriptionTierBandOpen": "Umfram fyrri þrep",
+    "subscriptionPerBookingShort": "á bókun",
+    "subscriptionPerMonthShort": "á mánuði",
+    "subscriptionLoadError": "Ekki tókst að sækja áskriftina."
   }
 }

@@ -353,6 +353,26 @@
     "language": "Kieli",
     "comingSoon": "Lisää vaihtoehtoja tulossa.",
     "courierContracts": "Kuljetussopimukset",
-    "courierContractsHint": "Valitse kuljetusliikkeet ja sopimustunnukset varauksia varten."
+    "courierContractsHint": "Valitse kuljetusliikkeet ja sopimustunnukset varauksia varten.",
+    "signedInAs": "Kirjautunut käyttäjänä",
+    "companyLabel": "Yritys",
+    "subscriptionTitle": "Tilaus",
+    "subscriptionPlanLabel": "Nimi",
+    "subscriptionPricingLabel": "Hinnoittelu",
+    "subscriptionUnnamedPlan": "Tilaussuunnitelma",
+    "subscriptionNonePlan": "Tilaussuunnitelmaa ei ole vielä määritetty.",
+    "subscriptionUnknownPlan": "Tilaustietoja ei ole saatavilla.",
+    "subscriptionTrial": "Kokeilujakso.",
+    "subscriptionTrialBookings": "Enintään {count} varausta kokeilujaksolla.",
+    "subscriptionPerBooking": "{amount} per valmis varaus.",
+    "subscriptionRatesPending": "Tarkat hinnat näytetään, kun ne on määritetty.",
+    "subscriptionMonthlyBase": "Kuukausimaksu: {amount}.",
+    "subscriptionIncludedBookings": "{count} varausta kuukaudessa.",
+    "subscriptionOverageEach": "Lisävaraukset: {amount} kpl.",
+    "subscriptionTierBandMax": "Enintään {max} varausta jaksolla",
+    "subscriptionTierBandOpen": "Aiempien tasojen yläpuolella",
+    "subscriptionPerBookingShort": "per varaus",
+    "subscriptionPerMonthShort": "kuukaudessa",
+    "subscriptionLoadError": "Tilauksen lataus epäonnistui."
   }
 }
