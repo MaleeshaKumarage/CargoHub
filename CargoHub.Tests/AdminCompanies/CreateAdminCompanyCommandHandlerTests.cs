@@ -1,5 +1,6 @@
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.Billing;
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Application.Company;
 using Moq;
 using Xunit;
@@ -17,7 +18,11 @@ public class CreateAdminCompanyCommandHandlerTests
         repo = new Mock<ICompanyRepository>();
         invites = new Mock<ICompanyAdminInviteIssuer>();
         metrics = new Mock<ICompanyUserMetrics>();
-        return new CreateAdminCompanyCommandHandler(repo.Object, invites.Object, metrics.Object);
+        var assignments = new Mock<ICompanySubscriptionAssignmentRepository>();
+        assignments
+            .Setup(x => x.RecordAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        return new CreateAdminCompanyCommandHandler(repo.Object, invites.Object, metrics.Object, assignments.Object);
     }
 
     [Fact]

@@ -54,6 +54,61 @@ public sealed class BillingPeriodInvoicePdfGenerator : IBillingInvoicePdfGenerat
                             .SemiBold().FontSize(11);
                     });
 
+                    if (model.Segments.Count > 0)
+                    {
+                        content.Item().PaddingTop(12).Text("Summary by segment").Bold().FontSize(12);
+                        content.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn(1);
+                                columns.RelativeColumn(1);
+                                columns.RelativeColumn(1);
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellHeader).Text("Segment");
+                                header.Cell().Element(CellHeader).AlignRight().Text("Bookings");
+                                header.Cell().Element(CellHeader).AlignRight().Text("Unit");
+                                header.Cell().Element(CellHeader).AlignRight().Text("Subtotal");
+                            });
+                            foreach (var s in model.Segments)
+                            {
+                                table.Cell().Element(Cell).Text(s.Label);
+                                table.Cell().Element(Cell).AlignRight().Text(s.BookingCount.ToString());
+                                table.Cell().Element(Cell).AlignRight().Text(s.UnitRate is { } u ? $"{u:N4}" : "—");
+                                table.Cell().Element(Cell).AlignRight().Text($"{s.Subtotal:N2}");
+                            }
+                        });
+                    }
+
+                    if (model.BookingRows.Count > 0)
+                    {
+                        content.Item().PaddingTop(12).Text("Bookings").Bold().FontSize(12);
+                        content.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn(1);
+                                columns.RelativeColumn(1);
+                            });
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellHeader).Text("Booking");
+                                header.Cell().Element(CellHeader).AlignRight().Text("Amount");
+                                header.Cell().Element(CellHeader).Text("On invoice");
+                            });
+                            foreach (var b in model.BookingRows)
+                            {
+                                table.Cell().Element(Cell).Text(b.Reference ?? b.BookingId.ToString("N"));
+                                table.Cell().Element(Cell).AlignRight().Text($"{b.Amount:N2}");
+                                table.Cell().Element(Cell).Text(b.ExcludedFromInvoice ? "No" : "Yes");
+                            }
+                        });
+                    }
+
                     content.Item().PaddingTop(12).Text("Line items").Bold().FontSize(12);
 
                     content.Item().Table(table =>

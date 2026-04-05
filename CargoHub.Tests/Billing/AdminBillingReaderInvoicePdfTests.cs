@@ -1,7 +1,9 @@
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Domain.Billing;
 using CargoHub.Infrastructure.Billing;
 using CargoHub.Infrastructure.Persistence;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
+using Moq;
 using Xunit;
 
 namespace CargoHub.Tests.Billing;
@@ -79,7 +81,11 @@ public sealed class AdminBillingReaderInvoicePdfTests
 
         await db.SaveChangesAsync();
 
-        var reader = new AdminBillingReader(db);
+        var breakMock = new Mock<IBillingMonthBreakdownReader>();
+        breakMock
+            .Setup(x => x.GetBreakdownAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BillingMonthBreakdownDto?)null);
+        var reader = new AdminBillingReader(db, breakMock.Object);
         var model = await reader.GetInvoicePdfModelAsync(billingPeriodId);
 
         Assert.NotNull(model);

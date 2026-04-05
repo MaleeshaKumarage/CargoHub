@@ -51,6 +51,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<SubscriptionInvoiceSend> SubscriptionInvoiceSends => Set<SubscriptionInvoiceSend>();
 
+    public DbSet<CompanySubscriptionAssignment> CompanySubscriptionAssignments => Set<CompanySubscriptionAssignment>();
+
+    public DbSet<BillingPeriodExcludedBooking> BillingPeriodExcludedBookings => Set<BillingPeriodExcludedBooking>();
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
@@ -320,6 +324,35 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne<CompanyEntity>()
                   .WithMany()
                   .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CompanySubscriptionAssignment>(entity =>
+        {
+            entity.ToTable("CompanySubscriptionAssignments", DbSchemas.Companies);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EffectiveFromUtc).IsRequired();
+            entity.Property(x => x.SetByUserId).HasMaxLength(128);
+            entity.HasIndex(x => new { x.CompanyId, x.EffectiveFromUtc })
+                  .HasDatabaseName("IX_CompanySubscriptionAssignments_Company_EffectiveFrom");
+            entity.HasOne<CompanyEntity>()
+                  .WithMany()
+                  .HasForeignKey(x => x.CompanyId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BillingPeriodExcludedBooking>(entity =>
+        {
+            entity.ToTable("BillingPeriodExcludedBookings", DbSchemas.Companies);
+            entity.HasKey(x => new { x.CompanyBillingPeriodId, x.BookingId });
+            entity.HasIndex(x => x.BookingId).HasDatabaseName("IX_BillingPeriodExcludedBookings_BookingId");
+            entity.HasOne(x => x.CompanyBillingPeriod)
+                  .WithMany(p => p.ExcludedBookings)
+                  .HasForeignKey(x => x.CompanyBillingPeriodId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Booking>()
+                  .WithMany()
+                  .HasForeignKey(x => x.BookingId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

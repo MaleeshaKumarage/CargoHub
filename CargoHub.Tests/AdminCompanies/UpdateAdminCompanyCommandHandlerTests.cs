@@ -1,4 +1,5 @@
 using CargoHub.Application.AdminCompanies;
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Application.Billing.AdminPlans;
 using CargoHub.Application.Company;
 using Moq;
@@ -24,12 +25,17 @@ public class UpdateAdminCompanyCommandHandlerTests
         planRepo
             .Setup(x => x.PlanExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        var assignments = new Mock<ICompanySubscriptionAssignmentRepository>();
+        assignments
+            .Setup(x => x.RecordAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         return new UpdateAdminCompanyCommandHandler(
             repo.Object,
             invites.Object,
             metrics.Object,
             limits.Object,
-            planRepo.Object);
+            planRepo.Object,
+            assignments.Object);
     }
 
     private static CompanyEntity TrackedCompany(Guid id, string bid = "BIZ-1") => new()
