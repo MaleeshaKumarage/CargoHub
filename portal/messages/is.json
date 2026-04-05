@@ -305,7 +305,7 @@
   },
   "manageInvoices": {
     "title": "Reikningshald og reikningar",
-    "description": "Skoða bókfærð áskriftarreikning eftir fyrirtæki og UTC mánuði. Greiðsluhæfi útilokar línur merktar úr reikningi.",
+    "description": "Skoða áskriftarreikning fyrir fyrirtæki yfir UTC dagsetningabil (fyrsta reikningshæfa tímapunkt). Greiðsluhæfi útilokar línur merktar úr reikningi. PDF, tölvupóstur og útilokun á bókun gildir aðeins þegar bilið fellur inn í einn UTC mánuð.",
     "selectCompany": "Fyrirtæki",
     "selectCompanyPlaceholder": "Veldu fyrirtæki…",
     "periodsTitle": "Reikningstímabil",
@@ -344,7 +344,6 @@
     "saveInvoice": "Vista reikning (PDF)",
     "loadingBreakdown": "Hleð sundurliðun…",
     "excludeBooking": "Útiloka af reikningi",
-    "monthOptionBookings": "({count} bókanir)",
     "excludedYes": "Já",
     "excludedNo": "Nei"
   },

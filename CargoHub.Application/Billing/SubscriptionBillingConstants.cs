@@ -4,4 +4,7 @@ namespace CargoHub.Application.Billing;
 public static class SubscriptionBillingConstants
 {
     public static readonly Guid DefaultTrialPlanId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1");
+
+    /// <summary>Non-test bookings require a portal company context.</summary>
+    public const string CompanyRequiredForBookingErrorCode = "CompanyRequiredForBooking";
 }

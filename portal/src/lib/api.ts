@@ -764,7 +764,10 @@ export type BillingMonthBreakdown = {
   companyId: string;
   yearUtc: number;
   monthUtc: number;
-  billingPeriodId: string;
+  /** Set when all bookings in the result fall in one UTC month — required for PDF, email, exclusions. */
+  billingPeriodId: string | null;
+  rangeStartUtc: string;
+  rangeEndExclusiveUtc: string;
   currency: string;
   billableBookingCount: number;
   payableTotal: number;
@@ -807,11 +810,14 @@ function normalizeBillingMonthBreakdown(raw: Record<string, unknown>): BillingMo
         };
       })
     : [];
+  const pid = raw.billingPeriodId ?? raw.BillingPeriodId;
   return {
     companyId: String(raw.companyId ?? raw.CompanyId ?? ''),
     yearUtc: Number(raw.yearUtc ?? raw.YearUtc ?? 0),
     monthUtc: Number(raw.monthUtc ?? raw.MonthUtc ?? 0),
-    billingPeriodId: String(raw.billingPeriodId ?? raw.BillingPeriodId ?? ''),
+    billingPeriodId: pid != null && String(pid).length > 0 ? String(pid) : null,
+    rangeStartUtc: String(raw.rangeStartUtc ?? raw.RangeStartUtc ?? ''),
+    rangeEndExclusiveUtc: String(raw.rangeEndExclusiveUtc ?? raw.RangeEndExclusiveUtc ?? ''),
     currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
     billableBookingCount: Number(raw.billableBookingCount ?? raw.BillableBookingCount ?? 0),
     payableTotal: Number(raw.payableTotal ?? raw.PayableTotal ?? 0),
@@ -819,6 +825,27 @@ function normalizeBillingMonthBreakdown(raw: Record<string, unknown>): BillingMo
     segments,
     bookings,
   };
+}
+
+/** UTC calendar dates inclusive (yyyy-MM-dd). Max span 731 days. */
+export async function adminGetBillingBreakdownByDateRange(
+  token: string,
+  companyId: string,
+  fromYmd: string,
+  toYmd: string
+): Promise<BillingMonthBreakdown> {
+  const q = new URLSearchParams({ from: fromYmd, to: toYmd });
+  const res = await fetch(
+    `${adminBase()}/companies/${encodeURIComponent(companyId)}/billing-breakdown?${q}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load billing breakdown (${res.status})`);
+  }
+  const raw = (await res.json()) as Record<string, unknown>;
+  return normalizeBillingMonthBreakdown(raw);
 }
 
 export async function adminGetBillingMonthBreakdown(

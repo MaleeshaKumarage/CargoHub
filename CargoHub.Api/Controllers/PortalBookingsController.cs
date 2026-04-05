@@ -193,7 +193,7 @@ public class PortalBookingsController : ControllerBase
         }
         catch (SubscriptionBillingException ex)
         {
-            return Conflict(new { errorCode = ex.ErrorCode, message = ex.Message });
+            return SubscriptionBillingError(ex);
         }
     }
 
@@ -285,7 +285,7 @@ public class PortalBookingsController : ControllerBase
         }
         catch (SubscriptionBillingException ex)
         {
-            return Conflict(new { errorCode = ex.ErrorCode, message = ex.Message });
+            return SubscriptionBillingError(ex);
         }
     }
 
@@ -537,6 +537,11 @@ public class PortalBookingsController : ControllerBase
 
     private static string ImportRawSessionCacheKey(string customerId, Guid sessionId) =>
         $"booking-import-raw:{customerId}:{sessionId:N}";
+
+    private static ActionResult SubscriptionBillingError(SubscriptionBillingException ex) =>
+        ex.ErrorCode == SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode
+            ? new BadRequestObjectResult(new { errorCode = ex.ErrorCode, message = ex.Message })
+            : new ConflictObjectResult(new { errorCode = ex.ErrorCode, message = ex.Message });
 
     /// <summary>Returns (CompanyId, _) for the current user's company. CompanyId is null if user has no company.</summary>
     private async Task<(Guid? CompanyId, IReadOnlySet<string>?)> GetCompanyIdAndAllowedSlotsAsync(CancellationToken cancellationToken)

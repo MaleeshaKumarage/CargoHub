@@ -64,24 +64,8 @@ public sealed class BillingMonthBreakdownReader : IBillingMonthBreakdownReader
         var monthStart = new DateTime(yearUtc, monthUtc, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthEnd = monthStart.AddMonths(1);
 
-        var period = await _db.CompanyBillingPeriods
-            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.YearUtc == yearUtc && p.MonthUtc == monthUtc, cancellationToken);
-
         var currency = await ResolveCurrencyAsync(companyId, cancellationToken);
-        if (period == null)
-        {
-            period = new CompanyBillingPeriod
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = companyId,
-                YearUtc = yearUtc,
-                MonthUtc = monthUtc,
-                Currency = currency,
-                Status = CompanyBillingPeriodStatus.Open
-            };
-            _db.CompanyBillingPeriods.Add(period);
-            await _db.SaveChangesAsync(cancellationToken);
-        }
+        var period = await EnsureBillingPeriodAsync(companyId, yearUtc, monthUtc, currency, cancellationToken);
 
         var allBookings = await _db.Bookings.AsNoTracking()
             .Include(b => b.Header)
@@ -96,11 +80,7 @@ public sealed class BillingMonthBreakdownReader : IBillingMonthBreakdownReader
             .ThenBy(b => b.Id)
             .ToListAsync(cancellationToken);
 
-        var excludedList = await _db.BillingPeriodExcludedBookings.AsNoTracking()
-            .Where(x => x.CompanyBillingPeriodId == period.Id)
-            .Select(x => x.BookingId)
-            .ToListAsync(cancellationToken);
-        var excludedIds = excludedList.ToHashSet();
+        var excludedIds = await LoadExcludedBookingIdsForPeriodAsync(period.Id, cancellationToken);
 
         var lineCount = await _db.BillingLineItems.CountAsync(l => l.CompanyBillingPeriodId == period.Id, cancellationToken);
         if (lineCount == 0 && await HasPayableBookingsAsync(allBookings, companyId, excludedIds, cancellationToken))
@@ -124,6 +104,8 @@ public sealed class BillingMonthBreakdownReader : IBillingMonthBreakdownReader
             YearUtc = yearUtc,
             MonthUtc = monthUtc,
             BillingPeriodId = period.Id,
+            RangeStartUtc = monthStart,
+            RangeEndExclusiveUtc = monthEnd,
             Currency = period.Currency,
             BillableBookingCount = allBookings.Count,
             PayableTotal = payable,
@@ -131,6 +113,162 @@ public sealed class BillingMonthBreakdownReader : IBillingMonthBreakdownReader
             Segments = segments,
             Bookings = bookingRows
         };
+    }
+
+    public async Task<BillingMonthBreakdownDto?> GetBreakdownForDateRangeAsync(
+        Guid companyId,
+        DateTime rangeStartUtc,
+        DateTime rangeEndExclusiveUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (rangeStartUtc.Kind != DateTimeKind.Utc || rangeEndExclusiveUtc.Kind != DateTimeKind.Utc)
+            return null;
+        if (rangeStartUtc >= rangeEndExclusiveUtc)
+            return null;
+        if ((rangeEndExclusiveUtc - rangeStartUtc).TotalDays > 731)
+            return null;
+
+        var company = await _db.Companies.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+        if (company == null)
+            return null;
+
+        var currency = await ResolveCurrencyAsync(companyId, cancellationToken);
+
+        var rangeBookings = await _db.Bookings.AsNoTracking()
+            .Include(b => b.Header)
+            .Where(b =>
+                b.CompanyId == companyId &&
+                !b.IsDraft &&
+                !b.IsTestBooking &&
+                b.FirstBillableAtUtc != null &&
+                b.FirstBillableAtUtc >= rangeStartUtc &&
+                b.FirstBillableAtUtc < rangeEndExclusiveUtc)
+            .OrderBy(b => b.FirstBillableAtUtc)
+            .ThenBy(b => b.Id)
+            .ToListAsync(cancellationToken);
+
+        var distinctMonths = rangeBookings
+            .Select(b => (Year: b.FirstBillableAtUtc!.Value.Year, Month: b.FirstBillableAtUtc.Value.Month))
+            .Distinct()
+            .ToList();
+
+        foreach (var ym in distinctMonths)
+        {
+            var monthStart = new DateTime(ym.Year, ym.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+            var period = await EnsureBillingPeriodAsync(companyId, ym.Year, ym.Month, currency, cancellationToken);
+            var monthBookings = await _db.Bookings.AsNoTracking()
+                .Where(b =>
+                    b.CompanyId == companyId &&
+                    !b.IsDraft &&
+                    !b.IsTestBooking &&
+                    b.FirstBillableAtUtc != null &&
+                    b.FirstBillableAtUtc >= monthStart &&
+                    b.FirstBillableAtUtc < monthEnd)
+                .ToListAsync(cancellationToken);
+            var excludedForMonth = await LoadExcludedBookingIdsForPeriodAsync(period.Id, cancellationToken);
+            var lineCount = await _db.BillingLineItems.CountAsync(l => l.CompanyBillingPeriodId == period.Id, cancellationToken);
+            if (lineCount == 0 && await HasPayableBookingsAsync(monthBookings, companyId, excludedForMonth, cancellationToken))
+                await _regeneration.RegenerateAsync(period.Id, cancellationToken);
+        }
+
+        var bookingIds = rangeBookings.Select(b => b.Id).ToHashSet();
+        var touchedPeriodIds = new List<Guid>();
+        foreach (var ym in distinctMonths)
+        {
+            var p = await _db.CompanyBillingPeriods.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.YearUtc == ym.Year && x.MonthUtc == ym.Month, cancellationToken);
+            if (p != null)
+                touchedPeriodIds.Add(p.Id);
+        }
+
+        IReadOnlyList<BillingLineItem> lines;
+        if (bookingIds.Count == 0)
+            lines = Array.Empty<BillingLineItem>();
+        else
+        {
+            var periodIdSet = touchedPeriodIds.ToHashSet();
+            lines = await _db.BillingLineItems.AsNoTracking()
+                .Where(l =>
+                    periodIdSet.Contains(l.CompanyBillingPeriodId) &&
+                    ((l.BookingId != null && bookingIds.Contains(l.BookingId.Value)) ||
+                     l.BookingId == null))
+                .ToListAsync(cancellationToken);
+        }
+
+        var ledger = lines.Sum(l => l.Amount);
+        var payable = lines.Where(l => !l.ExcludedFromInvoice).Sum(l => l.Amount);
+
+        var excludedUnion = new HashSet<Guid>();
+        foreach (var pid in touchedPeriodIds)
+        {
+            foreach (var id in await LoadExcludedBookingIdsForPeriodAsync(pid, cancellationToken))
+                excludedUnion.Add(id);
+        }
+
+        var segments = await BuildSegmentsFromBookingsAndLinesAsync(
+            rangeBookings, excludedUnion, companyId, lines, cancellationToken);
+        var bookingRows = await BuildBookingRowsAsync(rangeBookings, excludedUnion, lines, companyId, cancellationToken);
+
+        Guid? singlePeriodId = null;
+        if (distinctMonths.Count == 1)
+        {
+            var only = distinctMonths[0];
+            var p = await _db.CompanyBillingPeriods.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.YearUtc == only.Year && x.MonthUtc == only.Month, cancellationToken);
+            singlePeriodId = p?.Id;
+        }
+
+        return new BillingMonthBreakdownDto
+        {
+            CompanyId = companyId,
+            YearUtc = rangeStartUtc.Year,
+            MonthUtc = rangeStartUtc.Month,
+            BillingPeriodId = singlePeriodId,
+            RangeStartUtc = rangeStartUtc,
+            RangeEndExclusiveUtc = rangeEndExclusiveUtc,
+            Currency = currency,
+            BillableBookingCount = rangeBookings.Count,
+            PayableTotal = payable,
+            LedgerTotal = ledger,
+            Segments = segments,
+            Bookings = bookingRows
+        };
+    }
+
+    private async Task<CompanyBillingPeriod> EnsureBillingPeriodAsync(
+        Guid companyId,
+        int yearUtc,
+        int monthUtc,
+        string currency,
+        CancellationToken cancellationToken)
+    {
+        var period = await _db.CompanyBillingPeriods
+            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.YearUtc == yearUtc && p.MonthUtc == monthUtc, cancellationToken);
+        if (period != null)
+            return period;
+        period = new CompanyBillingPeriod
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            YearUtc = yearUtc,
+            MonthUtc = monthUtc,
+            Currency = currency,
+            Status = CompanyBillingPeriodStatus.Open
+        };
+        _db.CompanyBillingPeriods.Add(period);
+        await _db.SaveChangesAsync(cancellationToken);
+        return period;
+    }
+
+    private async Task<HashSet<Guid>> LoadExcludedBookingIdsForPeriodAsync(Guid periodId, CancellationToken cancellationToken)
+    {
+        var list = await _db.BillingPeriodExcludedBookings.AsNoTracking()
+            .Where(x => x.CompanyBillingPeriodId == periodId)
+            .Select(x => x.BookingId)
+            .ToListAsync(cancellationToken);
+        return list.ToHashSet();
     }
 
     private async Task<bool> HasPayableBookingsAsync(
@@ -171,20 +309,8 @@ public sealed class BillingMonthBreakdownReader : IBillingMonthBreakdownReader
         return string.IsNullOrWhiteSpace(cur) ? "EUR" : cur;
     }
 
-    private async Task<Guid?> ResolvePlanIdAtAsync(Guid companyId, DateTime instantUtc, CancellationToken cancellationToken)
-    {
-        var row = await _db.CompanySubscriptionAssignments.AsNoTracking()
-            .Where(a => a.CompanyId == companyId && a.EffectiveFromUtc <= instantUtc)
-            .OrderByDescending(a => a.EffectiveFromUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (row != null)
-            return row.SubscriptionPlanId;
-
-        return await _db.Companies.AsNoTracking()
-            .Where(c => c.Id == companyId)
-            .Select(c => c.SubscriptionPlanId)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
+    private Task<Guid?> ResolvePlanIdAtAsync(Guid companyId, DateTime instantUtc, CancellationToken cancellationToken) =>
+        CompanySubscriptionPlanResolver.ResolvePlanIdAtAsync(_db, companyId, instantUtc, cancellationToken);
 
     private async Task<IReadOnlyList<BillingMonthSegmentDto>> BuildSegmentsFromBookingsAndLinesAsync(
         IReadOnlyList<Booking> monthBookings,
