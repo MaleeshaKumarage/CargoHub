@@ -17,6 +17,8 @@ import {
   BOOKING_RULE_SECTION_ORDER,
   type BookingFieldRules,
   type BookingSectionId,
+  type RequirementLevel,
+  applySectionRequirement,
   bookingFieldRulesToApiBody,
   defaultBookingFieldRules,
   defsForSection,
@@ -26,6 +28,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const emptyEntry: AddressEntry = {
   name: "",
@@ -91,6 +95,10 @@ function sectionDescription(sectionId: BookingSectionId, tSections: (key: string
   }
 }
 
+function isMandatory(level: RequirementLevel | undefined): boolean {
+  return (level ?? "optional") === "mandatory";
+}
+
 export default function ActionsPage() {
   const t = useTranslations("actions");
   const tSections = useTranslations("bookings.sections");
@@ -110,6 +118,7 @@ export default function ActionsPage() {
   const [rulesError, setRulesError] = useState<string | null>(null);
   const [rulesSaving, setRulesSaving] = useState(false);
   const [rulesSavedHint, setRulesSavedHint] = useState(false);
+  const [activeTab, setActiveTab] = useState("addressBook");
 
   const roles = user?.roles ?? [];
   const isSuperAdmin = Array.isArray(roles) && roles.includes("SuperAdmin");
@@ -184,18 +193,19 @@ export default function ActionsPage() {
   }
 
   function isDuplicateEntry(newEntry: AddressEntry, existingList: AddressEntry[]): boolean {
-    return existingList.some((existing) => 
-      (existing.name ?? "").trim().toLowerCase() === (newEntry.name ?? "").trim().toLowerCase() &&
-      (existing.address1 ?? "").trim().toLowerCase() === (newEntry.address1 ?? "").trim().toLowerCase() &&
-      (existing.address2 ?? "").trim().toLowerCase() === (newEntry.address2 ?? "").trim().toLowerCase() &&
-      (existing.postalCode ?? "").trim().toLowerCase() === (newEntry.postalCode ?? "").trim().toLowerCase() &&
-      (existing.city ?? "").trim().toLowerCase() === (newEntry.city ?? "").trim().toLowerCase() &&
-      (existing.country ?? "").trim().toLowerCase() === (newEntry.country ?? "").trim().toLowerCase() &&
-      (existing.email ?? "").trim().toLowerCase() === (newEntry.email ?? "").trim().toLowerCase() &&
-      (existing.phoneNumber ?? "").trim() === (newEntry.phoneNumber ?? "").trim() &&
-      (existing.contactPersonName ?? "").trim().toLowerCase() === (newEntry.contactPersonName ?? "").trim().toLowerCase() &&
-      (existing.vatNo ?? "").trim().toLowerCase() === (newEntry.vatNo ?? "").trim().toLowerCase() &&
-      (existing.customerNumber ?? "").trim().toLowerCase() === (newEntry.customerNumber ?? "").trim().toLowerCase()
+    return existingList.some(
+      (existing) =>
+        (existing.name ?? "").trim().toLowerCase() === (newEntry.name ?? "").trim().toLowerCase() &&
+        (existing.address1 ?? "").trim().toLowerCase() === (newEntry.address1 ?? "").trim().toLowerCase() &&
+        (existing.address2 ?? "").trim().toLowerCase() === (newEntry.address2 ?? "").trim().toLowerCase() &&
+        (existing.postalCode ?? "").trim().toLowerCase() === (newEntry.postalCode ?? "").trim().toLowerCase() &&
+        (existing.city ?? "").trim().toLowerCase() === (newEntry.city ?? "").trim().toLowerCase() &&
+        (existing.country ?? "").trim().toLowerCase() === (newEntry.country ?? "").trim().toLowerCase() &&
+        (existing.email ?? "").trim().toLowerCase() === (newEntry.email ?? "").trim().toLowerCase() &&
+        (existing.phoneNumber ?? "").trim() === (newEntry.phoneNumber ?? "").trim() &&
+        (existing.contactPersonName ?? "").trim().toLowerCase() === (newEntry.contactPersonName ?? "").trim().toLowerCase() &&
+        (existing.vatNo ?? "").trim().toLowerCase() === (newEntry.vatNo ?? "").trim().toLowerCase() &&
+        (existing.customerNumber ?? "").trim().toLowerCase() === (newEntry.customerNumber ?? "").trim().toLowerCase()
     );
   }
 
@@ -243,51 +253,50 @@ export default function ActionsPage() {
 
   if (!isAuthenticated || isLoading) return null;
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("addressBook")}</CardTitle>
-          <CardDescription>{t("addressBookDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isSuperAdmin && addressBooks.length > 1 && (
-            <div className="space-y-2">
-              <Label className="text-sm">{t("filterByCompany")}</Label>
-              <select
-                className="w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selectedCompanyId ?? ""}
-                onChange={(e) => setSelectedCompanyId(e.target.value || null)}
-              >
-                {addressBooks.map((ab) => (
-                  <option key={ab.companyId} value={ab.companyId}>
-                    {ab.companyName || ab.companyId}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {data?.companyName && (
-            <p className="text-sm text-muted-foreground">
-              {t("company")}: <span className="font-medium">{data.companyName}</span>
-            </p>
-          )}
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-          {loading ? (
-            <p className="text-muted-foreground">{t("loading")}</p>
-          ) : !data ? (
-            <p className="text-muted-foreground">{t("noCompany")}</p>
-          ) : (
-            <div className="space-y-6">
-              {/* Add Forms - hidden for SuperAdmin (view-only address books) */}
-              {!isSuperAdmin && (
+  const companyFilter =
+    isSuperAdmin && addressBooks.length > 1 ? (
+      <div className="space-y-2">
+        <Label className="text-sm">{t("filterByCompany")}</Label>
+        <select
+          className="w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={selectedCompanyId ?? ""}
+          onChange={(e) => setSelectedCompanyId(e.target.value || null)}
+        >
+          {addressBooks.map((ab) => (
+            <option key={ab.companyId} value={ab.companyId}>
+              {ab.companyName || ab.companyId}
+            </option>
+          ))}
+        </select>
+      </div>
+    ) : null;
+
+  const addressBookCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("addressBook")}</CardTitle>
+        <CardDescription>{t("addressBookDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!canEditBookingRules ? companyFilter : null}
+        {data?.companyName && (
+          <p className="text-sm text-muted-foreground">
+            {t("company")}: <span className="font-medium">{data.companyName}</span>
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        {loading ? (
+          <p className="text-muted-foreground">{t("loading")}</p>
+        ) : !data ? (
+          <p className="text-muted-foreground">{t("noCompany")}</p>
+        ) : (
+          <div className="space-y-6">
+            {!isSuperAdmin && (
               <div className="grid gap-6 md:grid-cols-2">
-                {/* Add Sender Form */}
                 <form onSubmit={handleAddSender} className="space-y-3 rounded-lg border p-4 bg-muted/20">
                   <h2 className="text-lg font-semibold">{t("addSender")}</h2>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -352,7 +361,6 @@ export default function ActionsPage() {
                   </Button>
                 </form>
 
-                {/* Add Receiver Form */}
                 <form onSubmit={handleAddReceiver} className="space-y-3 rounded-lg border p-4 bg-muted/20">
                   <h2 className="text-lg font-semibold">{t("addReceiver")}</h2>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -417,160 +425,197 @@ export default function ActionsPage() {
                   </Button>
                 </form>
               </div>
-              )}
+            )}
 
-              {/* Address Book Lists - Bottom Section */}
-              <div className="grid gap-8 md:grid-cols-2">
-                {/* Senders List */}
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold">{t("senders")}</h2>
-                  <table className="w-full text-sm border rounded-md">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="p-2 text-left font-medium">{t("name")}</th>
-                        <th className="p-2 text-left font-medium">{t("city")}</th>
+            <div className="grid gap-8 md:grid-cols-2">
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">{t("senders")}</h2>
+                <table className="w-full text-sm border rounded-md">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left font-medium">{t("name")}</th>
+                      <th className="p-2 text-left font-medium">{t("city")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.senders.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="p-3 text-muted-foreground">
+                          {t("noSenders")}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {data.senders.length === 0 ? (
-                        <tr>
-                          <td colSpan={2} className="p-3 text-muted-foreground">
-                            {t("noSenders")}
-                          </td>
+                    ) : (
+                      data.senders.map((s) => (
+                        <tr key={s.id ?? s.name} className="border-b">
+                          <td className="p-2">{s.name || "—"}</td>
+                          <td className="p-2">{s.city || "—"}</td>
                         </tr>
-                      ) : (
-                        data.senders.map((s) => (
-                          <tr key={s.id ?? s.name} className="border-b">
-                            <td className="p-2">{s.name || "—"}</td>
-                            <td className="p-2">{s.city || "—"}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-                {/* Receivers List */}
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold">{t("receivers")}</h2>
-                  <table className="w-full text-sm border rounded-md">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="p-2 text-left font-medium">{t("name")}</th>
-                        <th className="p-2 text-left font-medium">{t("city")}</th>
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">{t("receivers")}</h2>
+                <table className="w-full text-sm border rounded-md">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left font-medium">{t("name")}</th>
+                      <th className="p-2 text-left font-medium">{t("city")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.receivers.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="p-3 text-muted-foreground">
+                          {t("noReceivers")}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {data.receivers.length === 0 ? (
-                        <tr>
-                          <td colSpan={2} className="p-3 text-muted-foreground">
-                            {t("noReceivers")}
-                          </td>
+                    ) : (
+                      data.receivers.map((r) => (
+                        <tr key={r.id ?? r.name} className="border-b">
+                          <td className="p-2">{r.name || "—"}</td>
+                          <td className="p-2">{r.city || "—"}</td>
                         </tr>
-                      ) : (
-                        data.receivers.map((r) => (
-                          <tr key={r.id ?? r.name} className="border-b">
-                            <td className="p-2">{r.name || "—"}</td>
-                            <td className="p-2">{r.city || "—"}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
-      {canEditBookingRules && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("bookingFieldRulesTitle")}</CardTitle>
-            <CardDescription>{t("bookingFieldRulesDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isSuperAdmin && !selectedCompanyId ? (
-              <p className="text-sm text-muted-foreground">{t("loading")}</p>
-            ) : rulesLoading ? (
-              <p className="text-sm text-muted-foreground">{t("loading")}</p>
-            ) : (
-              <>
-                {rulesError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {rulesError}
-                  </p>
-                )}
-                {rulesSavedHint && (
-                  <p className="text-sm text-muted-foreground" role="status">
-                    {t("rulesSaved")}
-                  </p>
-                )}
-                <div className="space-y-6">
-                  {BOOKING_RULE_SECTION_ORDER.map((sectionId) => (
-                    <div key={sectionId} className="rounded-lg border p-4 space-y-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <h3 className="font-semibold text-sm">{sectionTitle(sectionId, tSections, tFields)}</h3>
-                          <p className="text-xs text-muted-foreground">{sectionDescription(sectionId, tSections)}</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Label className="text-xs whitespace-nowrap">{t("sectionRequirement")}</Label>
-                          <select
-                            className="flex h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                            value={rulesDraft.sections[sectionId] ?? "optional"}
-                            onChange={(e) =>
-                              setRulesDraft((prev) => ({
-                                ...prev,
-                                sections: {
-                                  ...prev.sections,
-                                  [sectionId]: e.target.value as "mandatory" | "optional",
-                                },
-                              }))
-                            }
-                          >
-                            <option value="optional">{t("optional")}</option>
-                            <option value="mandatory">{t("mandatory")}</option>
-                          </select>
-                        </div>
+  const manageBookingCard = canEditBookingRules ? (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("bookingFieldRulesTitle")}</CardTitle>
+        <CardDescription>{t("bookingFieldRulesDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isSuperAdmin && !selectedCompanyId ? (
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
+        ) : rulesLoading ? (
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
+        ) : (
+          <>
+            {rulesError && (
+              <p className="text-sm text-destructive" role="alert">
+                {rulesError}
+              </p>
+            )}
+            {rulesSavedHint && (
+              <p className="text-sm text-muted-foreground" role="status">
+                {t("rulesSaved")}
+              </p>
+            )}
+            <div className="space-y-6">
+              {BOOKING_RULE_SECTION_ORDER.map((sectionId) => {
+                const sectionMandatory = isMandatory(rulesDraft.sections[sectionId]);
+                return (
+                  <div key={sectionId} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="font-semibold text-sm">{sectionTitle(sectionId, tSections, tFields)}</h3>
+                        <p className="text-xs text-muted-foreground">{sectionDescription(sectionId, tSections)}</p>
                       </div>
-                      <div className="space-y-2 pl-0 sm:pl-1">
-                        {defsForSection(sectionId).map((def) => (
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Label htmlFor={`section-${sectionId}`} className="text-xs whitespace-nowrap cursor-pointer">
+                          {t("sectionRequirement")}
+                        </Label>
+                        <Switch
+                          id={`section-${sectionId}`}
+                          checked={sectionMandatory}
+                          onCheckedChange={(checked) =>
+                            setRulesDraft((prev) =>
+                              applySectionRequirement(prev, sectionId, checked ? "mandatory" : "optional")
+                            )
+                          }
+                          aria-label={t("sectionRequirement")}
+                        />
+                        <span className="text-xs text-muted-foreground w-20">
+                          {sectionMandatory ? t("mandatory") : t("optional")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pl-0 sm:pl-1">
+                      {defsForSection(sectionId).map((def) => {
+                        const fieldMandatory = isMandatory(rulesDraft.fields[def.fieldId]);
+                        const lockedBySection = sectionMandatory;
+                        const showChecked = lockedBySection || fieldMandatory;
+                        return (
                           <div
                             key={def.fieldId}
                             className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-border/60 pt-2 first:border-t-0 first:pt-0"
                           >
-                            <Label className="text-sm font-normal">{tFields(def.labelKey as "name")}</Label>
-                            <select
-                              className="flex h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm sm:shrink-0"
-                              value={rulesDraft.fields[def.fieldId] ?? "optional"}
-                              onChange={(e) =>
-                                setRulesDraft((prev) => ({
-                                  ...prev,
-                                  fields: {
-                                    ...prev.fields,
-                                    [def.fieldId]: e.target.value as "mandatory" | "optional",
-                                  },
-                                }))
-                              }
+                            <Label
+                              htmlFor={`field-${def.fieldId}`}
+                              className="text-sm font-normal cursor-pointer sm:max-w-[55%]"
                             >
-                              <option value="optional">{t("optional")}</option>
-                              <option value="mandatory">{t("mandatory")}</option>
-                            </select>
+                              {tFields(def.labelKey as "name")}
+                            </Label>
+                            <div className="flex items-center gap-3 sm:shrink-0">
+                              <Switch
+                                id={`field-${def.fieldId}`}
+                                checked={showChecked}
+                                disabled={lockedBySection}
+                                onCheckedChange={(checked) => {
+                                  if (lockedBySection) return;
+                                  setRulesDraft((prev) => ({
+                                    ...prev,
+                                    fields: {
+                                      ...prev.fields,
+                                      [def.fieldId]: checked ? "mandatory" : "optional",
+                                    },
+                                  }));
+                                }}
+                                aria-label={tFields(def.labelKey as "name")}
+                              />
+                              <span className="text-xs text-muted-foreground w-20">
+                                {showChecked ? t("mandatory") : t("optional")}
+                              </span>
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-                <Button type="button" onClick={() => void handleSaveBookingRules()} disabled={rulesSaving}>
-                  {rulesSaving ? t("savingRules") : t("saveRules")}
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                );
+              })}
+            </div>
+            <Button type="button" onClick={() => void handleSaveBookingRules()} disabled={rulesSaving}>
+              {rulesSaving ? t("savingRules") : t("saveRules")}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  ) : null;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+
+      {canEditBookingRules ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {companyFilter ? <div className="mb-2">{companyFilter}</div> : null}
+          <TabsList>
+            <TabsTrigger value="addressBook">{t("tabAddressBook")}</TabsTrigger>
+            <TabsTrigger value="manageBooking">{t("tabManageBooking")}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="addressBook" className="mt-4">
+            {addressBookCard}
+          </TabsContent>
+          <TabsContent value="manageBooking" className="mt-4">
+            {manageBookingCard}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        addressBookCard
       )}
     </div>
   );

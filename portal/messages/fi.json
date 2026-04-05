@@ -274,6 +274,8 @@
     "title": "Toiminnot",
     "description": "Sopimusnumerot, oletuslähettäjä, osoitekirja jne.",
     "comingSoon": "Tulossa, kun taustapalvelut ovat käytettävissä.",
+    "tabAddressBook": "Osoitekirja",
+    "tabManageBooking": "Varauslomakkeen asetukset",
     "addressBook": "Osoitekirja",
     "addressBookDescription": "Lähettäjät ja vastaanottajat yhtiöittäin. Käytä näitä luodessa varauksia. Ei jaettu yhtiöiden välillä.",
     "company": "Yhtiö",

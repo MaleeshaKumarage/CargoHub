@@ -180,6 +180,8 @@
     "title": "Handlinger",
     "description": "Avtalenummer, standardavsender, adressebok og andre firmarelaterte handlinger.",
     "comingSoon": "Kommer snart når backend-endepunkter er tilgjengelige.",
+    "tabAddressBook": "Adressebok",
+    "tabManageBooking": "Administrer bookingsside",
     "addressBook": "Adressebok",
     "addressBookDescription": "Avsendere og mottakere per firma. Bruk disse når du oppretter bookinger. Deles ikke mellom firmaer.",
     "company": "Firma",

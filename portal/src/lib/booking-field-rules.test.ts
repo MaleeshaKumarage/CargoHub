@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applySectionRequirement,
   bookingFieldRulesToApiBody,
   defaultBookingFieldRules,
   isFieldRequired,
@@ -51,6 +52,16 @@ describe("parseBookingFieldRulesFromApi", () => {
     expect(r.sections.shipper).toBe("mandatory");
     expect(r.fields["shipper.name"]).toBe("optional");
   });
+
+  it("strips legacy courier field rules from stored payload", () => {
+    const r = parseBookingFieldRulesFromApi({
+      version: 1,
+      sections: { shipper: "optional" },
+      fields: { "courier.postalService": "mandatory", "shipper.name": "optional" },
+    });
+    expect(r.fields["courier.postalService"]).toBeUndefined();
+    expect(r.fields["shipper.name"]).toBe("optional");
+  });
 });
 
 describe("isFieldRequired", () => {
@@ -96,14 +107,6 @@ describe("validateBookingCreateForm", () => {
     packages: [pkg({ weight: "1", packageType: "box" })],
   });
 
-  it("flags empty postal service when courier mandatory", () => {
-    const rules = defaultBookingFieldRules();
-    rules.sections.courier = "mandatory";
-    const ctx = { ...baseCtx(), postalService: "" };
-    const err = validateBookingCreateForm(ctx, rules, "Required");
-    expect(err["courier.postalService"]).toBe("Required");
-  });
-
   it("skips payer party when payer is sender", () => {
     const rules = defaultBookingFieldRules();
     rules.sections.payer = "mandatory";
@@ -135,5 +138,25 @@ describe("bookingFieldRulesToApiBody", () => {
     expect(body.version).toBe(1);
     expect(body.sections.shipper).toBe("optional");
     expect(body.fields["shipper.name"]).toBe("optional");
+    expect(body.sections.courier).toBeUndefined();
+    expect(body.fields["courier.postalService"]).toBeUndefined();
+  });
+});
+
+describe("applySectionRequirement", () => {
+  it("sets all fields in section to mandatory when section is mandatory", () => {
+    let rules = defaultBookingFieldRules();
+    rules = applySectionRequirement(rules, "shipper", "mandatory");
+    expect(rules.sections.shipper).toBe("mandatory");
+    expect(rules.fields["shipper.name"]).toBe("mandatory");
+    expect(rules.fields["shipper.email"]).toBe("mandatory");
+  });
+
+  it("does not clear field entries when section becomes optional", () => {
+    let rules = defaultBookingFieldRules();
+    rules = applySectionRequirement(rules, "receiver", "mandatory");
+    rules = applySectionRequirement(rules, "receiver", "optional");
+    expect(rules.sections.receiver).toBe("optional");
+    expect(rules.fields["receiver.name"]).toBe("mandatory");
   });
 });
