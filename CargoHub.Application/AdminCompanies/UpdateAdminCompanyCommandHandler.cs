@@ -1,3 +1,4 @@
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Application.Billing.AdminPlans;
 using CargoHub.Application.Company;
 using MediatR;
@@ -11,19 +12,22 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
     private readonly ICompanyUserMetrics _metrics;
     private readonly IAdminCompanyLimitUserOperations _limitUserOperations;
     private readonly ISubscriptionPlanAdminRepository _subscriptionPlans;
+    private readonly ICompanySubscriptionAssignmentRepository _subscriptionAssignments;
 
     public UpdateAdminCompanyCommandHandler(
         ICompanyRepository companies,
         ICompanyAdminInviteIssuer inviteIssuer,
         ICompanyUserMetrics metrics,
         IAdminCompanyLimitUserOperations limitUserOperations,
-        ISubscriptionPlanAdminRepository subscriptionPlans)
+        ISubscriptionPlanAdminRepository subscriptionPlans,
+        ICompanySubscriptionAssignmentRepository subscriptionAssignments)
     {
         _companies = companies;
         _inviteIssuer = inviteIssuer;
         _metrics = metrics;
         _limitUserOperations = limitUserOperations;
         _subscriptionPlans = subscriptionPlans;
+        _subscriptionAssignments = subscriptionAssignments;
     }
 
     public async Task<AdminCompanyMutationResult> Handle(UpdateAdminCompanyCommand request, CancellationToken cancellationToken)
@@ -88,8 +92,23 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
             company.MaxUserAccounts = request.MaxUserAccounts;
         if (request.MaxAdminAccounts.HasValue)
             company.MaxAdminAccounts = request.MaxAdminAccounts;
+
         if (request.SubscriptionPlanId.HasValue)
-            company.SubscriptionPlanId = request.SubscriptionPlanId;
+        {
+            var newPlanId = request.SubscriptionPlanId.Value;
+            var previousPlanId = company.SubscriptionPlanId;
+            if (!previousPlanId.HasValue || previousPlanId.Value != newPlanId)
+            {
+                await _subscriptionAssignments.RecordAsync(
+                    company.Id,
+                    newPlanId,
+                    DateTime.UtcNow,
+                    null,
+                    cancellationToken);
+            }
+
+            company.SubscriptionPlanId = newPlanId;
+        }
 
         await _companies.UpdateAsync(company, cancellationToken);
 

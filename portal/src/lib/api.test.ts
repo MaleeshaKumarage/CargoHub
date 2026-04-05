@@ -21,6 +21,9 @@ import {
   adminSendTestEmail,
   adminSendReleaseNotes,
   adminGetCompanyBillingPeriods,
+  adminGetBillableMonths,
+  adminGetBillingMonthBreakdown,
+  adminSetBookingInvoiceExcluded,
   AdminCompanyLimitReductionRequiredError,
   DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
   adminGetBillingPeriodDetail,
@@ -940,6 +943,97 @@ describe("api", () => {
         json: async () => ({ message: "Nope" }),
       });
       await expect(adminGetCompanyBillingPeriods("token", "c1")).rejects.toThrow(/Nope|404/);
+    });
+  });
+
+  describe("adminGetBillableMonths", () => {
+    it("returns normalized months", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            YearUtc: 2026,
+            MonthUtc: 4,
+            BillableBookingCount: 2,
+            BillingPeriodId: "per1",
+          },
+        ],
+      });
+      const list = await adminGetBillableMonths("token", "c1");
+      expect(list).toHaveLength(1);
+      expect(list[0].yearUtc).toBe(2026);
+      expect(list[0].monthUtc).toBe(4);
+      expect(list[0].billableBookingCount).toBe(2);
+      expect(list[0].billingPeriodId).toBe("per1");
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/companies/c1/billable-months"), expect.any(Object));
+    });
+    it("throws when API returns non-ok", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ message: "Bad" }),
+      });
+      await expect(adminGetBillableMonths("token", "c1")).rejects.toThrow(/Bad/);
+    });
+  });
+
+  describe("adminGetBillingMonthBreakdown", () => {
+    it("returns normalized breakdown", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          CompanyId: "c1",
+          YearUtc: 2026,
+          MonthUtc: 4,
+          BillingPeriodId: "per1",
+          Currency: "EUR",
+          BillableBookingCount: 1,
+          PayableTotal: 9.5,
+          LedgerTotal: 10,
+          Segments: [
+            {
+              Label: "Tier 1",
+              BookingCount: 1,
+              UnitRate: 9.5,
+              Subtotal: 9.5,
+              PlanKind: "Tiered",
+              SubscriptionPlanId: "p1",
+            },
+          ],
+          Bookings: [
+            {
+              BookingId: "b1",
+              ShipmentNumber: null,
+              ReferenceNumber: "R1",
+              PlanLabel: "Pro",
+              Description: "Leg",
+              Amount: 9.5,
+              ExcludedFromInvoice: false,
+            },
+          ],
+        }),
+      });
+      const b = await adminGetBillingMonthBreakdown("token", "c1", 2026, 4);
+      expect(b.billingPeriodId).toBe("per1");
+      expect(b.payableTotal).toBe(9.5);
+      expect(b.segments).toHaveLength(1);
+      expect(b.segments[0].label).toBe("Tier 1");
+      expect(b.bookings[0].bookingId).toBe("b1");
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/companies/c1/billing-months/2026/4/breakdown"),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe("adminSetBookingInvoiceExcluded", () => {
+    it("PATCHes excluded flag", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, status: 204 });
+      await adminSetBookingInvoiceExcluded("token", "per1", "b1", true);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/billing-periods/per1/bookings/b1/invoice-excluded"),
+        expect.objectContaining({ method: "PATCH" })
+      );
     });
   });
 

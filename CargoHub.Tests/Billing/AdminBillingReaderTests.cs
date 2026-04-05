@@ -1,8 +1,10 @@
 using CargoHub.Application.Billing;
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Domain.Billing;
 using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Billing;
 using CargoHub.Infrastructure.Persistence;
+using Moq;
 using Xunit;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
 
@@ -15,6 +17,15 @@ public class AdminBillingReaderTests : IDisposable
     public AdminBillingReaderTests() => _fixture = new TestDbFixture();
 
     public void Dispose() => _fixture.Dispose();
+
+    private static AdminBillingReader CreateReader(ApplicationDbContext ctx)
+    {
+        var breakMock = new Mock<IBillingMonthBreakdownReader>();
+        breakMock
+            .Setup(x => x.GetBreakdownAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((BillingMonthBreakdownDto?)null);
+        return new AdminBillingReader(ctx, breakMock.Object);
+    }
 
     [Fact]
     public async Task ListSubscriptionPlans_ReturnsOrderedByName()
@@ -39,7 +50,7 @@ public class AdminBillingReaderTests : IDisposable
         ctx.SubscriptionPlans.AddRange(planB, planA);
         await ctx.SaveChangesAsync();
 
-        var reader = new AdminBillingReader(ctx);
+        var reader = CreateReader(ctx);
         var list = await reader.ListSubscriptionPlansAsync();
         Assert.Equal(2, list.Count);
         Assert.Equal("Alpha", list[0].Name);
@@ -114,7 +125,7 @@ public class AdminBillingReaderTests : IDisposable
         });
         await ctx.SaveChangesAsync();
 
-        var reader = new AdminBillingReader(ctx);
+        var reader = CreateReader(ctx);
         var periods = await reader.ListBillingPeriodsForCompanyAsync(companyId);
         Assert.Single(periods);
         Assert.Equal(2026, periods[0].YearUtc);
@@ -133,7 +144,7 @@ public class AdminBillingReaderTests : IDisposable
     public async Task GetBillingPeriodDetail_UnknownId_ReturnsNull()
     {
         using var ctx = _fixture.CreateContext();
-        var reader = new AdminBillingReader(ctx);
+        var reader = CreateReader(ctx);
         Assert.Null(await reader.GetBillingPeriodDetailAsync(Guid.NewGuid()));
     }
 }

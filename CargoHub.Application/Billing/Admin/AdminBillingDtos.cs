@@ -87,6 +87,10 @@ public sealed class BillingInvoicePdfModel
     public decimal PayableTotal { get; init; }
     public decimal LedgerTotal { get; init; }
     public IReadOnlyList<BillingInvoicePdfLineModel> Lines { get; init; } = Array.Empty<BillingInvoicePdfLineModel>();
+
+    public IReadOnlyList<BillingInvoicePdfSegmentModel> Segments { get; init; } = Array.Empty<BillingInvoicePdfSegmentModel>();
+
+    public IReadOnlyList<BillingInvoicePdfBookingRowModel> BookingRows { get; init; } = Array.Empty<BillingInvoicePdfBookingRowModel>();
 }
 
 public sealed class BillingInvoicePdfLineModel
@@ -96,4 +100,94 @@ public sealed class BillingInvoicePdfLineModel
     public decimal Amount { get; init; }
     public bool ExcludedFromInvoice { get; init; }
     public Guid? BookingId { get; init; }
+}
+
+/// <summary>UTC month that has at least one billable booking for a company.</summary>
+public sealed class BillableMonthSummaryDto
+{
+    public int YearUtc { get; init; }
+
+    public int MonthUtc { get; init; }
+
+    public int BillableBookingCount { get; init; }
+
+    public Guid? BillingPeriodId { get; init; }
+}
+
+public sealed class BillingMonthSegmentDto
+{
+    public string Label { get; init; } = "";
+
+    public int BookingCount { get; init; }
+
+    public decimal? UnitRate { get; init; }
+
+    public decimal Subtotal { get; init; }
+
+    public string PlanKind { get; init; } = "";
+
+    public Guid? SubscriptionPlanId { get; init; }
+}
+
+public sealed class BillingMonthBookingRowDto
+{
+    public Guid BookingId { get; init; }
+
+    public string? ShipmentNumber { get; init; }
+
+    public string? ReferenceNumber { get; init; }
+
+    public string PlanLabel { get; init; } = "";
+
+    public string Description { get; init; } = "";
+
+    public decimal Amount { get; init; }
+
+    public bool ExcludedFromInvoice { get; init; }
+}
+
+/// <summary>Super Admin billing month view: segments, per-booking rows, totals.</summary>
+public sealed class BillingMonthBreakdownDto
+{
+    public Guid CompanyId { get; init; }
+
+    public int YearUtc { get; init; }
+
+    public int MonthUtc { get; init; }
+
+    public Guid BillingPeriodId { get; init; }
+
+    public string Currency { get; init; } = "EUR";
+
+    public int BillableBookingCount { get; init; }
+
+    public decimal PayableTotal { get; init; }
+
+    public decimal LedgerTotal { get; init; }
+
+    public IReadOnlyList<BillingMonthSegmentDto> Segments { get; init; } = Array.Empty<BillingMonthSegmentDto>();
+
+    public IReadOnlyList<BillingMonthBookingRowDto> Bookings { get; init; } = Array.Empty<BillingMonthBookingRowDto>();
+}
+
+public sealed class BillingInvoicePdfSegmentModel
+{
+    public string Label { get; init; } = "";
+
+    public int BookingCount { get; init; }
+
+    public decimal? UnitRate { get; init; }
+
+    public decimal Subtotal { get; init; }
+}
+
+public sealed class BillingInvoicePdfBookingRowModel
+{
+    public Guid BookingId { get; init; }
+
+    public string? Reference { get; init; }
+
+    public decimal Amount { get; init; }
+
+    public bool ExcludedFromInvoice { get; init; }
 }

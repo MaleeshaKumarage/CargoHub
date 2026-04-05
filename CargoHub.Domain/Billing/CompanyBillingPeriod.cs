@@ -19,4 +19,6 @@ public class CompanyBillingPeriod
     public ICollection<BillingLineItem> LineItems { get; set; } = new List<BillingLineItem>();
 
     public ICollection<SubscriptionInvoiceSend> InvoiceSends { get; set; } = new List<SubscriptionInvoiceSend>();
+
+    public ICollection<BillingPeriodExcludedBooking> ExcludedBookings { get; set; } = new List<BillingPeriodExcludedBooking>();
 }
