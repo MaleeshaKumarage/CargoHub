@@ -94,5 +94,7 @@ public sealed class AdminBillingReaderInvoicePdfTests
         Assert.Equal("Test Oy", model.CompanyName);
         Assert.Equal("1234567-8", model.BusinessId);
         Assert.Equal(2, model.Lines.Count);
+        Assert.Equal(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), model.InvoiceRangeStartUtc);
+        Assert.Equal(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc), model.InvoiceRangeEndExclusiveUtc);
     }
 }

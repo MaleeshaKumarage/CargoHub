@@ -16,6 +16,9 @@ const mockGetCompanies = vi.fn();
 const mockGetBreakdownByRange = vi.fn();
 const mockGetDetail = vi.fn();
 const mockGetUsers = vi.fn();
+const mockDownloadPdf = vi.fn();
+const mockSendInvoiceEmail = vi.fn();
+const mockSetBookingExcluded = vi.fn();
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -25,9 +28,9 @@ vi.mock("@/lib/api", async () => {
     adminGetBillingBreakdownByDateRange: (...a: unknown[]) => mockGetBreakdownByRange(...a),
     adminGetBillingPeriodDetail: (...a: unknown[]) => mockGetDetail(...a),
     adminGetUsers: (...a: unknown[]) => mockGetUsers(...a),
-    adminDownloadBillingPeriodInvoicePdf: vi.fn(),
-    adminSendBillingPeriodInvoiceEmail: vi.fn(),
-    adminSetBookingInvoiceExcluded: vi.fn(),
+    adminDownloadBillingPeriodInvoicePdf: (...a: unknown[]) => mockDownloadPdf(...a),
+    adminSendBillingPeriodInvoiceEmail: (...a: unknown[]) => mockSendInvoiceEmail(...a),
+    adminSetBookingInvoiceExcluded: (...a: unknown[]) => mockSetBookingExcluded(...a),
   };
 });
 
@@ -66,6 +69,9 @@ describe("ManageInvoicesPage", () => {
     mockGetCompanies.mockResolvedValue([
       { id: "c1", name: "Acme", companyId: "x", businessId: "123" },
     ]);
+    mockDownloadPdf.mockResolvedValue(new Blob());
+    mockSendInvoiceEmail.mockResolvedValue(undefined);
+    mockSetBookingExcluded.mockResolvedValue(undefined);
     mockGetBreakdownByRange.mockResolvedValue(defaultBreakdown);
     mockGetDetail.mockResolvedValue({
       id: "per1",
@@ -97,6 +103,7 @@ describe("ManageInvoicesPage", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "loadBreakdown" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "loadBreakdown" }));
     await waitFor(() => expect(mockGetBreakdownByRange).toHaveBeenCalledWith("jwt", "c1", expect.any(String), expect.any(String)));
+    await waitFor(() => expect(screen.queryByText("loadingBreakdown")).not.toBeInTheDocument());
   }
 
   it("renders heading and loads companies", async () => {
@@ -227,5 +234,79 @@ describe("ManageInvoicesPage", () => {
       lineItems: [],
     });
     await waitFor(() => expect(screen.queryByText("…")).not.toBeInTheDocument());
+  });
+
+  it("shows endBeforeStart when range end is before start", async () => {
+    render(<ManageInvoicesPage />);
+    await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
+    const companyCombo = screen.getByRole("combobox", { name: "selectCompany" });
+    await waitFor(() => expect(companyCombo).not.toBeDisabled());
+    fireEvent.change(companyCombo, { target: { value: "c1" } });
+    await waitFor(() => expect(screen.getByLabelText("periodStart")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("periodStart"), { target: { value: "2026-04-10" } });
+    fireEvent.change(screen.getByLabelText("periodEnd"), { target: { value: "2026-04-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "loadBreakdown" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("endBeforeStart"));
+  });
+
+  it("shows multi-month invoice hint when period id is missing but bookings exist", async () => {
+    mockGetBreakdownByRange.mockResolvedValueOnce({
+      ...defaultBreakdown,
+      billingPeriodId: null,
+      billableBookingCount: 1,
+    });
+    render(<ManageInvoicesPage />);
+    await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
+    await selectCompanyAndLoadBreakdown();
+    await waitFor(() => expect(screen.getByText("multiMonthInvoiceHint")).toBeInTheDocument());
+  });
+
+  it("downloads PDF when save invoice is clicked", async () => {
+    mockDownloadPdf.mockResolvedValueOnce(new Blob(["%PDF"], { type: "application/pdf" }));
+    const origCreate = URL.createObjectURL?.bind(URL);
+    const origRevoke = URL.revokeObjectURL?.bind(URL);
+    URL.createObjectURL = vi.fn(() => "blob:mock");
+    URL.revokeObjectURL = vi.fn();
+    render(<ManageInvoicesPage />);
+    await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
+    await selectCompanyAndLoadBreakdown();
+    fireEvent.click(screen.getByRole("button", { name: "saveInvoice" }));
+    await waitFor(() =>
+      expect(mockDownloadPdf).toHaveBeenCalledWith("jwt", "per1", { from: expect.any(String), to: expect.any(String) }),
+    );
+    if (origCreate) URL.createObjectURL = origCreate;
+    else delete (URL as unknown as { createObjectURL?: unknown }).createObjectURL;
+    if (origRevoke) URL.revokeObjectURL = origRevoke;
+    else delete (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL;
+  });
+
+  it("sends invoice email when recipient selected", async () => {
+    mockSendInvoiceEmail.mockResolvedValueOnce(undefined);
+    render(<ManageInvoicesPage />);
+    await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
+    await selectCompanyAndLoadBreakdown();
+    const recipient = screen.getByLabelText("recipientAdmin");
+    await waitFor(() => expect(recipient).not.toBeDisabled());
+    fireEvent.change(recipient, { target: { value: "u1" } });
+    fireEvent.click(screen.getByRole("button", { name: "sendInvoice" }));
+    await waitFor(() =>
+      expect(mockSendInvoiceEmail).toHaveBeenCalledWith("jwt", "per1", "u1", {
+        from: expect.any(String),
+        to: expect.any(String),
+      }),
+    );
+  });
+
+  it("toggles exclude booking and refreshes breakdown", async () => {
+    mockSetBookingExcluded.mockResolvedValue(undefined);
+    render(<ManageInvoicesPage />);
+    await waitFor(() => expect(mockGetCompanies).toHaveBeenCalled());
+    await selectCompanyAndLoadBreakdown();
+    const sw = screen.getAllByRole("switch", { name: "excludeBooking" })[0];
+    fireEvent.click(sw);
+    await waitFor(() =>
+      expect(mockSetBookingExcluded).toHaveBeenCalledWith("jwt", "per1", "b1", true),
+    );
+    await waitFor(() => expect(mockGetBreakdownByRange).toHaveBeenCalledTimes(2));
   });
 });

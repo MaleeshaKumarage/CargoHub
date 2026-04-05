@@ -8,6 +8,12 @@ import {
   buildCurrencyDonutOption,
   buildMonthlyEarningsLineOption,
   buildMonetaryHorizontalBarOption,
+  buildSunburstOption,
+  buildSankeyOption,
+  buildDailyVolumeLineOption,
+  buildDeliveryBoxplotOption,
+  buildDayHourHeatmapOption,
+  buildTodayVsAverageBulletOption,
 } from "./dashboard-echarts";
 
 const theme = {
@@ -118,6 +124,27 @@ describe("buildLast7DaysGroupedBarOption", () => {
     // last7 ends 2025-01-14 … 2025-01-08; index 5 is Monday 2025-01-13 → avg of Mon = (4+8)/2
     expect(series[1].data[5].value).toBe(6);
   });
+
+  it("tooltip formatter covers array params, tuple values, decimals, and non-numeric skip", () => {
+    const daily: { date: string; count: number }[] = [];
+    for (let d = 1; d <= 14; d++) {
+      daily.push({ date: `2025-01-${String(d).padStart(2, "0")}`, count: 0 });
+    }
+    const opt = buildLast7DaysGroupedBarOption(daily, theme, "Act", "Avg", "#111", "#222", dow);
+    const fmt = opt!.tooltip?.formatter as (p: unknown) => string;
+    const multi = fmt([
+      { dataIndex: 5, seriesName: "Act", value: 7 },
+      { dataIndex: 5, seriesName: "Avg", value: 2.25 },
+    ]);
+    expect(multi).toContain("2025-01-13");
+    expect(multi).toContain("7");
+    expect(multi).toContain("2.3");
+    const single = fmt({ dataIndex: 1, seriesName: "Act", value: [4] });
+    expect(single).toContain("2025-01-09");
+    expect(single).toContain("4");
+    const skip = fmt([{ dataIndex: 0, seriesName: "Act", value: "x" }]);
+    expect(skip).not.toContain("Act:");
+  });
 });
 
 describe("buildCityBarOption", () => {
@@ -155,6 +182,21 @@ describe("buildCurrencyDonutOption", () => {
     const s = opt.series?.[0] as { type: string; data: { name: string; value: number }[] };
     expect(s?.type).toBe("pie");
     expect(s?.data[0]).toMatchObject({ name: "Plan A", value: 60 });
+  });
+
+  it("tooltip formatter includes amount and percent", () => {
+    const opt = buildCurrencyDonutOption([{ key: "A", count: 1 }], ["#c"], theme, (n) => `€${n}`);
+    const fmt = opt.tooltip?.formatter as (p: { name?: string; value?: number; percent?: number }) => string;
+    expect(fmt({ name: "A", value: 2, percent: 12.3 })).toContain("€2");
+    expect(fmt({ name: "A", value: 2, percent: 12.3 })).toContain("12.3%");
+  });
+
+  it("label formatter handles missing percent", () => {
+    const opt = buildCurrencyDonutOption([{ key: "A", count: 1 }], ["#c"], theme, (n) => String(n));
+    const s = opt.series?.[0] as {
+      label: { formatter: (p: { name?: string; percent?: number }) => string };
+    };
+    expect(s?.label.formatter({ name: "X" })).toContain("X");
   });
 });
 
@@ -195,3 +237,128 @@ describe("buildMonetaryHorizontalBarOption", () => {
   });
 });
 
+describe("buildSunburstOption", () => {
+  it("shows empty hint when root missing or has no children", () => {
+    expect(buildSunburstOption(null, ["#a", "#b"], theme, "empty").title?.text).toBe("empty");
+    expect(buildSunburstOption({ name: "r", value: 1 }, ["#a", "#b"], theme, "empty").title?.text).toBe("empty");
+  });
+
+  it("builds sunburst series when children exist", () => {
+    const opt = buildSunburstOption(
+      { name: "root", value: 10, children: [{ name: "a", value: 4 }, { name: "b", value: 6 }] },
+      ["#c0", "#c1"],
+      theme,
+      "empty",
+    );
+    const s = opt.series?.[0] as { type: string; data: unknown[] };
+    expect(s?.type).toBe("sunburst");
+    expect(s?.data).toHaveLength(1);
+  });
+});
+
+describe("buildSankeyOption", () => {
+  it("shows empty hint when there are no links", () => {
+    const opt = buildSankeyOption({ nodes: [{ name: "A" }], links: [] }, theme, "no flow");
+    expect(opt.title?.text).toBe("no flow");
+  });
+
+  it("maps nodes and links when graph has flow", () => {
+    const opt = buildSankeyOption(
+      {
+        nodes: [{ name: "A" }, { name: "B" }],
+        links: [{ source: "A", target: "B", value: 3 }],
+      },
+      theme,
+      "no flow",
+    );
+    const s = opt.series?.[0] as { type: string; data: { name: string }[]; links: { source: string; value: number }[] };
+    expect(s?.type).toBe("sankey");
+    expect(s?.data).toHaveLength(2);
+    expect(s?.links[0].source).toBe("A");
+    expect(s?.links[0].value).toBe(3);
+  });
+});
+
+describe("buildDailyVolumeLineOption", () => {
+  it("uses sliced dates and line series", () => {
+    const opt = buildDailyVolumeLineOption(
+      [{ date: "2026-04-06", count: 2 }, { date: "2026-04-07", count: 5 }],
+      "#f00",
+      theme,
+      "bookings",
+    );
+    const x = opt.xAxis as { data: string[] };
+    expect(x.data).toEqual(["04-06", "04-07"]);
+    const series = opt.series?.[0] as { type: string; data: number[] };
+    expect(series?.type).toBe("line");
+    expect(series?.data).toEqual([2, 5]);
+    const fmt = opt.tooltip?.valueFormatter as (v: number) => string;
+    expect(fmt(3)).toBe("3 bookings");
+  });
+});
+
+describe("buildDeliveryBoxplotOption", () => {
+  it("shows title when sample is empty", () => {
+    const opt = buildDeliveryBoxplotOption(
+      {
+        sampleSize: 0,
+        minHours: 0,
+        q1Hours: 0,
+        medianHours: 0,
+        q3Hours: 0,
+        maxHours: 0,
+        outlierCount: 0,
+        sampleHours: [],
+      },
+      theme,
+      "Hours",
+    );
+    expect(opt.title?.text).toBe("Hours");
+  });
+
+  it("builds boxplot row when sample present", () => {
+    const opt = buildDeliveryBoxplotOption(
+      {
+        sampleSize: 4,
+        minHours: 1,
+        q1Hours: 2,
+        medianHours: 3,
+        q3Hours: 4,
+        maxHours: 9,
+        outlierCount: 0,
+        sampleHours: [],
+      },
+      theme,
+      "h",
+    );
+    const s = opt.series?.[0] as { type: string; data: number[][] };
+    expect(s?.type).toBe("boxplot");
+    expect(s?.data[0]).toEqual([1, 2, 3, 4, 9]);
+  });
+});
+
+describe("buildDayHourHeatmapOption", () => {
+  it("maps cells and uses max at least 1 for visualMap", () => {
+    const opt = buildDayHourHeatmapOption(
+      [{ dayOfWeek: 1, hour: 3, count: 0 }],
+      0,
+      theme,
+      ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    );
+    expect((opt.visualMap as { max: number }).max).toBe(1);
+    const s = opt.series?.[0] as { type: string; data: [number, number, number][] };
+    expect(s?.type).toBe("heatmap");
+    expect(s?.data[0]).toEqual([3, 1, 0]);
+  });
+});
+
+describe("buildTodayVsAverageBulletOption", () => {
+  it("sets y max from larger of today, average, and floor", () => {
+    const opt = buildTodayVsAverageBulletOption(4, 10, theme, "Today", "Avg");
+    const y = opt.yAxis as { max: number };
+    expect(y.max).toBe(12);
+    const s = opt.series?.[0] as { type: string; data: number[]; markLine: { data: { yAxis: number }[] } };
+    expect(s?.data[0]).toBe(4);
+    expect(s?.markLine.data[0].yAxis).toBe(10);
+  });
+});

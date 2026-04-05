@@ -11,4 +11,10 @@ describe("releaseNotesEmailHtml", () => {
     expect(html).toContain("white-space: pre-wrap");
     expect(html).toContain("x\n\n  y");
   });
+
+  it("releaseNotesEmailBodyHtml treats null as empty body", () => {
+    expect(releaseNotesEmailBodyHtml(null as unknown as string)).toBe(
+      '<div style="white-space: pre-wrap; font-family: sans-serif;"></div>',
+    );
+  });
 });

@@ -45,22 +45,42 @@ public sealed class AdminBillingMediatRHandlersTests
     public async Task GetBillingInvoicePdfModelQueryHandler_delegates()
     {
         var mock = new Mock<IAdminBillingReader>();
-        mock.Setup(x => x.GetInvoicePdfModelAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        mock.Setup(x => x.GetInvoicePdfModelAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync((BillingInvoicePdfModel?)null);
         var h = new GetBillingInvoicePdfModelQueryHandler(mock.Object);
         await h.Handle(new GetBillingInvoicePdfModelQuery(Guid.NewGuid()), default);
-        mock.Verify(x => x.GetInvoicePdfModelAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(x => x.GetInvoicePdfModelAsync(
+            It.IsAny<Guid>(),
+            It.IsAny<CancellationToken>(),
+            null,
+            null), Times.Once);
     }
 
     [Fact]
     public async Task SendBillingPeriodInvoiceEmailCommandHandler_delegates()
     {
         var mock = new Mock<IAdminBillingInvoiceOperations>();
-        mock.Setup(x => x.SendInvoiceEmailAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        mock.Setup(x => x.SendInvoiceEmailAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync(SendInvoiceEmailResult.Ok());
         var h = new SendBillingPeriodInvoiceEmailCommandHandler(mock.Object);
         await h.Handle(new SendBillingPeriodInvoiceEmailCommand(Guid.NewGuid(), "u1", "sa"), default);
-        mock.Verify(x => x.SendInvoiceEmailAsync(It.IsAny<Guid>(), "u1", "sa", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(x => x.SendInvoiceEmailAsync(
+            It.IsAny<Guid>(),
+            "u1",
+            "sa",
+            It.IsAny<CancellationToken>(),
+            null,
+            null), Times.Once);
     }
 
     [Fact]
@@ -124,12 +144,28 @@ public sealed class AdminBillingMediatRHandlersTests
     }
 
     [Fact]
+    public async Task UpdateAdminSubscriptionPlanCommandHandler_validation_branches()
+    {
+        var repo = new Mock<ISubscriptionPlanAdminRepository>();
+        var h = new UpdateAdminSubscriptionPlanCommandHandler(repo.Object);
+        var id = Guid.NewGuid();
+
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "", "PayPerBooking", "CreatedAtUtc", null, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "N", "X", "CreatedAtUtc", null, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "N", "PayPerBooking", "X", null, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "N", "Trial", "CreatedAtUtc", null, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "N", "Trial", "CreatedAtUtc", 0, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new UpdateAdminSubscriptionPlanCommand(id, "N", "PayPerBooking", "CreatedAtUtc", null, "EURO", true), default)).Success);
+    }
+
+    [Fact]
     public async Task CreateAdminSubscriptionPlanCommandHandler_validation_branches()
     {
         var repo = new Mock<ISubscriptionPlanAdminRepository>();
         var h = new CreateAdminSubscriptionPlanCommandHandler(repo.Object);
 
         Assert.False((await h.Handle(new CreateAdminSubscriptionPlanCommand("", "PayPerBooking", "CreatedAtUtc", null, "EUR", true), default)).Success);
+        Assert.False((await h.Handle(new CreateAdminSubscriptionPlanCommand("   ", "PayPerBooking", "CreatedAtUtc", null, "EUR", true), default)).Success);
         Assert.False((await h.Handle(new CreateAdminSubscriptionPlanCommand("N", "X", "CreatedAtUtc", null, "EUR", true), default)).Success);
         Assert.False((await h.Handle(new CreateAdminSubscriptionPlanCommand("N", "PayPerBooking", "X", null, "EUR", true), default)).Success);
         Assert.False((await h.Handle(new CreateAdminSubscriptionPlanCommand("N", "Trial", "CreatedAtUtc", null, "EUR", true), default)).Success);

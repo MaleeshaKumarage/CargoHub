@@ -83,7 +83,11 @@ public sealed class AdminBillingInvoiceOperationsTests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var mockR = new Mock<IAdminBillingReader>();
-        mockR.Setup(x => x.GetInvoicePdfModelAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        mockR.Setup(x => x.GetInvoicePdfModelAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync((BillingInvoicePdfModel?)null);
         var ops = CreateOps(db, users, mockR.Object, Mock.Of<IEmailSender>(), Mock.Of<IBillingInvoicePdfGenerator>());
 
@@ -101,7 +105,11 @@ public sealed class AdminBillingInvoiceOperationsTests
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var companyId = Guid.NewGuid();
         var mockR = new Mock<IAdminBillingReader>();
-        mockR.Setup(x => x.GetInvoicePdfModelAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        mockR.Setup(x => x.GetInvoicePdfModelAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync(new BillingInvoicePdfModel
             {
                 PeriodId = Guid.NewGuid(),
@@ -109,6 +117,8 @@ public sealed class AdminBillingInvoiceOperationsTests
                 CompanyName = "X",
                 YearUtc = 2026,
                 MonthUtc = 4,
+                InvoiceRangeStartUtc = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+                InvoiceRangeEndExclusiveUtc = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
                 Currency = "EUR",
                 Status = "Open",
                 PayableTotal = 1m,
@@ -138,7 +148,11 @@ public sealed class AdminBillingInvoiceOperationsTests
 
         var periodId = Guid.NewGuid();
         var mockR = new Mock<IAdminBillingReader>();
-        mockR.Setup(x => x.GetInvoicePdfModelAsync(periodId, It.IsAny<CancellationToken>()))
+        mockR.Setup(x => x.GetInvoicePdfModelAsync(
+                periodId,
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync(new BillingInvoicePdfModel
             {
                 PeriodId = periodId,
@@ -146,6 +160,8 @@ public sealed class AdminBillingInvoiceOperationsTests
                 CompanyName = "Co",
                 YearUtc = 2026,
                 MonthUtc = 4,
+                InvoiceRangeStartUtc = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+                InvoiceRangeEndExclusiveUtc = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
                 Currency = "EUR",
                 Status = "Open",
                 PayableTotal = 1m,
@@ -262,7 +278,11 @@ public sealed class AdminBillingInvoiceOperationsTests
 
         var periodId = Guid.NewGuid();
         var mockR = new Mock<IAdminBillingReader>();
-        mockR.Setup(x => x.GetInvoicePdfModelAsync(periodId, It.IsAny<CancellationToken>()))
+        mockR.Setup(x => x.GetInvoicePdfModelAsync(
+                periodId,
+                It.IsAny<CancellationToken>(),
+                null,
+                null))
             .ReturnsAsync(new BillingInvoicePdfModel
             {
                 PeriodId = periodId,
@@ -270,6 +290,8 @@ public sealed class AdminBillingInvoiceOperationsTests
                 CompanyName = "Acme",
                 YearUtc = 2026,
                 MonthUtc = 5,
+                InvoiceRangeStartUtc = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
+                InvoiceRangeEndExclusiveUtc = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
                 Currency = "EUR",
                 Status = "Open",
                 PayableTotal = 10m,
@@ -302,7 +324,8 @@ public sealed class AdminBillingInvoiceOperationsTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.Is<IReadOnlyList<EmailAttachment>>(a => a.Count == 1 && a[0].Content.Length == 2),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<CancellationToken>(),
+                It.Is<string?>(t => t != null && t.Contains("Invoice date range (UTC):", StringComparison.Ordinal))),
             Times.Once);
 
         Assert.Equal(1, await db.SubscriptionInvoiceSends.CountAsync(s => s.CompanyBillingPeriodId == periodId));

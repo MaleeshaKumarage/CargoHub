@@ -212,4 +212,313 @@ public sealed class AdminReleaseNotesBroadcasterTests
         Assert.Null(result);
         Assert.Equal("No recipients match the selected filters.", err);
     }
+
+    [Fact]
+    public async Task TryBroadcastAsync_whitespace_body_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, Mock.Of<ICompanyRepository>(), Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "Ok",
+            BodyPlain = "   ",
+            AllCompanies = true,
+            AllRoles = true,
+        });
+        Assert.Null(result);
+        Assert.Equal("Body is required.", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_oversized_body_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, Mock.Of<ICompanyRepository>(), Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "Ok",
+            BodyPlain = new string('x', 100_001),
+            AllCompanies = true,
+            AllRoles = true,
+        });
+        Assert.Null(result);
+        Assert.Contains("Body exceeds maximum length", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_no_company_ids_when_not_all_companies_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, Mock.Of<ICompanyRepository>(), Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = false,
+            CompanyIds = Array.Empty<Guid>(),
+            AllRoles = true,
+        });
+        Assert.Null(result);
+        Assert.Contains("Select at least one company", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_company_without_business_id_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var companyId = Guid.NewGuid();
+        db.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = Guid.NewGuid().ToString("N"),
+            Name = "No Biz",
+            BusinessId = "  ",
+        });
+        await db.SaveChangesAsync();
+        var row = await db.Companies.FindAsync(companyId);
+        Assert.NotNull(row);
+        var mockC = new Mock<ICompanyRepository>();
+        mockC.Setup(x => x.GetByIdAsync(companyId, It.IsAny<CancellationToken>())).ReturnsAsync(row);
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, mockC.Object, Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = false,
+            CompanyIds = new[] { companyId },
+            AllRoles = true,
+        });
+        Assert.Null(result);
+        Assert.Contains("no business ID", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_no_roles_when_not_all_roles_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, Mock.Of<ICompanyRepository>(), Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = true,
+            AllRoles = false,
+            Roles = Array.Empty<string>(),
+        });
+        Assert.Null(result);
+        Assert.Contains("Select at least one role", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_invalid_role_returns_error()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, Mock.Of<ICompanyRepository>(), Mock.Of<IEmailSender>());
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = true,
+            AllRoles = false,
+            Roles = new[] { "NotARealRole" },
+        });
+        Assert.Null(result);
+        Assert.Contains("Invalid role", err);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_email_send_failure_is_recorded()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        await EnsureRolesAsync(roles);
+
+        var companyId = Guid.NewGuid();
+        db.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = Guid.NewGuid().ToString("N"),
+            Name = "Co",
+            BusinessId = "B200",
+        });
+        await db.SaveChangesAsync();
+
+        var u = new ApplicationUser
+        {
+            UserName = "u@x.com",
+            Email = "u@x.com",
+            BusinessId = "B200",
+            IsActive = true,
+            DisplayName = "U",
+        };
+        Assert.True((await users.CreateAsync(u, "Test12!")).Succeeded);
+        await users.AddToRoleAsync(u, RoleNames.User);
+
+        var companyRow = await db.Companies.FindAsync(companyId);
+        Assert.NotNull(companyRow);
+        var mockC = new Mock<ICompanyRepository>();
+        mockC.Setup(x => x.GetByIdAsync(companyId, It.IsAny<CancellationToken>())).ReturnsAsync(companyRow);
+
+        var mockE = new Mock<IEmailSender>();
+        mockE
+            .Setup(x => x.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("smtp down"));
+
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, mockC.Object, mockE.Object);
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = false,
+            CompanyIds = new[] { companyId },
+            AllRoles = true,
+        });
+
+        Assert.Null(err);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.RecipientCount);
+        Assert.Equal(0, result.SentCount);
+        Assert.Single(result.Failures);
+        Assert.Equal("u@x.com", result.Failures[0].Email);
+        Assert.Contains("smtp down", result.Failures[0].Message);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_ignores_empty_guid_in_company_list()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        await EnsureRolesAsync(roles);
+
+        var companyId = Guid.NewGuid();
+        db.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = Guid.NewGuid().ToString("N"),
+            Name = "Co",
+            BusinessId = "B300",
+        });
+        await db.SaveChangesAsync();
+
+        var u = new ApplicationUser
+        {
+            UserName = "r@x.com",
+            Email = "r@x.com",
+            BusinessId = "B300",
+            IsActive = true,
+            DisplayName = "R",
+        };
+        Assert.True((await users.CreateAsync(u, "Test12!")).Succeeded);
+        await users.AddToRoleAsync(u, RoleNames.User);
+
+        var companyRow = await db.Companies.FindAsync(companyId);
+        Assert.NotNull(companyRow);
+        var mockC = new Mock<ICompanyRepository>();
+        mockC.Setup(x => x.GetByIdAsync(companyId, It.IsAny<CancellationToken>())).ReturnsAsync(companyRow);
+
+        var mockE = new Mock<IEmailSender>();
+        mockE
+            .Setup(x => x.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, mockC.Object, mockE.Object);
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = false,
+            CompanyIds = new[] { Guid.Empty, companyId },
+            AllRoles = true,
+        });
+
+        Assert.Null(err);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.SentCount);
+        mockC.Verify(x => x.GetByIdAsync(companyId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task TryBroadcastAsync_sends_once_per_distinct_email()
+    {
+        using var sp = CreateServiceProvider(out _);
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        await EnsureRolesAsync(roles);
+
+        var companyId = Guid.NewGuid();
+        db.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = Guid.NewGuid().ToString("N"),
+            Name = "Co",
+            BusinessId = "B400",
+        });
+        await db.SaveChangesAsync();
+
+        async Task AddAsync(string email, string userName)
+        {
+            var x = new ApplicationUser
+            {
+                UserName = userName,
+                Email = email,
+                BusinessId = "B400",
+                IsActive = true,
+                DisplayName = userName,
+            };
+            Assert.True((await users.CreateAsync(x, "Test12!")).Succeeded);
+            await users.AddToRoleAsync(x, RoleNames.Admin);
+        }
+
+        await AddAsync("dup@x.com", "u1");
+        await AddAsync("DUP@x.com", "u2");
+
+        var companyRow = await db.Companies.FindAsync(companyId);
+        Assert.NotNull(companyRow);
+        var mockC = new Mock<ICompanyRepository>();
+        mockC.Setup(x => x.GetByIdAsync(companyId, It.IsAny<CancellationToken>())).ReturnsAsync(companyRow);
+
+        var mockE = new Mock<IEmailSender>();
+        mockE
+            .Setup(x => x.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var broadcaster = new AdminReleaseNotesBroadcaster(users, mockC.Object, mockE.Object);
+        var (result, err) = await broadcaster.TryBroadcastAsync(new ReleaseNotesBroadcastRequest
+        {
+            Subject = "S",
+            BodyPlain = "B",
+            AllCompanies = false,
+            CompanyIds = new[] { companyId },
+            AllRoles = true,
+        });
+
+        Assert.Null(err);
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.RecipientCount);
+        Assert.Equal(1, result.SentCount);
+        mockE.Verify(
+            x => x.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
