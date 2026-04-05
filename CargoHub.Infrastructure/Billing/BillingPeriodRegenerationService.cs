@@ -147,20 +147,8 @@ public sealed class BillingPeriodRegenerationService : IBillingPeriodRegeneratio
             ? b.CreatedAtUtc
             : b.FirstBillableAtUtc ?? b.CreatedAtUtc;
 
-    private async Task<Guid?> ResolvePlanIdAtAsync(Guid companyId, DateTime instantUtc, CancellationToken cancellationToken)
-    {
-        var row = await _db.CompanySubscriptionAssignments.AsNoTracking()
-            .Where(a => a.CompanyId == companyId && a.EffectiveFromUtc <= instantUtc)
-            .OrderByDescending(a => a.EffectiveFromUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (row != null)
-            return row.SubscriptionPlanId;
-
-        return await _db.Companies.AsNoTracking()
-            .Where(c => c.Id == companyId)
-            .Select(c => c.SubscriptionPlanId)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
+    private Task<Guid?> ResolvePlanIdAtAsync(Guid companyId, DateTime instantUtc, CancellationToken cancellationToken) =>
+        CompanySubscriptionPlanResolver.ResolvePlanIdAtAsync(_db, companyId, instantUtc, cancellationToken);
 
     private static DateTime GetAnchorUtc(Booking booking, SubscriptionPlan plan) =>
         plan.ChargeTimeAnchor == ChargeTimeAnchor.CreatedAtUtc

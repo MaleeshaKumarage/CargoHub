@@ -5,16 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   adminDownloadBillingPeriodInvoicePdf,
-  adminGetBillingMonthBreakdown,
+  adminGetBillingBreakdownByDateRange,
   adminGetBillingPeriodDetail,
-  adminGetBillableMonths,
   adminGetCompanies,
   adminGetUsers,
   adminSendBillingPeriodInvoiceEmail,
   adminSetBookingInvoiceExcluded,
   type AdminCompany,
   type AdminUser,
-  type BillableMonthSummary,
   type BillingMonthBreakdown,
   type BillingPeriodDetail,
 } from "@/lib/api";
@@ -33,8 +31,18 @@ function formatMoney(amount: number, currency: string) {
   }
 }
 
-function monthKey(m: BillableMonthSummary): string {
-  return `${m.yearUtc}-${String(m.monthUtc).padStart(2, "0")}`;
+/** UTC calendar yyyy-MM-dd */
+function utcYmd(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function defaultUtcDateRange(): { from: string; to: string } {
+  const today = new Date();
+  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  return { from: utcYmd(start), to: utcYmd(today) };
 }
 
 export default function ManageInvoicesPage() {
@@ -42,11 +50,9 @@ export default function ManageInvoicesPage() {
   const t = useTranslations("manageInvoices");
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  const [months, setMonths] = useState<BillableMonthSummary[]>([]);
-  const [selectedMonthKey, setSelectedMonthKey] = useState("");
+  const [{ from: dateFrom, to: dateTo }, setDateRange] = useState(defaultUtcDateRange);
   const [breakdown, setBreakdown] = useState<BillingMonthBreakdown | null>(null);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [loadingMonths, setLoadingMonths] = useState(false);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lineDetail, setLineDetail] = useState<BillingPeriodDetail | null>(null);
@@ -63,10 +69,8 @@ export default function ManageInvoicesPage() {
     return c?.businessId?.trim() || null;
   }, [companies, selectedCompanyId]);
 
-  const selectedMonth = useMemo(
-    () => months.find((m) => monthKey(m) === selectedMonthKey) ?? null,
-    [months, selectedMonthKey]
-  );
+  const invoicePeriodId = breakdown?.billingPeriodId ?? null;
+  const invoiceActionsAvailable = invoicePeriodId != null && invoicePeriodId.length > 0;
 
   useEffect(() => {
     if (!token) return;
@@ -88,52 +92,27 @@ export default function ManageInvoicesPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!token || !selectedCompanyId) {
-      setMonths([]);
-      setSelectedMonthKey("");
-      setBreakdown(null);
-      return;
-    }
-    let c = false;
-    setLoadingMonths(true);
-    setError(null);
-    adminGetBillableMonths(token, selectedCompanyId)
-      .then((list) => {
-        if (!c) {
-          setMonths(list);
-          setSelectedMonthKey("");
-          setBreakdown(null);
-        }
-      })
-      .catch((e) => {
-        if (!c) setError(e instanceof Error ? e.message : "Failed to load months");
-      })
-      .finally(() => {
-        if (!c) setLoadingMonths(false);
-      });
-    return () => {
-      c = true;
-    };
-  }, [token, selectedCompanyId]);
+    setBreakdown(null);
+    setDateRange(defaultUtcDateRange());
+  }, [selectedCompanyId]);
 
   const loadBreakdown = useCallback(() => {
-    if (!token || !selectedCompanyId || !selectedMonth) return;
-    const { yearUtc, monthUtc } = selectedMonth;
+    if (!token || !selectedCompanyId) return;
+    if (!dateFrom || !dateTo) {
+      setError(t("datesRequired"));
+      return;
+    }
+    if (dateFrom > dateTo) {
+      setError(t("endBeforeStart"));
+      return;
+    }
     setLoadingBreakdown(true);
     setError(null);
-    adminGetBillingMonthBreakdown(token, selectedCompanyId, yearUtc, monthUtc)
+    adminGetBillingBreakdownByDateRange(token, selectedCompanyId, dateFrom, dateTo)
       .then(setBreakdown)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load breakdown"))
       .finally(() => setLoadingBreakdown(false));
-  }, [token, selectedCompanyId, selectedMonth]);
-
-  useEffect(() => {
-    if (!selectedMonth) {
-      setBreakdown(null);
-      return;
-    }
-    loadBreakdown();
-  }, [selectedMonth, loadBreakdown]);
+  }, [token, selectedCompanyId, dateFrom, dateTo, t]);
 
   useEffect(() => {
     if (!token || !breakdown || !selectedBusinessId) {
@@ -163,11 +142,11 @@ export default function ManageInvoicesPage() {
   }, [token, breakdown, selectedBusinessId]);
 
   const openLineDetail = () => {
-    if (!token || !breakdown) return;
+    if (!token || !invoicePeriodId) return;
     setLineDetailLoading(true);
     setLineDetail(null);
     setError(null);
-    adminGetBillingPeriodDetail(token, breakdown.billingPeriodId)
+    adminGetBillingPeriodDetail(token, invoicePeriodId)
       .then(setLineDetail)
       .catch((e) => {
         setLineDetail(null);
@@ -177,15 +156,15 @@ export default function ManageInvoicesPage() {
   };
 
   const onDownloadPdf = async () => {
-    if (!token || !breakdown) return;
+    if (!token || !invoicePeriodId) return;
     setPdfBusy(true);
     setError(null);
     try {
-      const blob = await adminDownloadBillingPeriodInvoicePdf(token, breakdown.billingPeriodId);
+      const blob = await adminDownloadBillingPeriodInvoicePdf(token, invoicePeriodId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `invoice-${breakdown.yearUtc}-${String(breakdown.monthUtc).padStart(2, "0")}.pdf`;
+      a.download = `invoice-${dateFrom}-${dateTo}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -196,11 +175,11 @@ export default function ManageInvoicesPage() {
   };
 
   const onSendEmail = async () => {
-    if (!token || !breakdown || !emailRecipientId) return;
+    if (!token || !invoicePeriodId || !emailRecipientId) return;
     setEmailBusy(true);
     setError(null);
     try {
-      await adminSendBillingPeriodInvoiceEmail(token, breakdown.billingPeriodId, emailRecipientId);
+      await adminSendBillingPeriodInvoiceEmail(token, invoicePeriodId, emailRecipientId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send email failed");
     } finally {
@@ -209,11 +188,11 @@ export default function ManageInvoicesPage() {
   };
 
   const onToggleBookingExcluded = async (bookingId: string, excluded: boolean) => {
-    if (!token || !breakdown) return;
+    if (!token || !invoicePeriodId) return;
     setBookingBusyId(bookingId);
     setError(null);
     try {
-      await adminSetBookingInvoiceExcluded(token, breakdown.billingPeriodId, bookingId, excluded);
+      await adminSetBookingInvoiceExcluded(token, invoicePeriodId, bookingId, excluded);
       await loadBreakdown();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
@@ -256,25 +235,34 @@ export default function ManageInvoicesPage() {
           </div>
 
           {selectedCompanyId ? (
-            <div className="space-y-2 max-w-md">
-              <Label htmlFor="invoice-month">{t("billableMonth")}</Label>
-              <select
-                id="invoice-month"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                value={selectedMonthKey}
-                onChange={(e) => setSelectedMonthKey(e.target.value)}
-                disabled={loadingMonths}
-              >
-                <option value="">{t("selectMonthPlaceholder")}</option>
-                {months.map((m) => (
-                  <option key={monthKey(m)} value={monthKey(m)}>
-                    {m.yearUtc}-{String(m.monthUtc).padStart(2, "0")}{" "}
-                    {t("monthOptionBookings", { count: m.billableBookingCount })}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-end gap-4 max-w-2xl">
+              <div className="space-y-2">
+                <Label htmlFor="invoice-from">{t("periodStart")}</Label>
+                <input
+                  id="invoice-from"
+                  type="date"
+                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  value={dateFrom}
+                  onChange={(e) => setDateRange((r) => ({ ...r, from: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoice-to">{t("periodEnd")}</Label>
+                <input
+                  id="invoice-to"
+                  type="date"
+                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  value={dateTo}
+                  onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
+                />
+              </div>
+              <Button type="button" onClick={loadBreakdown} disabled={loadingBreakdown}>
+                {loadingBreakdown ? "…" : t("loadBreakdown")}
+              </Button>
             </div>
           ) : null}
+
+          <p className="text-xs text-muted-foreground max-w-2xl">{t("periodUtcHint")}</p>
 
           {error && (
             <p className="text-sm text-destructive" role="alert">
@@ -282,14 +270,14 @@ export default function ManageInvoicesPage() {
             </p>
           )}
 
-          {selectedCompanyId && !loadingMonths && months.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("noBillableMonths")}</p>
-          ) : null}
-
           {loadingBreakdown && <p className="text-sm text-muted-foreground">{t("loadingBreakdown")}</p>}
 
           {breakdown && !loadingBreakdown ? (
             <div className="space-y-6">
+              {breakdown.billableBookingCount === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("noBookingsInRange")}</p>
+              ) : null}
+
               <div className="flex flex-wrap gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">{t("totalPayable")}: </span>
@@ -300,6 +288,10 @@ export default function ManageInvoicesPage() {
                   <span>{formatMoney(breakdown.ledgerTotal, breakdown.currency)}</span>
                 </div>
               </div>
+
+              {!invoiceActionsAvailable && breakdown.billableBookingCount > 0 ? (
+                <p className="text-sm text-amber-700 dark:text-amber-500">{t("multiMonthInvoiceHint")}</p>
+              ) : null}
 
               {breakdown.segments.length > 0 ? (
                 <div>
@@ -356,7 +348,7 @@ export default function ManageInvoicesPage() {
                           <td className="p-2">
                             <Switch
                               checked={b.excludedFromInvoice}
-                              disabled={bookingBusyId === b.bookingId}
+                              disabled={!invoiceActionsAvailable || bookingBusyId === b.bookingId}
                               onCheckedChange={(v) => onToggleBookingExcluded(b.bookingId, v)}
                               aria-label={t("excludeBooking")}
                             />
@@ -369,10 +361,22 @@ export default function ManageInvoicesPage() {
               </div>
 
               <div className="flex flex-wrap items-end gap-3 border-t pt-4">
-                <Button type="button" variant="secondary" size="sm" disabled={pdfBusy} onClick={onDownloadPdf}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={pdfBusy || !invoiceActionsAvailable}
+                  onClick={onDownloadPdf}
+                >
                   {pdfBusy ? "…" : t("saveInvoice")}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={openLineDetail}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!invoiceActionsAvailable}
+                  onClick={openLineDetail}
+                >
                   {t("viewLines")}
                 </Button>
                 <div className="flex flex-col gap-1 min-w-[200px]">
@@ -382,7 +386,9 @@ export default function ManageInvoicesPage() {
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
                     value={emailRecipientId}
                     onChange={(e) => setEmailRecipientId(e.target.value)}
-                    disabled={!selectedBusinessId || invoiceAdminsLoading || invoiceAdmins.length === 0}
+                    disabled={
+                      !invoiceActionsAvailable || !selectedBusinessId || invoiceAdminsLoading || invoiceAdmins.length === 0
+                    }
                   >
                     <option value="">{t("recipientPlaceholder")}</option>
                     {invoiceAdmins.map((u) => (
@@ -396,13 +402,20 @@ export default function ManageInvoicesPage() {
                   type="button"
                   size="sm"
                   disabled={
-                    emailBusy || !emailRecipientId || !selectedBusinessId || invoiceAdmins.length === 0
+                    emailBusy ||
+                    !invoiceActionsAvailable ||
+                    !emailRecipientId ||
+                    !selectedBusinessId ||
+                    invoiceAdmins.length === 0
                   }
                   onClick={onSendEmail}
                 >
                   {emailBusy ? "…" : t("sendInvoice")}
                 </Button>
               </div>
+              {!invoiceActionsAvailable && (
+                <p className="text-xs text-muted-foreground">{t("invoiceActionsSingleMonth")}</p>
+              )}
               {!selectedBusinessId && (
                 <p className="text-xs text-muted-foreground">{t("emailRequiresBusinessId")}</p>
               )}

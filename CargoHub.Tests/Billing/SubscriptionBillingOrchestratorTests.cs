@@ -47,11 +47,13 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task AssertBillableBookingAllowedAsync_Skips_WhenNoCompany()
+    public async Task AssertBillableBookingAllowedAsync_Throws_WhenNoCompany()
     {
         using var ctx = _fixture.CreateContext();
         var orch = new SubscriptionBillingOrchestrator(ctx);
-        await orch.AssertBillableBookingAllowedAsync(null, false, default);
+        var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
+            orch.AssertBillableBookingAllowedAsync(null, false, default));
+        Assert.Equal(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, ex.ErrorCode);
     }
 
     [Fact]
@@ -114,6 +116,75 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.AssertBillableBookingAllowedAsync(companyId, false, default));
         Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task AssertBillableBookingAllowedAsync_TrialExhausted_CountsBookingsWithoutFirstBillableAtUtc()
+    {
+        using var ctx = _fixture.CreateContext();
+        await SubscriptionPlanSeed.EnsureDefaultTrialPlanAsync(ctx);
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            Name = "Co",
+            BusinessId = "biz-nofb",
+            CompanyId = companyId.ToString("N"),
+            SubscriptionPlanId = SubscriptionBillingConstants.DefaultTrialPlanId
+        });
+        for (var i = 0; i < 5; i++)
+            ctx.Bookings.Add(MinimalBooking(Guid.NewGuid(), "cust-nofb", companyId, isDraft: false, firstBillableAtUtc: null));
+
+        await ctx.SaveChangesAsync();
+        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
+            orch.AssertBillableBookingAllowedAsync(companyId, false, default));
+        Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task AssertBillableBookingAllowedAsync_TrialResolvedFromAssignment_WhenCompanyPlanIdNull()
+    {
+        using var ctx = _fixture.CreateContext();
+        await SubscriptionPlanSeed.EnsureDefaultTrialPlanAsync(ctx);
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            Name = "Co",
+            BusinessId = "biz-asg",
+            CompanyId = companyId.ToString("N"),
+            SubscriptionPlanId = null
+        });
+        ctx.CompanySubscriptionAssignments.Add(new CompanySubscriptionAssignment
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            SubscriptionPlanId = SubscriptionBillingConstants.DefaultTrialPlanId,
+            EffectiveFromUtc = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        });
+        for (var i = 0; i < 5; i++)
+            ctx.Bookings.Add(MinimalBooking(Guid.NewGuid(), "cust-asg", companyId, isDraft: false, firstBillableAtUtc: DateTime.UtcNow.AddMinutes(-i)));
+
+        await ctx.SaveChangesAsync();
+        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
+            orch.AssertBillableBookingAllowedAsync(companyId, false, default));
+        Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ConfirmDraftWithBillingAsync_Throws_WhenNotTestAndNoCompany()
+    {
+        using var ctx = _fixture.CreateContext();
+        await SubscriptionPlanSeed.EnsureDefaultTrialPlanAsync(ctx);
+        var id = Guid.NewGuid();
+        ctx.Bookings.Add(MinimalBooking(id, "c-nc", null, isDraft: true));
+        await ctx.SaveChangesAsync();
+        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
+            orch.ConfirmDraftWithBillingAsync(id, "c-nc", default));
+        Assert.Equal(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, ex.ErrorCode);
     }
 
     [Fact]

@@ -151,11 +151,20 @@ public sealed class BillingMonthBreakdownDto
 {
     public Guid CompanyId { get; init; }
 
+    /// <summary>Label month (UTC) — range start when using date-range breakdown.</summary>
     public int YearUtc { get; init; }
 
+    /// <summary>Label month (UTC) — range start when using date-range breakdown.</summary>
     public int MonthUtc { get; init; }
 
-    public Guid BillingPeriodId { get; init; }
+    /// <summary>Set when the result maps to a single calendar month (invoice PDF/email/toggles apply).</summary>
+    public Guid? BillingPeriodId { get; init; }
+
+    /// <summary>Inclusive UTC start of the breakdown window.</summary>
+    public DateTime RangeStartUtc { get; init; }
+
+    /// <summary>Exclusive UTC end of the breakdown window.</summary>
+    public DateTime RangeEndExclusiveUtc { get; init; }
 
     public string Currency { get; init; } = "EUR";
 

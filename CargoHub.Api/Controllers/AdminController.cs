@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using CargoHub.Application.AdminCompanies;
 using CargoHub.Application.AdminEmail;
@@ -131,6 +132,40 @@ public class AdminController : ControllerBase
         if (dto == null)
             return NotFound(new { message = "Breakdown not available." });
         return Ok(dto);
+    }
+
+    /// <summary>
+    /// Invoice-style breakdown for billable bookings with first billable instant in <c>[from, to]</c> (UTC calendar dates, inclusive end day).
+    /// Billing period id is returned only when all matching bookings fall in one UTC month (PDF/email/exclusion apply).
+    /// </summary>
+    [HttpGet("companies/{companyId:guid}/billing-breakdown")]
+    public async Task<ActionResult<BillingMonthBreakdownDto>> GetBillingBreakdownByDateRange(
+        Guid companyId,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
+            return BadRequest(new { message = "Query parameters from and to are required (yyyy-MM-dd, UTC dates)." });
+        if (!DateOnly.TryParse(from, CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromDay) ||
+            !DateOnly.TryParse(to, CultureInfo.InvariantCulture, DateTimeStyles.None, out var toDay))
+            return BadRequest(new { message = "Invalid from or to; use yyyy-MM-dd." });
+        if (fromDay > toDay)
+            return BadRequest(new { message = "End date must be on or after start date." });
+
+        var rangeStartUtc = fromDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var rangeEndExclusiveUtc = toDay.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        if ((rangeEndExclusiveUtc - rangeStartUtc).TotalDays > 731)
+            return BadRequest(new { message = "Date range must be at most 731 days." });
+
+        var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
+        if (company == null)
+            return NotFound(new { message = "Company not found." });
+
+        var dto = await _mediator.Send(
+            new GetBillingDateRangeBreakdownQuery(companyId, rangeStartUtc, rangeEndExclusiveUtc),
+            cancellationToken);
+        return dto == null ? NotFound(new { message = "Breakdown not available." }) : Ok(dto);
     }
 
     /// <summary>Exclude or include a booking for invoice totals; regenerates period lines.</summary>

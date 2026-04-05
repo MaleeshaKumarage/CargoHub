@@ -23,6 +23,7 @@ import {
   adminGetCompanyBillingPeriods,
   adminGetBillableMonths,
   adminGetBillingMonthBreakdown,
+  adminGetBillingBreakdownByDateRange,
   adminSetBookingInvoiceExcluded,
   AdminCompanyLimitReductionRequiredError,
   DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID,
@@ -986,6 +987,8 @@ describe("api", () => {
           YearUtc: 2026,
           MonthUtc: 4,
           BillingPeriodId: "per1",
+          RangeStartUtc: "2026-04-01T00:00:00Z",
+          RangeEndExclusiveUtc: "2026-05-01T00:00:00Z",
           Currency: "EUR",
           BillableBookingCount: 1,
           PayableTotal: 9.5,
@@ -1015,6 +1018,7 @@ describe("api", () => {
       });
       const b = await adminGetBillingMonthBreakdown("token", "c1", 2026, 4);
       expect(b.billingPeriodId).toBe("per1");
+      expect(b.rangeStartUtc).toContain("2026-04-01");
       expect(b.payableTotal).toBe(9.5);
       expect(b.segments).toHaveLength(1);
       expect(b.segments[0].label).toBe("Tier 1");
@@ -1023,6 +1027,38 @@ describe("api", () => {
         expect.stringContaining("/companies/c1/billing-months/2026/4/breakdown"),
         expect.any(Object)
       );
+    });
+  });
+
+  describe("adminGetBillingBreakdownByDateRange", () => {
+    it("calls billing-breakdown with from and to", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          CompanyId: "c1",
+          YearUtc: 2026,
+          MonthUtc: 3,
+          BillingPeriodId: null,
+          RangeStartUtc: "2026-03-01T00:00:00Z",
+          RangeEndExclusiveUtc: "2026-03-16T00:00:00Z",
+          Currency: "EUR",
+          BillableBookingCount: 0,
+          PayableTotal: 0,
+          LedgerTotal: 0,
+          Segments: [],
+          Bookings: [],
+        }),
+      });
+      const b = await adminGetBillingBreakdownByDateRange("token", "c1", "2026-03-01", "2026-03-15");
+      expect(b.billingPeriodId).toBeNull();
+      expect(b.billableBookingCount).toBe(0);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/companies/c1/billing-breakdown?"),
+        expect.any(Object)
+      );
+      const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(url).toContain("from=2026-03-01");
+      expect(url).toContain("to=2026-03-15");
     });
   });
 
