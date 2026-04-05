@@ -1,4 +1,5 @@
 using CargoHub.Application.Billing;
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Application.Company;
 using MediatR;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
@@ -10,15 +11,18 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
     private readonly ICompanyRepository _companies;
     private readonly ICompanyAdminInviteIssuer _inviteIssuer;
     private readonly ICompanyUserMetrics _metrics;
+    private readonly ICompanySubscriptionAssignmentRepository _subscriptionAssignments;
 
     public CreateAdminCompanyCommandHandler(
         ICompanyRepository companies,
         ICompanyAdminInviteIssuer inviteIssuer,
-        ICompanyUserMetrics metrics)
+        ICompanyUserMetrics metrics,
+        ICompanySubscriptionAssignmentRepository subscriptionAssignments)
     {
         _companies = companies;
         _inviteIssuer = inviteIssuer;
         _metrics = metrics;
+        _subscriptionAssignments = subscriptionAssignments;
     }
 
     public async Task<AdminCompanyMutationResult> Handle(CreateAdminCompanyCommand request, CancellationToken cancellationToken)
@@ -59,6 +63,16 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
             company.CompanyId = company.Id.ToString("N");
 
         company = await _companies.CreateAsync(company, cancellationToken);
+
+        if (company.SubscriptionPlanId is { } initialPlanId)
+        {
+            await _subscriptionAssignments.RecordAsync(
+                company.Id,
+                initialPlanId,
+                DateTime.UtcNow,
+                null,
+                cancellationToken);
+        }
 
         var admins = await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
         if (admins == 0)

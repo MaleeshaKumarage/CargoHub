@@ -59,15 +59,14 @@ export default function ManageCompaniesPage() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
 
-  const [editLimitsCompany, setEditLimitsCompany] = useState<AdminCompany | null>(null);
+  const [editCompany, setEditCompany] = useState<AdminCompany | null>(null);
   const [editMaxUsers, setEditMaxUsers] = useState("");
   const [editMaxAdmins, setEditMaxAdmins] = useState("");
   const [editSubscriptionPlanId, setEditSubscriptionPlanId] = useState("");
   /** Value from API when the edit dialog opened (`null` = company had no plan yet). */
   const [editSubscriptionFromServer, setEditSubscriptionFromServer] = useState<string | null>(null);
-  const [savingLimitsId, setSavingLimitsId] = useState<string | null>(null);
-  const [savingSubscriptionId, setSavingSubscriptionId] = useState<string | null>(null);
-  const [limitsError, setLimitsError] = useState<string | null>(null);
+  const [savingCompanyId, setSavingCompanyId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState<AdminSubscriptionPlanSummary[]>([]);
   const [createSubscriptionPlanId, setCreateSubscriptionPlanId] = useState("");
 
@@ -242,9 +241,9 @@ export default function ManageCompaniesPage() {
     }
   };
 
-  const openEditLimits = (c: AdminCompany) => {
-    setLimitsError(null);
-    setEditLimitsCompany(c);
+  const openEditCompany = (c: AdminCompany) => {
+    setEditError(null);
+    setEditCompany(c);
     setEditMaxUsers(c.maxUserAccounts != null ? String(c.maxUserAccounts) : "");
     setEditMaxAdmins(c.maxAdminAccounts != null ? String(c.maxAdminAccounts) : "");
     const raw = c.subscriptionPlanId?.trim() ?? "";
@@ -252,37 +251,13 @@ export default function ManageCompaniesPage() {
     setEditSubscriptionPlanId(raw.length > 0 ? raw : DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID);
   };
 
-  const handleSaveSubscriptionOnly = async () => {
-    if (!token || !editLimitsCompany) return;
-    const desired = editSubscriptionPlanId.trim();
-    if (!desired) {
-      setLimitsError(tMc("subscriptionSelectRequired"));
-      return;
-    }
-    if (editSubscriptionFromServer !== null && editSubscriptionFromServer === desired) {
-      setLimitsError(null);
-      return;
-    }
-    setSavingSubscriptionId(editLimitsCompany.id);
-    setLimitsError(null);
-    try {
-      await adminPatchCompany(token, editLimitsCompany.id, { subscriptionPlanId: desired });
-      setEditSubscriptionFromServer(desired);
-      refetchCompanies();
-    } catch (e) {
-      setLimitsError(e instanceof Error ? e.message : "Update failed");
-    } finally {
-      setSavingSubscriptionId(null);
-    }
-  };
-
-  const handleSaveLimits = async () => {
-    if (!token || !editLimitsCompany) return;
+  const handleSaveCompany = async () => {
+    if (!token || !editCompany) return;
     const body: AdminPatchCompanyBody = {};
     if (editMaxUsers.trim() !== "") {
       const p = parseOptionalInt(editMaxUsers);
       if (p === undefined) {
-        setLimitsError("Max users must be a valid whole number.");
+        setEditError(tMc("validationMaxUsersInvalid"));
         return;
       }
       body.maxUserAccounts = p;
@@ -290,12 +265,16 @@ export default function ManageCompaniesPage() {
     if (editMaxAdmins.trim() !== "") {
       const p = parseOptionalInt(editMaxAdmins);
       if (p === undefined) {
-        setLimitsError("Max admins must be a valid whole number.");
+        setEditError(tMc("validationMaxAdminsInvalid"));
         return;
       }
       body.maxAdminAccounts = p;
     }
     const desiredSub = editSubscriptionPlanId.trim();
+    if (!desiredSub) {
+      setEditError(tMc("subscriptionSelectRequired"));
+      return;
+    }
     if (
       desiredSub &&
       !(editSubscriptionFromServer !== null && editSubscriptionFromServer === desiredSub)
@@ -303,21 +282,21 @@ export default function ManageCompaniesPage() {
       body.subscriptionPlanId = desiredSub;
     }
     if (Object.keys(body).length === 0) {
-      setLimitsError("Change at least one limit, subscription, or cancel.");
+      setEditError(tMc("validationNoChanges"));
       return;
     }
-    setSavingLimitsId(editLimitsCompany.id);
-    setLimitsError(null);
+    setSavingCompanyId(editCompany.id);
+    setEditError(null);
     try {
-      await adminPatchCompany(token, editLimitsCompany.id, body);
+      await adminPatchCompany(token, editCompany.id, body);
       if (body.subscriptionPlanId) setEditSubscriptionFromServer(body.subscriptionPlanId);
-      setEditLimitsCompany(null);
+      setEditCompany(null);
       refetchCompanies();
     } catch (e) {
       if (e instanceof AdminCompanyLimitReductionRequiredError) {
-        setLimitsError(null);
+        setEditError(null);
         setReductionFlow({
-          company: editLimitsCompany,
+          company: editCompany,
           details: e.details,
           pending: {
             maxUserAccounts: body.maxUserAccounts,
@@ -326,9 +305,9 @@ export default function ManageCompaniesPage() {
         });
         return;
       }
-      setLimitsError(e instanceof Error ? e.message : "Update failed");
+      setEditError(e instanceof Error ? e.message : "Update failed");
     } finally {
-      setSavingLimitsId(null);
+      setSavingCompanyId(null);
     }
   };
 
@@ -375,7 +354,7 @@ export default function ManageCompaniesPage() {
     try {
       await adminPatchCompany(token, company.id, body);
       setReductionFlow(null);
-      setEditLimitsCompany(null);
+      setEditCompany(null);
       refetchCompanies();
     } catch (e) {
       setReductionError(e instanceof Error ? e.message : "Update failed");
@@ -391,8 +370,8 @@ export default function ManageCompaniesPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Companies</h1>
         <p className="text-muted-foreground mt-1">
-          Create companies with limits and admin invite emails. One invite per filled email is sent when the company has
-          no administrator yet (if all email fields are empty, a single fallback invite uses{" "}
+          Create companies, assign plans, and send admin invitations. One invite per filled email is sent when the company
+          has no administrator yet (if all email fields are empty, a single fallback invite uses{" "}
           <code className="text-xs">businessId@domain</code> — configure{" "}
           <code className="text-xs">Portal:CompanyAdminFallbackEmailDomain</code> on the API).
         </p>
@@ -537,7 +516,7 @@ export default function ManageCompaniesPage() {
                     <th className="p-3 text-left font-medium">Admins / max</th>
                     <th className="p-3 text-left font-medium">{tMc("subscriptionColumn")}</th>
                     <th className="p-3 text-left font-medium">Company ID</th>
-                    <th className="p-3 text-left font-medium">Limits</th>
+                    <th className="p-3 text-left font-medium">{tMc("companyActionsColumn")}</th>
                     <th className="p-3 text-left font-medium">Invite</th>
                   </tr>
                 </thead>
@@ -565,9 +544,9 @@ export default function ManageCompaniesPage() {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            onClick={() => openEditLimits(c)}
+                            onClick={() => openEditCompany(c)}
                           >
-                            Edit limits
+                            {tMc("editButton")}
                           </Button>
                         </td>
                         <td className="p-3">
@@ -600,11 +579,11 @@ export default function ManageCompaniesPage() {
       </Card>
 
       <DialogPrimitive.Root
-        open={!!editLimitsCompany}
+        open={!!editCompany}
         onOpenChange={(open) => {
           if (!open) {
-            setEditLimitsCompany(null);
-            setLimitsError(null);
+            setEditCompany(null);
+            setEditError(null);
           }
         }}
       >
@@ -615,34 +594,33 @@ export default function ManageCompaniesPage() {
               "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg border bg-background p-6 shadow-lg",
             )}
           >
-            <DialogPrimitive.Title className="text-lg font-semibold">Edit company limits</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="text-lg font-semibold">{tMc("editCompanyTitle")}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm text-muted-foreground mt-1">
-              Update max users and max admins for {editLimitsCompany?.name ?? "this company"}. Leave a field empty to leave
-              that limit unchanged.
+              {tMc("editCompanyDescription", { name: editCompany?.name?.trim() || tMc("editCompanyFallbackName") })}
             </DialogPrimitive.Description>
             <div className="mt-4 flex flex-col gap-3">
               <div className="space-y-2">
-                <Label htmlFor="edit-max-users">Max users</Label>
+                <Label htmlFor="edit-max-users">{tMc("maxUsersLabel")}</Label>
                 <Input
                   id="edit-max-users"
                   type="number"
                   min={1}
                   value={editMaxUsers}
                   onChange={(e) => setEditMaxUsers(e.target.value)}
-                  placeholder="unchanged if empty"
-                  disabled={!!savingLimitsId}
+                  placeholder={tMc("placeholderUnchanged")}
+                  disabled={!!savingCompanyId}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-max-admins">Max admins</Label>
+                <Label htmlFor="edit-max-admins">{tMc("maxAdminsLabel")}</Label>
                 <Input
                   id="edit-max-admins"
                   type="number"
                   min={1}
                   value={editMaxAdmins}
                   onChange={(e) => setEditMaxAdmins(e.target.value)}
-                  placeholder="unchanged if empty"
-                  disabled={!!savingLimitsId}
+                  placeholder={tMc("placeholderUnchanged")}
+                  disabled={!!savingCompanyId}
                 />
               </div>
               <div className="space-y-2">
@@ -652,7 +630,7 @@ export default function ManageCompaniesPage() {
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
                   value={editSubscriptionPlanId}
                   onChange={(e) => setEditSubscriptionPlanId(e.target.value)}
-                  disabled={!!savingLimitsId || !!savingSubscriptionId}
+                  disabled={!!savingCompanyId}
                 >
                   {editSubscriptionPlanId &&
                     !subscriptionPlans.some((p) => p.id === editSubscriptionPlanId) && (
@@ -665,35 +643,25 @@ export default function ManageCompaniesPage() {
                     </option>
                   ))}
                 </select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="w-full sm:w-auto"
-                  onClick={() => void handleSaveSubscriptionOnly()}
-                  disabled={!!savingLimitsId || !!savingSubscriptionId}
-                >
-                  {savingSubscriptionId ? tMc("savingSubscription") : tMc("saveSubscription")}
-                </Button>
               </div>
-              {limitsError && (
+              {editError && (
                 <p className="text-sm text-destructive" role="alert">
-                  {limitsError}
+                  {editError}
                 </p>
               )}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <DialogPrimitive.Close asChild>
-                <Button type="button" variant="outline" disabled={!!savingLimitsId}>
-                  Cancel
+                <Button type="button" variant="outline" disabled={!!savingCompanyId}>
+                  {tMc("cancelButton")}
                 </Button>
               </DialogPrimitive.Close>
               <Button
                 type="button"
-                onClick={() => void handleSaveLimits()}
-                disabled={!!savingLimitsId || !!savingSubscriptionId}
+                onClick={() => void handleSaveCompany()}
+                disabled={!!savingCompanyId}
               >
-                {savingLimitsId ? "Saving…" : "Save"}
+                {savingCompanyId ? tMc("savingButton") : tMc("saveButton")}
               </Button>
             </div>
           </DialogPrimitive.Content>
@@ -713,10 +681,9 @@ export default function ManageCompaniesPage() {
               "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-[60] max-h-[85vh] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg",
             )}
           >
-            <DialogPrimitive.Title className="text-lg font-semibold">Choose accounts to free capacity</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="text-lg font-semibold">{tMc("reductionTitle")}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm text-muted-foreground mt-1">
-              Lowering limits requires demoting administrators and/or deactivating users. Demotions run first; then
-              selected accounts are deactivated (they can no longer sign in).
+              {tMc("reductionDescription")}
             </DialogPrimitive.Description>
             {reductionFlow && (
               <div className="mt-3 text-xs text-muted-foreground space-y-1">
@@ -809,11 +776,11 @@ export default function ManageCompaniesPage() {
             <div className="mt-6 flex justify-end gap-2">
               <DialogPrimitive.Close asChild>
                 <Button type="button" variant="outline" disabled={applyingReduction}>
-                  Cancel
+                  {tMc("cancelButton")}
                 </Button>
               </DialogPrimitive.Close>
               <Button type="button" onClick={() => void handleApplyReduction()} disabled={applyingReduction || reductionUsersLoading}>
-                {applyingReduction ? "Applying…" : "Apply limits"}
+                {applyingReduction ? tMc("reductionApplying") : tMc("reductionApply")}
               </Button>
             </div>
           </DialogPrimitive.Content>

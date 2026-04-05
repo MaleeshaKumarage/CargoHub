@@ -709,6 +709,161 @@ export async function adminGetCompanyBillingPeriods(
   return data.map((x) => normalizeBillingPeriodSummary(x as Record<string, unknown>));
 }
 
+export type BillableMonthSummary = {
+  yearUtc: number;
+  monthUtc: number;
+  billableBookingCount: number;
+  billingPeriodId: string | null;
+};
+
+function normalizeBillableMonth(raw: Record<string, unknown>): BillableMonthSummary {
+  const pid = raw.billingPeriodId ?? raw.BillingPeriodId;
+  return {
+    yearUtc: Number(raw.yearUtc ?? raw.YearUtc ?? 0),
+    monthUtc: Number(raw.monthUtc ?? raw.MonthUtc ?? 0),
+    billableBookingCount: Number(raw.billableBookingCount ?? raw.BillableBookingCount ?? 0),
+    billingPeriodId: pid != null && String(pid).length > 0 ? String(pid) : null,
+  };
+}
+
+export async function adminGetBillableMonths(token: string, companyId: string): Promise<BillableMonthSummary[]> {
+  const res = await fetch(
+    `${adminBase()}/companies/${encodeURIComponent(companyId)}/billable-months`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load billable months (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => normalizeBillableMonth(x as Record<string, unknown>));
+}
+
+export type BillingMonthSegment = {
+  label: string;
+  bookingCount: number;
+  unitRate: number | null;
+  subtotal: number;
+  planKind: string;
+  subscriptionPlanId: string | null;
+};
+
+export type BillingMonthBookingRow = {
+  bookingId: string;
+  shipmentNumber?: string | null;
+  referenceNumber?: string | null;
+  planLabel: string;
+  description: string;
+  amount: number;
+  excludedFromInvoice: boolean;
+};
+
+export type BillingMonthBreakdown = {
+  companyId: string;
+  yearUtc: number;
+  monthUtc: number;
+  billingPeriodId: string;
+  currency: string;
+  billableBookingCount: number;
+  payableTotal: number;
+  ledgerTotal: number;
+  segments: BillingMonthSegment[];
+  bookings: BillingMonthBookingRow[];
+};
+
+function normalizeBillingMonthBreakdown(raw: Record<string, unknown>): BillingMonthBreakdown {
+  const segsRaw = raw.segments ?? raw.Segments;
+  const bookRaw = raw.bookings ?? raw.Bookings;
+  const segments: BillingMonthSegment[] = Array.isArray(segsRaw)
+    ? segsRaw.map((s) => {
+        const o = s as Record<string, unknown>;
+        const ur = o.unitRate ?? o.UnitRate;
+        return {
+          label: String(o.label ?? o.Label ?? ''),
+          bookingCount: Number(o.bookingCount ?? o.BookingCount ?? 0),
+          unitRate: ur != null && ur !== '' ? Number(ur) : null,
+          subtotal: Number(o.subtotal ?? o.Subtotal ?? 0),
+          planKind: String(o.planKind ?? o.PlanKind ?? ''),
+          subscriptionPlanId: (() => {
+            const sp = o.subscriptionPlanId ?? o.SubscriptionPlanId;
+            return sp != null && String(sp).length > 0 ? String(sp) : null;
+          })(),
+        };
+      })
+    : [];
+  const bookings: BillingMonthBookingRow[] = Array.isArray(bookRaw)
+    ? bookRaw.map((b) => {
+        const o = b as Record<string, unknown>;
+        return {
+          bookingId: String(o.bookingId ?? o.BookingId ?? ''),
+          shipmentNumber: (o.shipmentNumber ?? o.ShipmentNumber ?? null) as string | null,
+          referenceNumber: (o.referenceNumber ?? o.ReferenceNumber ?? null) as string | null,
+          planLabel: String(o.planLabel ?? o.PlanLabel ?? ''),
+          description: String(o.description ?? o.Description ?? ''),
+          amount: Number(o.amount ?? o.Amount ?? 0),
+          excludedFromInvoice: Boolean(o.excludedFromInvoice ?? o.ExcludedFromInvoice ?? false),
+        };
+      })
+    : [];
+  return {
+    companyId: String(raw.companyId ?? raw.CompanyId ?? ''),
+    yearUtc: Number(raw.yearUtc ?? raw.YearUtc ?? 0),
+    monthUtc: Number(raw.monthUtc ?? raw.MonthUtc ?? 0),
+    billingPeriodId: String(raw.billingPeriodId ?? raw.BillingPeriodId ?? ''),
+    currency: String(raw.currency ?? raw.Currency ?? 'EUR'),
+    billableBookingCount: Number(raw.billableBookingCount ?? raw.BillableBookingCount ?? 0),
+    payableTotal: Number(raw.payableTotal ?? raw.PayableTotal ?? 0),
+    ledgerTotal: Number(raw.ledgerTotal ?? raw.LedgerTotal ?? 0),
+    segments,
+    bookings,
+  };
+}
+
+export async function adminGetBillingMonthBreakdown(
+  token: string,
+  companyId: string,
+  yearUtc: number,
+  monthUtc: number
+): Promise<BillingMonthBreakdown> {
+  const res = await fetch(
+    `${adminBase()}/companies/${encodeURIComponent(companyId)}/billing-months/${yearUtc}/${monthUtc}/breakdown`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = (err as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load billing breakdown (${res.status})`);
+  }
+  const raw = (await res.json()) as Record<string, unknown>;
+  return normalizeBillingMonthBreakdown(raw);
+}
+
+export async function adminSetBookingInvoiceExcluded(
+  token: string,
+  periodId: string,
+  bookingId: string,
+  excluded: boolean
+): Promise<void> {
+  const res = await fetch(
+    `${adminBase()}/billing-periods/${encodeURIComponent(periodId)}/bookings/${encodeURIComponent(bookingId)}/invoice-excluded`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ excluded }),
+    }
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      (data.message as string | undefined) ??
+      (data.Message as string | undefined) ??
+      res.statusText;
+    throw new Error(msg || `Update booking exclusion failed (${res.status})`);
+  }
+}
+
 export type BillingPeriodLineItem = {
   id: string;
   bookingId?: string | null;

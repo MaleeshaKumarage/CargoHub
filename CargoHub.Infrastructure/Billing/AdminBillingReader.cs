@@ -8,8 +8,13 @@ namespace CargoHub.Infrastructure.Billing;
 public sealed class AdminBillingReader : IAdminBillingReader
 {
     private readonly ApplicationDbContext _db;
+    private readonly IBillingMonthBreakdownReader _breakdownReader;
 
-    public AdminBillingReader(ApplicationDbContext db) => _db = db;
+    public AdminBillingReader(ApplicationDbContext db, IBillingMonthBreakdownReader breakdownReader)
+    {
+        _db = db;
+        _breakdownReader = breakdownReader;
+    }
 
     public async Task<IReadOnlyList<AdminSubscriptionPlanSummaryDto>> ListSubscriptionPlansAsync(
         CancellationToken cancellationToken = default)
@@ -120,6 +125,12 @@ public sealed class AdminBillingReader : IAdminBillingReader
             .Select(c => new { c.Name, c.BusinessId })
             .FirstOrDefaultAsync(cancellationToken);
 
+        var breakdown = await _breakdownReader.GetBreakdownAsync(
+            header.CompanyId,
+            header.YearUtc,
+            header.MonthUtc,
+            cancellationToken);
+
         var lines = await _db.BillingLineItems.AsNoTracking()
             .Where(l => l.CompanyBillingPeriodId == periodId)
             .OrderBy(l => l.CreatedAtUtc)
@@ -136,6 +147,30 @@ public sealed class AdminBillingReader : IAdminBillingReader
         var ledger = lines.Sum(l => l.Amount);
         var payable = lines.Where(l => !l.ExcludedFromInvoice).Sum(l => l.Amount);
 
+        IReadOnlyList<BillingInvoicePdfSegmentModel> segments = Array.Empty<BillingInvoicePdfSegmentModel>();
+        IReadOnlyList<BillingInvoicePdfBookingRowModel> bookingRows = Array.Empty<BillingInvoicePdfBookingRowModel>();
+        if (breakdown != null)
+        {
+            segments = breakdown.Segments
+                .Select(s => new BillingInvoicePdfSegmentModel
+                {
+                    Label = s.Label,
+                    BookingCount = s.BookingCount,
+                    UnitRate = s.UnitRate,
+                    Subtotal = s.Subtotal
+                })
+                .ToList();
+            bookingRows = breakdown.Bookings
+                .Select(b => new BillingInvoicePdfBookingRowModel
+                {
+                    BookingId = b.BookingId,
+                    Reference = b.ShipmentNumber ?? b.ReferenceNumber ?? b.BookingId.ToString("N")[..8],
+                    Amount = b.Amount,
+                    ExcludedFromInvoice = b.ExcludedFromInvoice
+                })
+                .ToList();
+        }
+
         return new BillingInvoicePdfModel
         {
             PeriodId = header.Id,
@@ -148,7 +183,9 @@ public sealed class AdminBillingReader : IAdminBillingReader
             Status = header.Status == CompanyBillingPeriodStatus.Open ? "Open" : "Closed",
             PayableTotal = payable,
             LedgerTotal = ledger,
-            Lines = lines
+            Lines = lines,
+            Segments = segments,
+            BookingRows = bookingRows
         };
     }
 }

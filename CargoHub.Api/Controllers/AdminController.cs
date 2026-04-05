@@ -101,6 +101,101 @@ public class AdminController : ControllerBase
         return Ok(detail);
     }
 
+    /// <summary>UTC months that have at least one billable booking for the company.</summary>
+    [HttpGet("companies/{companyId:guid}/billable-months")]
+    public async Task<ActionResult<IReadOnlyList<BillableMonthSummaryDto>>> GetBillableMonths(
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
+        var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
+        if (company == null)
+            return NotFound(new { message = "Company not found." });
+        var list = await _mediator.Send(new GetCompanyBillableMonthsQuery(companyId), cancellationToken);
+        return Ok(list);
+    }
+
+    /// <summary>Segment breakdown and per-booking rows for a UTC month (creates billing period row if missing).</summary>
+    [HttpGet("companies/{companyId:guid}/billing-months/{year:int}/{month:int}/breakdown")]
+    public async Task<ActionResult<BillingMonthBreakdownDto>> GetBillingMonthBreakdown(
+        Guid companyId,
+        int year,
+        int month,
+        CancellationToken cancellationToken)
+    {
+        var company = await _companyRepository.GetByIdAsync(companyId, cancellationToken);
+        if (company == null)
+            return NotFound(new { message = "Company not found." });
+        if (month is < 1 or > 12)
+            return BadRequest(new { message = "Month must be 1–12." });
+        var dto = await _mediator.Send(new GetBillingMonthBreakdownQuery(companyId, year, month), cancellationToken);
+        if (dto == null)
+            return NotFound(new { message = "Breakdown not available." });
+        return Ok(dto);
+    }
+
+    /// <summary>Exclude or include a booking for invoice totals; regenerates period lines.</summary>
+    [HttpPatch("billing-periods/{periodId:guid}/bookings/{bookingId:guid}/invoice-excluded")]
+    public async Task<ActionResult> SetBookingInvoiceExcluded(
+        Guid periodId,
+        Guid bookingId,
+        [FromBody] SetBookingInvoiceExcludedRequest body,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        var result = await _mediator.Send(
+            new SetBillingPeriodBookingExcludedCommand(periodId, bookingId, body.Excluded, userId),
+            cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return NoContent();
+    }
+
+    /// <summary>Download invoice PDF (includes segments and booking summary when available).</summary>
+    [HttpGet("billing-periods/{periodId:guid}/invoice.pdf")]
+    public async Task<IActionResult> DownloadBillingInvoicePdf(
+        Guid periodId,
+        [FromServices] IBillingInvoicePdfGenerator pdfGenerator,
+        CancellationToken cancellationToken)
+    {
+        var model = await _mediator.Send(new GetBillingInvoicePdfModelQuery(periodId), cancellationToken);
+        if (model == null)
+            return NotFound(new { message = "Billing period not found." });
+        var bytes = pdfGenerator.GeneratePdf(model);
+        return File(bytes, "application/pdf", $"invoice-{model.YearUtc}-{model.MonthUtc:00}.pdf");
+    }
+
+    /// <summary>Email invoice PDF to a company admin.</summary>
+    [HttpPost("billing-periods/{periodId:guid}/send-invoice-email")]
+    public async Task<ActionResult> SendBillingInvoiceEmail(
+        Guid periodId,
+        [FromBody] SendInvoiceEmailRequest body,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        var result = await _mediator.Send(
+            new SendBillingPeriodInvoiceEmailCommand(periodId, body.RecipientAdminUserId ?? "", userId),
+            cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>Toggle whether a posted line counts toward the invoice payable total.</summary>
+    [HttpPatch("billing-line-items/{lineId:guid}")]
+    public async Task<ActionResult> PatchBillingLineItem(
+        Guid lineId,
+        [FromBody] PatchBillingLineItemRequest body,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        var result = await _mediator.Send(
+            new UpdateBillingLineExcludedCommand(lineId, body.ExcludedFromInvoice, userId),
+            cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return NoContent();
+    }
+
     /// <summary>Create a company with limits and send initial admin invite (explicit or fallback email).</summary>
     [HttpPost("companies")]
     public async Task<ActionResult<AdminCompanyDetailDto>> CreateCompany([FromBody] CreateAdminCompanyRequest body, CancellationToken cancellationToken)
@@ -355,5 +450,10 @@ public class AdminController : ControllerBase
     public sealed class PatchBillingLineItemRequest
     {
         public bool ExcludedFromInvoice { get; set; }
+    }
+
+    public sealed class SetBookingInvoiceExcludedRequest
+    {
+        public bool Excluded { get; set; }
     }
 }

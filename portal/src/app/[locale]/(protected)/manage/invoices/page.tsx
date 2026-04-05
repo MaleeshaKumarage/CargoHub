@@ -1,20 +1,22 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   adminDownloadBillingPeriodInvoicePdf,
+  adminGetBillingMonthBreakdown,
   adminGetBillingPeriodDetail,
+  adminGetBillableMonths,
   adminGetCompanies,
-  adminGetCompanyBillingPeriods,
   adminGetUsers,
-  adminPatchBillingLineItem,
   adminSendBillingPeriodInvoiceEmail,
+  adminSetBookingInvoiceExcluded,
   type AdminCompany,
   type AdminUser,
+  type BillableMonthSummary,
+  type BillingMonthBreakdown,
   type BillingPeriodDetail,
-  type CompanyBillingPeriodSummary,
 } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,29 +33,40 @@ function formatMoney(amount: number, currency: string) {
   }
 }
 
+function monthKey(m: BillableMonthSummary): string {
+  return `${m.yearUtc}-${String(m.monthUtc).padStart(2, "0")}`;
+}
+
 export default function ManageInvoicesPage() {
   const { token } = useAuth();
   const t = useTranslations("manageInvoices");
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  const [periods, setPeriods] = useState<CompanyBillingPeriodSummary[]>([]);
+  const [months, setMonths] = useState<BillableMonthSummary[]>([]);
+  const [selectedMonthKey, setSelectedMonthKey] = useState("");
+  const [breakdown, setBreakdown] = useState<BillingMonthBreakdown | null>(null);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [loadingPeriods, setLoadingPeriods] = useState(false);
+  const [loadingMonths, setLoadingMonths] = useState(false);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<BillingPeriodDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [openPeriodId, setOpenPeriodId] = useState<string | null>(null);
+  const [lineDetail, setLineDetail] = useState<BillingPeriodDetail | null>(null);
+  const [lineDetailLoading, setLineDetailLoading] = useState(false);
   const [invoiceAdmins, setInvoiceAdmins] = useState<AdminUser[]>([]);
   const [invoiceAdminsLoading, setInvoiceAdminsLoading] = useState(false);
   const [emailRecipientId, setEmailRecipientId] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
-  const [lineBusyId, setLineBusyId] = useState<string | null>(null);
+  const [bookingBusyId, setBookingBusyId] = useState<string | null>(null);
 
   const selectedBusinessId = useMemo(() => {
     const c = companies.find((x) => x.id === selectedCompanyId);
     return c?.businessId?.trim() || null;
   }, [companies, selectedCompanyId]);
+
+  const selectedMonth = useMemo(
+    () => months.find((m) => monthKey(m) === selectedMonthKey) ?? null,
+    [months, selectedMonthKey]
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -76,42 +89,54 @@ export default function ManageInvoicesPage() {
 
   useEffect(() => {
     if (!token || !selectedCompanyId) {
-      setPeriods([]);
+      setMonths([]);
+      setSelectedMonthKey("");
+      setBreakdown(null);
       return;
     }
     let c = false;
-    setLoadingPeriods(true);
+    setLoadingMonths(true);
     setError(null);
-    adminGetCompanyBillingPeriods(token, selectedCompanyId)
+    adminGetBillableMonths(token, selectedCompanyId)
       .then((list) => {
-        if (!c) setPeriods(list);
+        if (!c) {
+          setMonths(list);
+          setSelectedMonthKey("");
+          setBreakdown(null);
+        }
       })
       .catch((e) => {
-        if (!c) setError(e instanceof Error ? e.message : "Failed to load periods");
+        if (!c) setError(e instanceof Error ? e.message : "Failed to load months");
       })
       .finally(() => {
-        if (!c) setLoadingPeriods(false);
+        if (!c) setLoadingMonths(false);
       });
     return () => {
       c = true;
     };
   }, [token, selectedCompanyId]);
 
-  const openDetail = (periodId: string) => {
-    if (!token) return;
-    setOpenPeriodId(periodId);
-    setDetailLoading(true);
-    setDetail(null);
-    setEmailRecipientId("");
-    setInvoiceAdmins([]);
-    adminGetBillingPeriodDetail(token, periodId)
-      .then((d) => setDetail(d))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load period"))
-      .finally(() => setDetailLoading(false));
-  };
+  const loadBreakdown = useCallback(() => {
+    if (!token || !selectedCompanyId || !selectedMonth) return;
+    const { yearUtc, monthUtc } = selectedMonth;
+    setLoadingBreakdown(true);
+    setError(null);
+    adminGetBillingMonthBreakdown(token, selectedCompanyId, yearUtc, monthUtc)
+      .then(setBreakdown)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load breakdown"))
+      .finally(() => setLoadingBreakdown(false));
+  }, [token, selectedCompanyId, selectedMonth]);
 
   useEffect(() => {
-    if (!token || !detail || !selectedBusinessId) {
+    if (!selectedMonth) {
+      setBreakdown(null);
+      return;
+    }
+    loadBreakdown();
+  }, [selectedMonth, loadBreakdown]);
+
+  useEffect(() => {
+    if (!token || !breakdown || !selectedBusinessId) {
       setInvoiceAdmins([]);
       return;
     }
@@ -135,23 +160,32 @@ export default function ManageInvoicesPage() {
     return () => {
       c = true;
     };
-  }, [token, detail?.id, selectedBusinessId]);
+  }, [token, breakdown, selectedBusinessId]);
 
-  const refreshDetail = () => {
-    if (!token || !openPeriodId) return;
-    adminGetBillingPeriodDetail(token, openPeriodId).then(setDetail).catch(() => {});
+  const openLineDetail = () => {
+    if (!token || !breakdown) return;
+    setLineDetailLoading(true);
+    setLineDetail(null);
+    setError(null);
+    adminGetBillingPeriodDetail(token, breakdown.billingPeriodId)
+      .then(setLineDetail)
+      .catch((e) => {
+        setLineDetail(null);
+        setError(e instanceof Error ? e.message : "Failed to load period lines");
+      })
+      .finally(() => setLineDetailLoading(false));
   };
 
   const onDownloadPdf = async () => {
-    if (!token || !openPeriodId) return;
+    if (!token || !breakdown) return;
     setPdfBusy(true);
     setError(null);
     try {
-      const blob = await adminDownloadBillingPeriodInvoicePdf(token, openPeriodId);
+      const blob = await adminDownloadBillingPeriodInvoicePdf(token, breakdown.billingPeriodId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `invoice-${detail?.yearUtc ?? ""}-${String(detail?.monthUtc ?? "").padStart(2, "0")}.pdf`;
+      a.download = `invoice-${breakdown.yearUtc}-${String(breakdown.monthUtc).padStart(2, "0")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -162,11 +196,11 @@ export default function ManageInvoicesPage() {
   };
 
   const onSendEmail = async () => {
-    if (!token || !openPeriodId || !emailRecipientId) return;
+    if (!token || !breakdown || !emailRecipientId) return;
     setEmailBusy(true);
     setError(null);
     try {
-      await adminSendBillingPeriodInvoiceEmail(token, openPeriodId, emailRecipientId);
+      await adminSendBillingPeriodInvoiceEmail(token, breakdown.billingPeriodId, emailRecipientId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send email failed");
     } finally {
@@ -174,17 +208,17 @@ export default function ManageInvoicesPage() {
     }
   };
 
-  const onToggleExcluded = async (lineId: string, excluded: boolean) => {
-    if (!token) return;
-    setLineBusyId(lineId);
+  const onToggleBookingExcluded = async (bookingId: string, excluded: boolean) => {
+    if (!token || !breakdown) return;
+    setBookingBusyId(bookingId);
     setError(null);
     try {
-      await adminPatchBillingLineItem(token, lineId, excluded);
-      refreshDetail();
+      await adminSetBookingInvoiceExcluded(token, breakdown.billingPeriodId, bookingId, excluded);
+      await loadBreakdown();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update line failed");
+      setError(e instanceof Error ? e.message : "Update failed");
     } finally {
-      setLineBusyId(null);
+      setBookingBusyId(null);
     }
   };
 
@@ -199,7 +233,7 @@ export default function ManageInvoicesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("periodsTitle")}</CardTitle>
+          <CardTitle>{t("breakdownTitle")}</CardTitle>
           <CardDescription>{t("selectCompany")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -221,59 +255,168 @@ export default function ManageInvoicesPage() {
             </select>
           </div>
 
+          {selectedCompanyId ? (
+            <div className="space-y-2 max-w-md">
+              <Label htmlFor="invoice-month">{t("billableMonth")}</Label>
+              <select
+                id="invoice-month"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                value={selectedMonthKey}
+                onChange={(e) => setSelectedMonthKey(e.target.value)}
+                disabled={loadingMonths}
+              >
+                <option value="">{t("selectMonthPlaceholder")}</option>
+                {months.map((m) => (
+                  <option key={monthKey(m)} value={monthKey(m)}>
+                    {m.yearUtc}-{String(m.monthUtc).padStart(2, "0")}{" "}
+                    {t("monthOptionBookings", { count: m.billableBookingCount })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
           )}
 
-          {!selectedCompanyId ? (
-            <p className="text-sm text-muted-foreground">{t("selectCompanyPlaceholder")}</p>
-          ) : loadingPeriods ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : periods.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("noPeriods")}</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="p-3 text-left font-medium">{t("month")}</th>
-                    <th className="p-3 text-left font-medium">{t("status")}</th>
-                    <th className="p-3 text-right font-medium">{t("lines")}</th>
-                    <th className="p-3 text-right font-medium">{t("payable")}</th>
-                    <th className="p-3 text-left font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {periods.map((p) => (
-                    <tr key={p.id} className="border-b last:border-0">
-                      <td className="p-3 font-mono">
-                        {p.yearUtc}-{String(p.monthUtc).padStart(2, "0")}
-                      </td>
-                      <td className="p-3">{p.status}</td>
-                      <td className="p-3 text-right">{p.lineItemCount}</td>
-                      <td className="p-3 text-right">{formatMoney(p.payableTotal, p.currency)}</td>
-                      <td className="p-3">
-                        <Button type="button" variant="secondary" size="sm" onClick={() => openDetail(p.id)}>
-                          {t("viewLines")}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {selectedCompanyId && !loadingMonths && months.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("noBillableMonths")}</p>
+          ) : null}
+
+          {loadingBreakdown && <p className="text-sm text-muted-foreground">{t("loadingBreakdown")}</p>}
+
+          {breakdown && !loadingBreakdown ? (
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("totalPayable")}: </span>
+                  <span className="font-semibold">{formatMoney(breakdown.payableTotal, breakdown.currency)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("totalLedger")}: </span>
+                  <span>{formatMoney(breakdown.ledgerTotal, breakdown.currency)}</span>
+                </div>
+              </div>
+
+              {breakdown.segments.length > 0 ? (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">{t("segmentsTitle")}</h3>
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-2 text-left font-medium">{t("segmentLabel")}</th>
+                          <th className="p-2 text-right font-medium">{t("segmentBookings")}</th>
+                          <th className="p-2 text-right font-medium">{t("segmentUnit")}</th>
+                          <th className="p-2 text-right font-medium">{t("segmentSubtotal")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {breakdown.segments.map((s, i) => (
+                          <tr key={`${s.label}-${i}`} className="border-b last:border-0">
+                            <td className="p-2">{s.label}</td>
+                            <td className="p-2 text-right">{s.bookingCount}</td>
+                            <td className="p-2 text-right">
+                              {s.unitRate != null ? formatMoney(s.unitRate, breakdown.currency) : "—"}
+                            </td>
+                            <td className="p-2 text-right">{formatMoney(s.subtotal, breakdown.currency)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
+              <div>
+                <h3 className="text-sm font-medium mb-2">{t("bookingsTitle")}</h3>
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="p-2 text-left font-medium">{t("bookingRef")}</th>
+                        <th className="p-2 text-left font-medium">{t("plan")}</th>
+                        <th className="p-2 text-left font-medium">{t("bookingDescription")}</th>
+                        <th className="p-2 text-right font-medium">{t("amount")}</th>
+                        <th className="p-2 text-left font-medium">{t("excludeBooking")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdown.bookings.map((b) => (
+                        <tr key={b.bookingId} className="border-b last:border-0">
+                          <td className="p-2 font-mono text-xs">
+                            {b.shipmentNumber || b.referenceNumber || b.bookingId.slice(0, 8)}
+                          </td>
+                          <td className="p-2">{b.planLabel || "—"}</td>
+                          <td className="p-2 text-muted-foreground">{b.description}</td>
+                          <td className="p-2 text-right">{formatMoney(b.amount, breakdown.currency)}</td>
+                          <td className="p-2">
+                            <Switch
+                              checked={b.excludedFromInvoice}
+                              disabled={bookingBusyId === b.bookingId}
+                              onCheckedChange={(v) => onToggleBookingExcluded(b.bookingId, v)}
+                              aria-label={t("excludeBooking")}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-3 border-t pt-4">
+                <Button type="button" variant="secondary" size="sm" disabled={pdfBusy} onClick={onDownloadPdf}>
+                  {pdfBusy ? "…" : t("saveInvoice")}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={openLineDetail}>
+                  {t("viewLines")}
+                </Button>
+                <div className="flex flex-col gap-1 min-w-[200px]">
+                  <Label htmlFor="invoice-email-recipient">{t("recipientAdmin")}</Label>
+                  <select
+                    id="invoice-email-recipient"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                    value={emailRecipientId}
+                    onChange={(e) => setEmailRecipientId(e.target.value)}
+                    disabled={!selectedBusinessId || invoiceAdminsLoading || invoiceAdmins.length === 0}
+                  >
+                    <option value="">{t("recipientPlaceholder")}</option>
+                    {invoiceAdmins.map((u) => (
+                      <option key={u.userId} value={u.userId}>
+                        {u.email || u.userId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    emailBusy || !emailRecipientId || !selectedBusinessId || invoiceAdmins.length === 0
+                  }
+                  onClick={onSendEmail}
+                >
+                  {emailBusy ? "…" : t("sendInvoice")}
+                </Button>
+              </div>
+              {!selectedBusinessId && (
+                <p className="text-xs text-muted-foreground">{t("emailRequiresBusinessId")}</p>
+              )}
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
       <DialogPrimitive.Root
-        open={detail != null || detailLoading}
+        open={lineDetail != null || lineDetailLoading}
         onOpenChange={(open) => {
           if (!open) {
-            setDetail(null);
-            setDetailLoading(false);
+            setLineDetail(null);
+            setLineDetailLoading(false);
           }
         }}
       >
@@ -285,80 +428,31 @@ export default function ManageInvoicesPage() {
             )}
           >
             <DialogPrimitive.Title className="text-lg font-semibold">{t("detailTitle")}</DialogPrimitive.Title>
-            {detailLoading && <p className="mt-4 text-sm text-muted-foreground">…</p>}
-            {detail && (
-              <div className="mt-4 space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {detail.yearUtc}-{String(detail.monthUtc).padStart(2, "0")} · {detail.status} ·{" "}
-                  {formatMoney(detail.payableTotal, detail.currency)} {t("payable").toLowerCase()}
-                </p>
-                <div className="flex flex-wrap items-end gap-3">
-                  <Button type="button" variant="secondary" size="sm" disabled={pdfBusy} onClick={onDownloadPdf}>
-                    {pdfBusy ? "…" : t("downloadPdf")}
-                  </Button>
-                  <div className="flex flex-col gap-1 min-w-[200px]">
-                    <Label htmlFor="invoice-email-recipient">{t("recipientAdmin")}</Label>
-                    <select
-                      id="invoice-email-recipient"
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                      value={emailRecipientId}
-                      onChange={(e) => setEmailRecipientId(e.target.value)}
-                      disabled={!selectedBusinessId || invoiceAdminsLoading || invoiceAdmins.length === 0}
-                    >
-                      <option value="">{t("recipientPlaceholder")}</option>
-                      {invoiceAdmins.map((u) => (
-                        <option key={u.userId} value={u.userId}>
-                          {u.email || u.userId}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={
-                      emailBusy ||
-                      !emailRecipientId ||
-                      !selectedBusinessId ||
-                      invoiceAdmins.length === 0
-                    }
-                    onClick={onSendEmail}
-                  >
-                    {emailBusy ? "…" : t("sendInvoice")}
-                  </Button>
-                </div>
-                {!selectedBusinessId && (
-                  <p className="text-xs text-muted-foreground">{t("emailRequiresBusinessId")}</p>
-                )}
-                <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="p-2 text-left font-medium">{t("lineType")}</th>
-                        <th className="p-2 text-left font-medium">{t("booking")}</th>
-                        <th className="p-2 text-right font-medium">{t("amount")}</th>
-                        <th className="p-2 text-left font-medium">{t("excluded")}</th>
+            {lineDetailLoading && <p className="mt-4 text-sm text-muted-foreground">…</p>}
+            {lineDetail && (
+              <div className="mt-4 overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left font-medium">{t("lineType")}</th>
+                      <th className="p-2 text-left font-medium">{t("booking")}</th>
+                      <th className="p-2 text-right font-medium">{t("amount")}</th>
+                      <th className="p-2 text-left font-medium">{t("excluded")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineDetail.lineItems.map((l) => (
+                      <tr key={l.id} className="border-b last:border-0">
+                        <td className="p-2">{l.lineType}</td>
+                        <td className="p-2 font-mono text-xs">{l.bookingId ?? "—"}</td>
+                        <td className="p-2 text-right">{formatMoney(l.amount, l.currency)}</td>
+                        <td className="p-2">
+                          {l.excludedFromInvoice ? t("excludedYes") : t("excludedNo")}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {detail.lineItems.map((l) => (
-                        <tr key={l.id} className="border-b last:border-0">
-                          <td className="p-2">{l.lineType}</td>
-                          <td className="p-2 font-mono text-xs">{l.bookingId ?? "—"}</td>
-                          <td className="p-2 text-right">{formatMoney(l.amount, l.currency)}</td>
-                          <td className="p-2">
-                            <Switch
-                              checked={l.excludedFromInvoice}
-                              disabled={lineBusyId === l.id}
-                              onCheckedChange={(v) => onToggleExcluded(l.id, v)}
-                              aria-label={t("excluded")}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
             <div className="mt-6 flex justify-end">

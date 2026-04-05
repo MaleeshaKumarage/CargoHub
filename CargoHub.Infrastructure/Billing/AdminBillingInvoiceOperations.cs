@@ -78,12 +78,15 @@ public sealed class AdminBillingInvoiceOperations : IAdminBillingInvoiceOperatio
 
         var pdf = _pdfGenerator.GeneratePdf(model);
         var fileName = $"invoice-{model.YearUtc}-{model.MonthUtc:00}.pdf";
-        var subject = $"Invoice {model.YearUtc}-{model.MonthUtc:00} — {model.CompanyName}";
+        var periodLabel = $"{model.YearUtc}-{model.MonthUtc:00} (UTC)";
+        var subject = $"Invoice {periodLabel} — {model.CompanyName}";
         var html =
-            $"<p>Hello,</p><p>Please find attached the billing summary for <strong>{System.Net.WebUtility.HtmlEncode(model.CompanyName)}</strong> " +
-            $"for <strong>{model.YearUtc}-{model.MonthUtc:00}</strong> (UTC).</p>" +
-            $"<p>Ledger total: <strong>{model.LedgerTotal:N2} {model.Currency}</strong><br/>" +
-            $"Amount due (invoice): <strong>{model.PayableTotal:N2} {model.Currency}</strong></p>" +
+            "<p>Hello,</p>" +
+            $"<p>Please find attached the invoice for <strong>{System.Net.WebUtility.HtmlEncode(model.CompanyName)}</strong>.</p>" +
+            $"<p>Billing period: <strong>{System.Net.WebUtility.HtmlEncode(periodLabel)}</strong>.</p>" +
+            $"<p>Amount due (invoice): <strong>{model.PayableTotal:N2} {model.Currency}</strong><br/>" +
+            $"Ledger total (all posted lines): <strong>{model.LedgerTotal:N2} {model.Currency}</strong></p>" +
+            "<p>The PDF includes segment summaries, per-booking rows, and detailed line items.</p>" +
             "<p>Regards</p>";
 
         await _emailSender.SendAsync(
