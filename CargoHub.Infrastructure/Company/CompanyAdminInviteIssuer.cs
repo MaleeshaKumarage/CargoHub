@@ -101,6 +101,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
 
         var baseUrl = PortalPublicBaseUrlResolver.Resolve(_portal.Value, _configuration);
         var link = $"{baseUrl}/en/accept-invite?token={Uri.EscapeDataString(raw)}";
+        var tourUrl = PortalPublicBaseUrlResolver.ResolveTourUrl(_portal.Value, _configuration);
 
         var company = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
         var companyLabel = company?.Name ?? company?.BusinessId ?? companyId.ToString();
@@ -109,6 +110,7 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         var body =
             $"<p>You have been invited as an administrator for <strong>{System.Net.WebUtility.HtmlEncode(companyLabel)}</strong>.</p>" +
             $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(link)}\">Open the invitation</a> to choose your user name and password.</p>" +
+            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(tourUrl)}\">Product tour</a> — overview of bookings, insight, and workflows (optional).</p>" +
             "<p>If the link expires, ask a Super Admin to resend the invite.</p>";
 
         try

@@ -107,4 +107,33 @@ public class PortalPublicBaseUrlResolverTests
         var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
         Assert.Equal("https://fallback.example", url);
     }
+
+    [Fact]
+    public void ResolveTourUrl_UsesTourUrl_WhenSet()
+    {
+        var portal = new PortalPublicOptions
+        {
+            PublicBaseUrl = "https://ignored.example",
+            TourUrl = "https://tour.example.com/en/tour/",
+        };
+        var url = PortalPublicBaseUrlResolver.ResolveTourUrl(portal, Config());
+        Assert.Equal("https://tour.example.com/en/tour", url);
+    }
+
+    [Fact]
+    public void ResolveTourUrl_AppendsEnTour_WhenTourUrlEmpty()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "https://app.example.com", TourUrl = "" };
+        var url = PortalPublicBaseUrlResolver.ResolveTourUrl(portal, Config());
+        Assert.Equal("https://app.example.com/en/tour", url);
+    }
+
+    [Fact]
+    public void ResolveTourUrl_UsesResolvedBase_WhenTourUrlEmptyAndPublicBaseEmpty()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "", TourUrl = "" };
+        var cfg = Config(("Cors:PortalOrigin", "https://portal.example"));
+        var url = PortalPublicBaseUrlResolver.ResolveTourUrl(portal, cfg);
+        Assert.Equal("https://portal.example/en/tour", url);
+    }
 }
