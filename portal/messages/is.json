@@ -200,7 +200,16 @@
     "validationActionBanner": "Sum skyldureitir vantar. Skrunaðu upp að merktum villum og reyndu aftur.",
     "trialLimitBannerTitle": "Prufuheimild fyrir bókanir er út",
     "trialLimitBannerHint": "Uppfærðu áskriftina þína eða biddu stjórnanda um greidda áætlun svo þú getir haldið áfram að búa til bókanir.",
-    "trialLimitBannerDismiss": "Loka"
+    "trialLimitBannerDismiss": "Loka",
+    "saveAsDraft": "Vista sem drög",
+    "sections": {
+      "headerDescription": "Tilvísun og flutningsaðili"
+    },
+    "fields": {
+      "referenceNumber": "Tilvísunarnúmer",
+      "postalService": "Póstþjónusta / flutningsaðili",
+      "receiver": "Viðtakandi"
+    }
   },
   "actions": {
     "title": "Aðgerðir",
@@ -432,7 +441,7 @@
   },
   "tour": {
     "metaTitle": "CargoHub — Product tour",
-    "metaDescription": "Multi-tenant logistics: bookings, operational insight, carrier setup, and platform administration.",
+    "metaDescription": "Multi-tenant logistics: bookings, APIs, bulk import, waybills, carriers, plans, invoicing, and platform administration.",
     "logoAlt": "CargoHub",
     "nav": {
       "top": "Home",
@@ -440,8 +449,10 @@
       "bookings": "Shipments",
       "dashboard": "Insight",
       "workflow": "Workflow",
+      "integrations": "Integrate",
       "carriers": "Carriers",
       "admin": "Operators",
+      "subscriptions": "Plans",
       "start": "Start"
     },
     "cta": {
@@ -479,7 +490,10 @@
       "b1": "Single structured booking flow",
       "b2": "Address book and drafts",
       "b3": "Shared milestone visibility",
-      "mockLabel": "Booking workspace"
+      "b4": "Waybill PDFs—generate and print when the shipment reaches the right milestone",
+      "mockLabel": "Booking workspace",
+      "bulkTitle": "CSV & Excel import",
+      "bulkBody": "Upload structured files to create multiple bookings in one pass—ideal for campaign drops, seasonal volume, or migrating lists from legacy tools."
     },
     "dashboard": {
       "index": "03",
@@ -501,22 +515,42 @@
       "b3": "Less hunting through menus",
       "mockLabel": "Workflow"
     },
-    "carriers": {
+    "integrations": {
       "index": "05",
+      "kicker": "// connect",
+      "title": "Plug in your stack—APIs & e-commerce",
+      "body": "Connect your store, ERP, or custom services with CargoHub’s APIs—bookings and updates flow in automatically so operations stay aligned without re-keying.",
+      "apiTitle": "APIs & e-commerce platforms",
+      "apiBody": "Create and update bookings from your own systems or storefronts; keep orders and shipments in sync with a stable integration surface."
+    },
+    "carriers": {
+      "index": "06",
       "kicker": "// carrier_reality",
       "title": "Work with your real carrier agreements",
       "body": "Configure the carriers and identifiers your company actually uses so bookings line up with provider contracts.",
       "mockLabel": "Carrier contracts"
     },
     "admin": {
-      "index": "06",
+      "index": "07",
       "kicker": "// platform_ops",
       "title": "For operators running the whole tenant base",
       "body": "Onboard companies, control who can sign in, handle billing and subscription plans, and publish what changed.",
       "mockLabel": "Administration"
     },
+    "subscriptions": {
+      "index": "08",
+      "kicker": "// plans",
+      "title": "Subscription tiers and custom plans",
+      "intro": "Match each company to the right model: packaged tiers, bespoke deals, and operator workflows for billing periods and invoice PDFs when terms or volume need a custom fit.",
+      "tiersTitle": "Tiered subscriptions",
+      "tiersBody": "Plans with included booking allowances, stepped pricing, and clear overage rules—straightforward to sell, assign, and enforce across tenants.",
+      "customTitle": "Custom subscriptions",
+      "customBody": "When standard tiers are not enough, operators can define tailored plans: custom limits, billing periods, and pricing so strategic or high-volume accounts get the right agreement.",
+      "invoiceTitle": "Invoice handling",
+      "invoiceBody": "Billing periods, earnings breakdowns, and print-ready invoice PDFs—operators review platform revenue and send clear statements per company."
+    },
     "start": {
-      "index": "07",
+      "index": "09",
       "kicker": "// onboarding",
       "title": "Get started in minutes",
       "step1": "Your organization is created by a platform administrator.",

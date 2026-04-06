@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@/test/test-utils";
 import BookingsPage from "./page";
 
+vi.mock("@/components/ui/dropdown-menu", () => import("@/test/mock-dropdown-menu"));
+
 const mockReplace = vi.fn();
 const mockUseAuth = vi.fn();
 
@@ -38,6 +40,7 @@ const bookingsImportConfirm = await import("@/lib/api").then((m) => m.bookingsIm
 const bookingsWaybillsBulkDownload = await import("@/lib/api").then(
   (m) => m.bookingsWaybillsBulkDownload,
 );
+const bookingsExportDownload = await import("@/lib/api").then((m) => m.bookingsExportDownload);
 
 describe("BookingsPage", () => {
   beforeEach(() => {
@@ -404,5 +407,220 @@ describe("BookingsPage", () => {
       );
     });
     await expect(screen.findByText("importCountCompleted")).resolves.toBeInTheDocument();
+  });
+
+  it("redirects to login when not authenticated", () => {
+    mockUseAuth.mockReturnValue({
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      user: null,
+    });
+    render(<BookingsPage />);
+    expect(mockReplace).toHaveBeenCalledWith("/login");
+  });
+
+  it("export CSV calls API and shows error on failure", async () => {
+    vi.mocked(bookingsExportDownload).mockRejectedValue(new Error("export failed"));
+    vi.mocked(bookingList).mockResolvedValue([
+      {
+        id: "b1",
+        shipmentNumber: "S1",
+        customerName: "C",
+        createdAtUtc: "2025-01-01T00:00:00Z",
+        enabled: true,
+        isFavourite: false,
+        isDraft: false,
+        statusHistory: [],
+      },
+    ]);
+    render(<BookingsPage />);
+    await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: /export/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /exportCsv/i }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("export failed");
+    });
+  });
+
+  it("import analyze non-Error rejection shows generic message", async () => {
+    vi.mocked(bookingsImportAnalyze).mockRejectedValue("x");
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Import failed");
+    });
+  });
+
+  it("saved mapping adjust opens manual mapping step", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: true,
+      sessionId: "adj1",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+      fileHeaders: ["H1"],
+      bookingFields: ["ReferenceNumber"],
+      hasSavedMapping: true,
+      savedColumnMap: { ReferenceNumber: "H1" },
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByText("importSavedMappingTitle");
+    fireEvent.click(screen.getByRole("button", { name: /^importSavedMappingAdjust$/i }));
+    await expect(screen.findByText("importMappingTitle")).resolves.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "ReferenceNumber" })).toBeInTheDocument();
+  });
+
+  it("manual column mapping with save flag calls apply mapping", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: true,
+      sessionId: "man1",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+      fileHeaders: ["FileRef"],
+      bookingFields: ["ReferenceNumber"],
+      hasSavedMapping: false,
+      savedColumnMap: null,
+    });
+    vi.mocked(bookingsImportApplyMapping).mockResolvedValue({
+      sessionId: "man1",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByText("importMappingTitle");
+    fireEvent.change(screen.getByRole("combobox", { name: "ReferenceNumber" }), {
+      target: { value: "FileRef" },
+    });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /^importMappingContinue$/i }));
+    await vi.waitFor(() => {
+      expect(bookingsImportApplyMapping).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          saveMappingForCompany: true,
+          columnMap: expect.objectContaining({ ReferenceNumber: "FileRef" }),
+        }),
+      );
+    });
+  });
+
+  it("apply saved mapping with zero rows shows importNoDataRows", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: true,
+      sessionId: "z1",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+      fileHeaders: ["R"],
+      bookingFields: ["ReferenceNumber"],
+      hasSavedMapping: true,
+      savedColumnMap: { ReferenceNumber: "R" },
+    });
+    vi.mocked(bookingsImportApplyMapping).mockResolvedValue({
+      sessionId: "z1",
+      completedCount: 0,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 0,
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByText("importSavedMappingTitle");
+    fireEvent.click(screen.getByRole("button", { name: /^importSavedMappingUseSaved$/i }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("importNoDataRows");
+    });
+  });
+
+  it("bulk waybill download failure shows alert", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
+      sessionId: "w1",
+      completedCount: 1,
+      draftCount: 0,
+      skippedEmptyRows: 0,
+      totalDataRows: 1,
+      fileHeaders: [],
+      bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
+    });
+    vi.mocked(bookingsImportConfirm).mockResolvedValue({
+      createdCount: 1,
+      draftCount: 0,
+      errors: [],
+      createdBookingIds: ["b1"],
+      draftBookingIds: [],
+    });
+    vi.mocked(bookingsWaybillsBulkDownload).mockRejectedValue(new Error("pdf nope"));
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /^importRun$/i }));
+    await screen.findByText("importSummaryLine");
+    fireEvent.click(screen.getByRole("button", { name: /^importDownloadWaybills$/i }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("pdf nope");
+    });
+  });
+
+  it("import confirm only drafts when preview has draft rows", async () => {
+    vi.mocked(bookingsImportAnalyze).mockResolvedValue({
+      needsMapping: false,
+      sessionId: "donly",
+      completedCount: 0,
+      draftCount: 2,
+      skippedEmptyRows: 0,
+      totalDataRows: 2,
+      fileHeaders: [],
+      bookingFields: [],
+      hasSavedMapping: false,
+      savedColumnMap: null,
+    });
+    vi.mocked(bookingsImportConfirm).mockResolvedValue({
+      createdCount: 0,
+      draftCount: 2,
+      errors: [],
+      createdBookingIds: [],
+      draftBookingIds: ["d1", "d2"],
+    });
+    render(<BookingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["h"], "t.csv")] } });
+    await screen.findByRole("dialog");
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[boxes.length - 1]);
+    fireEvent.click(screen.getByRole("button", { name: /^importRun$/i }));
+    await vi.waitFor(() => {
+      expect(bookingsImportConfirm).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          sessionId: "donly",
+          importCompleted: false,
+          importDrafts: true,
+        }),
+      );
+    });
   });
 });
