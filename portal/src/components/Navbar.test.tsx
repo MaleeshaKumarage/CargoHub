@@ -11,6 +11,12 @@ let mockUser: { displayName?: string; email?: string; businessId?: string | null
   businessId: null,
 };
 let mockRolesFromToken: string[] = [];
+let mockBranding: { appName: string; logoUrl: string; primaryColor: string; secondaryColor: string } = {
+  appName: "appName",
+  logoUrl: "",
+  primaryColor: "",
+  secondaryColor: "",
+};
 
 vi.mock("@/context/DesignThemeContext", () => ({
   useDesignTheme: () => ({ theme: "minimalism", setTheme: vi.fn(), isLoading: false }),
@@ -30,7 +36,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/context/BrandingContext", () => ({
-  useBranding: () => ({ appName: "appName", logoUrl: "", primaryColor: "", secondaryColor: "" }),
+  useBranding: () => mockBranding,
 }));
 
 vi.mock("@/lib/jwt", () => ({
@@ -55,6 +61,7 @@ describe("Navbar", () => {
     vi.clearAllMocks();
     mockUser = { displayName: "Test User", email: "u@test.com", businessId: null };
     mockRolesFromToken = [];
+    mockBranding = { appName: "appName", logoUrl: "", primaryColor: "", secondaryColor: "" };
   });
 
   it("renders app name link to dashboard", () => {
@@ -62,6 +69,26 @@ describe("Navbar", () => {
     const appLink = screen.getByRole("link", { name: /appName/i });
     expect(appLink).toBeInTheDocument();
     expect(appLink).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("renders custom logo image when branding.logoUrl is set", () => {
+    mockBranding = {
+      appName: "Acme Ship",
+      logoUrl: "https://cdn.example/logo.png",
+      primaryColor: "",
+      secondaryColor: "",
+    };
+    render(<Navbar />);
+    const img = screen.getByRole("img", { name: "Acme Ship" });
+    expect(img).toHaveAttribute("src", "https://cdn.example/logo.png");
+    expect(screen.getByRole("link", { name: /Acme Ship/i })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("does not render logo img when branding.logoUrl is empty", () => {
+    mockBranding = { appName: "NoLogo Co", logoUrl: "", primaryColor: "", secondaryColor: "" };
+    render(<Navbar />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /NoLogo Co/i })).toBeInTheDocument();
   });
 
   it("renders nav tabs: Dashboard, Bookings, Actions, Plugin, More", () => {

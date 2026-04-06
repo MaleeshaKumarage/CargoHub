@@ -189,6 +189,22 @@ public class CompanyRepositoryTestDbTests : IDisposable
     }
 
     [Fact]
+    public async Task GetByBusinessIdWithAgreements_ReturnsNull_WhenBusinessIdEmpty()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        Assert.Null(await repo.GetByBusinessIdWithAgreementsAsync("", default));
+    }
+
+    [Fact]
+    public async Task GetByBusinessIdWithAgreements_ReturnsNull_WhenBusinessIdWhitespace()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        Assert.Null(await repo.GetByBusinessIdWithAgreementsAsync("\t", default));
+    }
+
+    [Fact]
     public async Task GetEnabledCourierIds_ReturnsEmpty_WhenCompanyMissing()
     {
         using var context = _fixture.CreateContext();

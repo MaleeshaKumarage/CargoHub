@@ -64,7 +64,11 @@ export function Navbar() {
       <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           {branding.logoUrl ? (
-            <img src={branding.logoUrl} alt="" className="h-8 w-auto object-contain" />
+            <img
+              src={branding.logoUrl}
+              alt={appName}
+              className="h-8 w-auto object-contain"
+            />
           ) : null}
           {appName}
         </Link>

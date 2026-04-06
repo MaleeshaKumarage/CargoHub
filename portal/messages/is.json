@@ -83,7 +83,9 @@
     "setPassword": "Setja lykilorð",
     "settingPassword": "Set lykilorð…",
     "resetSuccess": "Lykilorðið hefur verið endurstillt. Þú getur nú skráð þig inn.",
-    "invalidOrExpiredToken": "Ógildur eða útrunninn miði."
+    "invalidOrExpiredToken": "Ógildur eða útrunninn miði.",
+    "productTour": "Product tour",
+    "productTourHint": "Explore features before you sign in."
   },
   "home": {
     "title": "Heim",
@@ -427,5 +429,108 @@
     "saveTiers": "Vista þrep",
     "loading": "Hleð…",
     "openEdit": "Breyta"
+  },
+  "tour": {
+    "metaTitle": "CargoHub — Product tour",
+    "metaDescription": "Multi-tenant logistics: bookings, operational insight, carrier setup, and platform administration.",
+    "logoAlt": "CargoHub",
+    "nav": {
+      "top": "Home",
+      "platform": "Platform",
+      "bookings": "Shipments",
+      "dashboard": "Insight",
+      "workflow": "Workflow",
+      "carriers": "Carriers",
+      "admin": "Operators",
+      "start": "Start"
+    },
+    "cta": {
+      "signIn": "Sign in",
+      "register": "Register",
+      "explore": "View platform"
+    },
+    "hero": {
+      "kicker": "MULTI_TENANT_LOGISTICS",
+      "title": "Operate freight with clarity",
+      "subtitle": "One hub for bookings, network insight, and carrier reality—scoped per company, governed when you run the platform.",
+      "strip1": "Book → track → reconcile",
+      "strip2": "Nordic locales",
+      "strip3": "Tenant-safe by design"
+    },
+    "platform": {
+      "index": "01",
+      "kicker": "// platform_overview",
+      "title": "Built for ops, visibility, and control",
+      "intro": "Four capability layers map to how teams actually work—not a feature laundry list.",
+      "card1Title": "Ship & track",
+      "card1Body": "From booking to delivery visibility with fewer handoffs and one shared picture of what is moving.",
+      "card2Title": "Understand your network",
+      "card2Body": "Volume, carriers, routes, and signals that need attention—before they become customer escalations.",
+      "card3Title": "Connect your workflow",
+      "card3Body": "Desktop plugin path and release visibility so rollouts do not surprise your desk teams.",
+      "card4Title": "Trust & control",
+      "card4Body": "Companies see only their data; platform operators govern tenants, access, and plans."
+    },
+    "bookings": {
+      "index": "02",
+      "kicker": "// shipments",
+      "title": "Get every shipment documented and moving",
+      "body": "One flow for parties, stops, and cargo. Reuse contacts, save progress, switch to essentials-only when speed matters.",
+      "b1": "Single structured booking flow",
+      "b2": "Address book and drafts",
+      "b3": "Shared milestone visibility",
+      "mockLabel": "Booking workspace"
+    },
+    "dashboard": {
+      "index": "03",
+      "kicker": "// operational_insight",
+      "title": "See performance before it becomes a fire drill",
+      "body": "Leadership views for what is busy, who carries your volume, and where friction shows up early.",
+      "b1": "Period and trend context",
+      "b2": "Carrier and lane perspective",
+      "b3": "Exception-oriented signals",
+      "mockLabel": "Control room"
+    },
+    "workflow": {
+      "index": "04",
+      "kicker": "// desk_and_delivery",
+      "title": "Speed for the desk, clarity on change",
+      "body": "Shortcuts for everyday operational tasks plus a path to stay current with what shipped in the product.",
+      "b1": "Actions hub for recurring work",
+      "b2": "Plugin and release notes",
+      "b3": "Less hunting through menus",
+      "mockLabel": "Workflow"
+    },
+    "carriers": {
+      "index": "05",
+      "kicker": "// carrier_reality",
+      "title": "Work with your real carrier agreements",
+      "body": "Configure the carriers and identifiers your company actually uses so bookings line up with provider contracts.",
+      "mockLabel": "Carrier contracts"
+    },
+    "admin": {
+      "index": "06",
+      "kicker": "// platform_ops",
+      "title": "For operators running the whole tenant base",
+      "body": "Onboard companies, control who can sign in, handle billing and subscription plans, and publish what changed.",
+      "mockLabel": "Administration"
+    },
+    "start": {
+      "index": "07",
+      "kicker": "// onboarding",
+      "title": "Get started in minutes",
+      "step1": "Your organization is created by a platform administrator.",
+      "step2": "You register with your company ID or accept an admin invite.",
+      "step3": "Configure carriers, then create and track bookings.",
+      "faq": "Company ID is your government business identifier—it ties your account to the right tenant."
+    },
+    "footer": {
+      "rights": "All rights reserved.",
+      "backToTour": "Back to top"
+    },
+    "previewDisclaimer": "Sample data only—not connected to your company.",
+    "previewAdminNote": "SuperAdmin view (sample rows).",
+    "previewActive": "Active",
+    "previewTrial": "Trial"
   }
 }
