@@ -9,6 +9,7 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
 {
     private readonly ICompanyRepository _companies;
     private readonly ICompanyAdminInviteIssuer _inviteIssuer;
+    private readonly ICompanyAdminInviteRepository _invites;
     private readonly ICompanyUserMetrics _metrics;
     private readonly IAdminCompanyLimitUserOperations _limitUserOperations;
     private readonly ISubscriptionPlanAdminRepository _subscriptionPlans;
@@ -17,6 +18,7 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
     public UpdateAdminCompanyCommandHandler(
         ICompanyRepository companies,
         ICompanyAdminInviteIssuer inviteIssuer,
+        ICompanyAdminInviteRepository invites,
         ICompanyUserMetrics metrics,
         IAdminCompanyLimitUserOperations limitUserOperations,
         ISubscriptionPlanAdminRepository subscriptionPlans,
@@ -24,6 +26,7 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
     {
         _companies = companies;
         _inviteIssuer = inviteIssuer;
+        _invites = invites;
         _metrics = metrics;
         _limitUserOperations = limitUserOperations;
         _subscriptionPlans = subscriptionPlans;
@@ -110,7 +113,33 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
             company.SubscriptionPlanId = newPlanId;
         }
 
+        if (request.IsActive.HasValue)
+            company.IsActive = request.IsActive.Value;
+
+        var inviteEmailsUpdate = request.InitialAdminEmails != null
+            ? CompanyAdminInviteEmailsHelper.NormalizeList(request.InitialAdminEmails)
+            : null;
+
+        if (inviteEmailsUpdate != null)
+        {
+            var adminsForInvites = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
+            if (adminsForInvites > 0)
+                return Fail("AlreadyHasAdmin", "Cannot change admin invite emails: company already has an administrator.");
+
+            var capAdmins = request.MaxAdminAccounts ?? company.MaxAdminAccounts;
+            if (capAdmins is int maxA && inviteEmailsUpdate.Count > maxA)
+                return Fail("TooManyInviteEmails", "Number of admin emails cannot exceed max admin accounts.");
+
+            company.InitialAdminInviteEmailsJson = CompanyAdminInviteEmailsHelper.SerializeJson(inviteEmailsUpdate);
+            company.InitialAdminInviteEmail = inviteEmailsUpdate.FirstOrDefault();
+        }
+
         await _companies.UpdateAsync(company, cancellationToken);
+
+        var targetsChanged = inviteEmailsUpdate != null;
+
+        if (request.ResendAdminInvite || targetsChanged)
+            await _invites.RevokePendingForCompanyAsync(company.Id, cancellationToken);
 
         if (request.ResendAdminInvite)
         {
@@ -138,6 +167,8 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
         var adminCount = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
 
         var inviteList = CompanyAdminInviteEmailsHelper.GetExplicitTargets(c.InitialAdminInviteEmailsJson, c.InitialAdminInviteEmail);
+        var pendingInvites = await _invites.CountPendingValidInvitesAsync(c.Id, cancellationToken);
+        var lastInviteAt = await _invites.GetLastInviteCreatedAtAsync(c.Id, cancellationToken);
 
         return new AdminCompanyMutationResult
         {
@@ -154,7 +185,11 @@ public sealed class UpdateAdminCompanyCommandHandler : IRequestHandler<UpdateAdm
                 InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
                 AdminCount = adminCount,
-                SubscriptionPlanId = c.SubscriptionPlanId
+                SubscriptionPlanId = c.SubscriptionPlanId,
+                IsActive = c.IsActive,
+                AdminInviteFirstAcceptedAtUtc = c.AdminInviteFirstAcceptedAtUtc,
+                PendingAdminInviteCount = pendingInvites,
+                LastAdminInviteCreatedAtUtc = lastInviteAt
             }
         };
     }

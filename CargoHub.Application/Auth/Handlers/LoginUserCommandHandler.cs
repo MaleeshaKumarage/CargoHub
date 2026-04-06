@@ -33,6 +33,16 @@ public sealed class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, 
 
         if (!authResult.Success)
         {
+            if (!string.IsNullOrEmpty(authResult.ErrorCode))
+            {
+                return new LoginResult
+                {
+                    Success = false,
+                    ErrorCode = authResult.ErrorCode,
+                    Message = authResult.Message ?? "Sign-in failed."
+                };
+            }
+
             return new LoginResult
             {
                 Success = false,

@@ -22,7 +22,14 @@ public class CreateAdminCompanyCommandHandlerTests
         assignments
             .Setup(x => x.RecordAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        return new CreateAdminCompanyCommandHandler(repo.Object, invites.Object, metrics.Object, assignments.Object);
+        var inviteRepo = new Mock<ICompanyAdminInviteRepository>();
+        inviteRepo
+            .Setup(x => x.CountPendingValidInvitesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        inviteRepo
+            .Setup(x => x.GetLastInviteCreatedAtAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DateTimeOffset?)null);
+        return new CreateAdminCompanyCommandHandler(repo.Object, invites.Object, inviteRepo.Object, metrics.Object, assignments.Object);
     }
 
     [Fact]

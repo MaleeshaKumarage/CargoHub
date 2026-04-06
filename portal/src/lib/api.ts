@@ -456,6 +456,8 @@ export type AdminPatchCompanyBody = {
   maxUserAccounts?: number | null;
   maxAdminAccounts?: number | null;
   resendAdminInvite?: boolean;
+  /** Replace invite recipient list (only when company has no Admin yet). */
+  initialAdminEmails?: string[] | null;
   /** Super Admin lowering caps: user IDs to demote from Admin to User. */
   demoteAdminUserIds?: string[];
   /** Super Admin lowering caps: user IDs to deactivate. */
