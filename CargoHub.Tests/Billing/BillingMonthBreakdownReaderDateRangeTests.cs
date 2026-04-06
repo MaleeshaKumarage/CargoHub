@@ -224,6 +224,62 @@ public sealed class BillingMonthBreakdownReaderDateRangeTests : IDisposable
         Assert.Equal(2025, months[0].YearUtc);
         Assert.Equal(7, months[0].MonthUtc);
         Assert.Equal(2, months[0].BillableBookingCount);
+        Assert.Null(months[0].BillingPeriodId);
+    }
+
+    [Fact]
+    public async Task GetBillableMonthsAsync_SetsBillingPeriodId_WhenOpenPeriodExistsForMonth()
+    {
+        using var ctx = _fixture.CreateContext();
+        var reader = new BillingMonthBreakdownReader(ctx, new NoOpBillingPeriodRegenerationService());
+        var companyId = Guid.NewGuid();
+        var periodId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            Name = "CoP",
+            BusinessId = "biz-per",
+            CompanyId = companyId.ToString("N"),
+        });
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = 2025,
+            MonthUtc = 11,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+        await ctx.SaveChangesAsync();
+
+        var t = new DateTime(2025, 11, 3, 8, 0, 0, DateTimeKind.Utc);
+        ctx.Bookings.Add(MinimalBillableBooking(Guid.NewGuid(), companyId, t));
+        await ctx.SaveChangesAsync();
+
+        var months = await reader.GetBillableMonthsAsync(companyId, default);
+        var row = Assert.Single(months);
+        Assert.Equal(2025, row.YearUtc);
+        Assert.Equal(11, row.MonthUtc);
+        Assert.Equal(periodId, row.BillingPeriodId);
+    }
+
+    [Fact]
+    public async Task GetBillableMonthsAsync_ReturnsEmpty_WhenNoBillableBookings()
+    {
+        using var ctx = _fixture.CreateContext();
+        var reader = new BillingMonthBreakdownReader(ctx, new NoOpBillingPeriodRegenerationService());
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            Name = "CoE",
+            BusinessId = "biz-empty",
+            CompanyId = companyId.ToString("N"),
+        });
+        await ctx.SaveChangesAsync();
+
+        var months = await reader.GetBillableMonthsAsync(companyId, default);
+        Assert.Empty(months);
     }
 
     [Fact]

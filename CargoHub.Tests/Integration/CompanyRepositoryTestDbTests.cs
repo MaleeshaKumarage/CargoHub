@@ -189,6 +189,44 @@ public class CompanyRepositoryTestDbTests : IDisposable
     }
 
     [Fact]
+    public async Task GetByBusinessIdWithAddressBooks_LoadsCompany_TrimAndCaseInsensitive()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        var company = new CompanyEntity
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = "comp-ab",
+            Name = "Addr Book Co",
+            BusinessId = "Biz-99",
+            CustomerId = "cust-ab",
+        };
+        await repo.CreateAsync(company, default);
+
+        var loaded = await repo.GetByBusinessIdWithAddressBooksAsync("  biz-99 ", default);
+        Assert.NotNull(loaded);
+        Assert.Equal("Addr Book Co", loaded!.Name);
+        Assert.NotNull(loaded.SenderAddressBook);
+        Assert.NotNull(loaded.AddressBook);
+    }
+
+    [Fact]
+    public async Task GetByBusinessIdWithAgreements_ReturnsNull_WhenBusinessIdEmpty()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        Assert.Null(await repo.GetByBusinessIdWithAgreementsAsync("", default));
+    }
+
+    [Fact]
+    public async Task GetByBusinessIdWithAgreements_ReturnsNull_WhenBusinessIdWhitespace()
+    {
+        using var context = _fixture.CreateContext();
+        var repo = new CompanyRepository(context);
+        Assert.Null(await repo.GetByBusinessIdWithAgreementsAsync("\t", default));
+    }
+
+    [Fact]
     public async Task GetEnabledCourierIds_ReturnsEmpty_WhenCompanyMissing()
     {
         using var context = _fixture.CreateContext();

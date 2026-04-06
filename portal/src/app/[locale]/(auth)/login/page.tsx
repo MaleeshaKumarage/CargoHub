@@ -82,6 +82,13 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? t("signingIn") : t("signInButton")}
           </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            <Link href="/tour" className="text-primary underline-offset-4 hover:underline">
+              {t("productTour")}
+            </Link>
+            {" — "}
+            {t("productTourHint")}
+          </p>
           <p className="text-center text-sm text-muted-foreground">
             {t("noAccount")}{" "}
             <Link href="/register" className="text-primary underline-offset-4 hover:underline">

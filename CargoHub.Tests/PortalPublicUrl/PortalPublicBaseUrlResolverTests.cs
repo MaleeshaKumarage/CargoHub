@@ -51,4 +51,60 @@ public class PortalPublicBaseUrlResolverTests
         var url = PortalPublicBaseUrlResolver.Resolve(portal, Config());
         Assert.Equal("http://localhost:3000", url);
     }
+
+    [Fact]
+    public void Resolve_TrimsTrailingSlash_FromPublicBaseUrl()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "https://portal.example.com///" };
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, Config());
+        Assert.Equal("https://portal.example.com", url);
+    }
+
+    [Fact]
+    public void Resolve_TrimsTrailingSlash_FromCorsPortalOrigin()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "" };
+        var cfg = Config(("Cors:PortalOrigin", "https://cors.example.com/path/"));
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("https://cors.example.com/path", url);
+    }
+
+    [Fact]
+    public void Resolve_WhenPortalOriginWhitespace_SkipsToPortalOrigins()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "" };
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cors:PortalOrigin"] = "   ",
+                ["Cors:PortalOrigins:0"] = "https://from-array.example/",
+            })
+            .Build();
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("https://from-array.example", url);
+    }
+
+    [Fact]
+    public void Resolve_WhenPortalOriginsOnlyBlanks_DefaultsToLocalhost()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = "" };
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cors:PortalOrigins:0"] = "",
+                ["Cors:PortalOrigins:1"] = "  ",
+            })
+            .Build();
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("http://localhost:3000", url);
+    }
+
+    [Fact]
+    public void Resolve_WhenPublicBaseUrlNull_FallsBackToConfiguration()
+    {
+        var portal = new PortalPublicOptions { PublicBaseUrl = null! };
+        var cfg = Config(("Cors:PortalOrigin", "https://fallback.example"));
+        var url = PortalPublicBaseUrlResolver.Resolve(portal, cfg);
+        Assert.Equal("https://fallback.example", url);
+    }
 }

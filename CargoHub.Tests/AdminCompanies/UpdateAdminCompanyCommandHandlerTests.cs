@@ -346,4 +346,66 @@ public class UpdateAdminCompanyCommandHandlerTests
         Assert.False(r.Success);
         Assert.Equal("InvalidSubscriptionPlan", r.ErrorCode);
     }
+
+    [Fact]
+    public async Task Handle_Demote_PassesNormalizedDistinctIds_ToLimitOperations()
+    {
+        var id = Guid.NewGuid();
+        var company = TrackedCompany(id);
+        var h = CreateHandler(out var repo, out _, out var metrics, out var limits, out _);
+        repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
+        metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(4);
+        limits.Setup(x => x.DemoteAdminsAsync("BIZ-1", It.IsAny<IReadOnlyList<string>>(), default))
+            .ReturnsAsync((string?)null);
+        repo.Setup(x => x.UpdateAsync(company, default)).ReturnsAsync(company);
+        repo.Setup(x => x.GetByIdAsync(id, default)).ReturnsAsync(company);
+
+        var r = await h.Handle(
+            new UpdateAdminCompanyCommand(
+                id,
+                10,
+                2,
+                false,
+                null,
+                new[] { " adm-1 ", "adm-1", "adm-2", "", null! }),
+            default);
+
+        Assert.True(r.Success);
+        limits.Verify(
+            x => x.DemoteAdminsAsync(
+                "BIZ-1",
+                It.Is<IReadOnlyList<string>>(l => l.Count == 2 && l[0] == "adm-1" && l[1] == "adm-2"),
+                default),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Deactivate_PassesNormalizedDistinctIds_ToLimitOperations()
+    {
+        var id = Guid.NewGuid();
+        var company = TrackedCompany(id);
+        var h = CreateHandler(out var repo, out _, out var metrics, out var limits, out _);
+        repo.Setup(x => x.GetByIdForUpdateAsync(id, default)).ReturnsAsync(company);
+        metrics.Setup(x => x.CountActiveUsersForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(12);
+        metrics.Setup(x => x.CountAdminsForBusinessIdAsync("BIZ-1", default)).ReturnsAsync(1);
+        limits.Setup(x => x.DeactivateUsersAsync("BIZ-1", It.IsAny<IReadOnlyList<string>>(), default))
+            .ReturnsAsync((string?)null);
+        repo.Setup(x => x.UpdateAsync(company, default)).ReturnsAsync(company);
+        repo.Setup(x => x.GetByIdAsync(id, default)).ReturnsAsync(company);
+
+        var raw = new[] { " u1", "u1", "u2", "u3", "u4", "u5", "u6", "u7", "  ", null! };
+        var r = await h.Handle(new UpdateAdminCompanyCommand(id, 5, 3, false, raw, null), default);
+
+        Assert.True(r.Success);
+        limits.Verify(
+            x => x.DeactivateUsersAsync(
+                "BIZ-1",
+                It.Is<IReadOnlyList<string>>(l =>
+                    l.Count == 7 &&
+                    l.Contains("u1") &&
+                    l.Contains("u7")),
+                default),
+            Times.Once);
+    }
 }

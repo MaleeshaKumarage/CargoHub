@@ -182,6 +182,95 @@ public class RegisterUserCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenUnderUserCap_AllowsRegistration()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme", MaxUserAccounts = 10 };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var metrics = new Mock<ICompanyUserMetrics>();
+        metrics.Setup(m => m.CountActiveUsersForBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(4);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService.Setup(r => r.CreateUserAsync("cap@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(("u-cap", "cap@b.com", "Cap", "1234567-8", "cust-cap"));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+        jwtFactory.Setup(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<Claim>>()))
+            .Returns("jwt");
+
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object, metrics.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "cap@b.com",
+            Password = "P@ss1",
+            UserName = "Cap",
+        }), default);
+
+        Assert.True(result.Success);
+        Assert.Equal("jwt", result.Data!.JwtToken);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCreateUserThrows_WithPrefixOnlyMessage_UsesGenericRegistrationFailedText()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme" };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService
+            .Setup(r => r.CreateUserAsync("z@b.com", "P@ss1", It.IsAny<string>(), "1234567-8", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Failed to register user: "));
+
+        var handler = CreateHandler(companyRepo.Object, regService.Object, new Mock<IJwtTokenFactory>().Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "z@b.com",
+            Password = "P@ss1",
+            UserName = "Z",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Registration failed.", result.Message);
+    }
+
+    [Fact]
+    public async Task Handle_UsesRequestBusinessIdForMetrics_WhenCompanyRowHasNullBusinessId()
+    {
+        var company = new CompanyEntity { BusinessId = null, Name = "Legacy Co", MaxUserAccounts = 3 };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("9999999-9", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var metrics = new Mock<ICompanyUserMetrics>();
+        metrics.Setup(m => m.CountActiveUsersForBusinessIdAsync("9999999-9", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+
+        var regService = new Mock<IUserRegistrationService>();
+        regService.Setup(r => r.CreateUserAsync("leg@b.com", "P@ss1", It.IsAny<string>(), null, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(("u-leg", "leg@b.com", "Leg", "9999999-9", "cust-leg"));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+        jwtFactory.Setup(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IEnumerable<Claim>>()))
+            .Returns("jwt-leg");
+
+        var handler = CreateHandler(companyRepo.Object, regService.Object, jwtFactory.Object, metrics.Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "9999999-9",
+            Email = "leg@b.com",
+            Password = "P@ss1",
+            UserName = "Leg",
+        }), default);
+
+        Assert.True(result.Success);
+        metrics.Verify(m => m.CountActiveUsersForBusinessIdAsync("9999999-9", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_WhenUserCapReached_ReturnsCompanyUserLimitReached()
     {
         var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme", MaxUserAccounts = 5 };

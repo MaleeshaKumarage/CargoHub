@@ -491,3 +491,9 @@
     color-scheme: dark;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.marketing-tour-root) {
+    scroll-behavior: smooth;
+  }
+}
