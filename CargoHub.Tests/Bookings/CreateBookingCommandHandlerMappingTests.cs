@@ -138,6 +138,74 @@ public class CreateBookingCommandHandlerMappingTests
     }
 
     [Fact]
+    public void MapReceiver_CreateRequest_AllNullRequiredStrings_UseEmptyAndFiDefault()
+    {
+        var p = CreateBookingCommandHandler.MapReceiver(new CreateBookingRequest());
+        Assert.Equal("", p.Name);
+        Assert.Equal("", p.Address1);
+        Assert.Null(p.Address2);
+        Assert.Equal("", p.PostalCode);
+        Assert.Equal("", p.City);
+        Assert.Equal("FI", p.Country);
+        Assert.Null(p.Email);
+        Assert.Null(p.PhoneNumber);
+        Assert.Null(p.PhoneNumberMobile);
+        Assert.Null(p.ContactPersonName);
+        Assert.Null(p.VatNo);
+        Assert.Null(p.CustomerNumber);
+    }
+
+    [Fact]
+    public void MapReceiver_CreateRequest_SetsOptionalReceiverScalars()
+    {
+        var p = CreateBookingCommandHandler.MapReceiver(new CreateBookingRequest
+        {
+            ReceiverName = "N",
+            ReceiverAddress1 = "L1",
+            ReceiverAddress2 = "L2",
+            ReceiverPostalCode = "PC",
+            ReceiverCity = "C",
+            ReceiverCountry = "SE",
+            ReceiverEmail = "e@x.com",
+            ReceiverPhone = "p",
+            ReceiverPhoneMobile = "m",
+            ReceiverContactPersonName = "cp",
+            ReceiverVatNo = "vat",
+            ReceiverCustomerNumber = "cn",
+        });
+        Assert.Equal("N", p.Name);
+        Assert.Equal("L2", p.Address2);
+        Assert.Equal("SE", p.Country);
+        Assert.Equal("m", p.PhoneNumberMobile);
+        Assert.Equal("vat", p.VatNo);
+        Assert.Equal("cn", p.CustomerNumber);
+    }
+
+    [Fact]
+    public void MapReceiver_UpdateDraftRequest_AllNullRequiredStrings_UseEmptyAndFiDefault()
+    {
+        var p = CreateBookingCommandHandler.MapReceiver(new UpdateDraftRequest());
+        Assert.Equal("", p.Name);
+        Assert.Equal("FI", p.Country);
+        Assert.Null(p.Address2);
+    }
+
+    [Fact]
+    public void MapReceiver_UpdateDraftRequest_SetsOptionalReceiverScalars()
+    {
+        var p = CreateBookingCommandHandler.MapReceiver(new UpdateDraftRequest
+        {
+            ReceiverCountry = "NO",
+            ReceiverPhoneMobile = "mob",
+            ReceiverVatNo = "v",
+            ReceiverCustomerNumber = "cust",
+        });
+        Assert.Equal("NO", p.Country);
+        Assert.Equal("mob", p.PhoneNumberMobile);
+        Assert.Equal("cust", p.CustomerNumber);
+    }
+
+    [Fact]
     public async Task Handle_WithOptionalReceiverFields_MapsCorrectly()
     {
         var repo = new Mock<IBookingRepository>();
