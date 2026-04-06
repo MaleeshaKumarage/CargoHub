@@ -209,6 +209,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(c => c.InitialAdminInviteEmail).HasMaxLength(256);
             entity.Property(c => c.InitialAdminInviteEmailsJson);
             entity.Property(c => c.SubscriptionPlanId);
+            entity.Property(c => c.IsActive).IsRequired();
+            entity.Property(c => c.AdminInviteFirstAcceptedAtUtc);
             entity.HasOne<SubscriptionPlan>()
                   .WithMany()
                   .HasForeignKey(c => c.SubscriptionPlanId)

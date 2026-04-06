@@ -97,6 +97,12 @@ public class Company
 
     /// <summary>Optional subscription template for portal billing (see <c>CargoHub.Domain.Billing</c>).</summary>
     public Guid? SubscriptionPlanId { get; set; }
+
+    /// <summary>When false, company-linked portal users cannot sign in until a Super Admin reactivates the company.</summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>Set once when an admin invite is first completed via the accept-invite flow (not self-registration).</summary>
+    public DateTimeOffset? AdminInviteFirstAcceptedAtUtc { get; set; }
 }
 
 /// <summary>

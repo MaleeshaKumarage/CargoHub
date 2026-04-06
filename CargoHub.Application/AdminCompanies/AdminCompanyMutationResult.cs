@@ -35,4 +35,8 @@ public sealed class AdminCompanyDetailDto
     public int ActiveUserCount { get; init; }
     public int AdminCount { get; init; }
     public Guid? SubscriptionPlanId { get; init; }
+    public bool IsActive { get; init; } = true;
+    public DateTimeOffset? AdminInviteFirstAcceptedAtUtc { get; init; }
+    public int PendingAdminInviteCount { get; init; }
+    public DateTimeOffset? LastAdminInviteCreatedAtUtc { get; init; }
 }

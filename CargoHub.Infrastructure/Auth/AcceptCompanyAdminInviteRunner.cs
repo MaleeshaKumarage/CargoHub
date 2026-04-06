@@ -12,6 +12,7 @@ namespace CargoHub.Infrastructure.Auth;
 public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRunner
 {
     private readonly ICompanyAdminInviteRepository _invites;
+    private readonly ICompanyRepository _companies;
     private readonly IUserRegistrationService _registration;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtTokenFactory _jwtTokenFactory;
@@ -19,12 +20,14 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
 
     public AcceptCompanyAdminInviteRunner(
         ICompanyAdminInviteRepository invites,
+        ICompanyRepository companies,
         IUserRegistrationService registration,
         UserManager<ApplicationUser> userManager,
         IJwtTokenFactory jwtTokenFactory,
         ICompanyUserMetrics metrics)
     {
         _invites = invites;
+        _companies = companies;
         _registration = registration;
         _userManager = userManager;
         _jwtTokenFactory = jwtTokenFactory;
@@ -46,6 +49,9 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
         var company = invite.Company;
         if (string.IsNullOrWhiteSpace(company.BusinessId))
             return Fail("CompanyMisconfigured", "Company has no Business ID; contact support.");
+
+        if (!company.IsActive)
+            return Fail("CompanyInactive", AuthMessages.CompanyInactive);
 
         var businessId = company.BusinessId.Trim();
 
@@ -75,6 +81,7 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
             await _userManager.AddToRoleAsync(existing, RoleNames.Admin);
 
             await _invites.MarkConsumedAsync(invite.Id, cancellationToken);
+            await TryRecordFirstAdminInviteAcceptedAsync(company.Id, cancellationToken);
 
             var updatedRoles = await _userManager.GetRolesAsync(existing);
             var claims = updatedRoles.Select(r => new Claim(ClaimTypes.Role, r)).ToList();
@@ -122,6 +129,7 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
                 cancellationToken);
 
             await _invites.MarkConsumedAsync(invite.Id, cancellationToken);
+            await TryRecordFirstAdminInviteAcceptedAsync(company.Id, cancellationToken);
 
             var roleClaims = new[] { new Claim(ClaimTypes.Role, RoleNames.Admin) };
             var token = _jwtTokenFactory.CreateToken(userId, email, roleClaims);
@@ -149,6 +157,15 @@ public sealed class AcceptCompanyAdminInviteRunner : IAcceptCompanyAdminInviteRu
                 message = message[prefix.Length..];
             return Fail("RegistrationFailed", string.IsNullOrWhiteSpace(message) ? "Registration failed." : message);
         }
+    }
+
+    private async Task TryRecordFirstAdminInviteAcceptedAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var tracked = await _companies.GetByIdForUpdateAsync(companyId, cancellationToken);
+        if (tracked == null || tracked.AdminInviteFirstAcceptedAtUtc != null)
+            return;
+        tracked.AdminInviteFirstAcceptedAtUtc = DateTimeOffset.UtcNow;
+        await _companies.UpdateAsync(tracked, cancellationToken);
     }
 
     private static RegisterResult Fail(string code, string message) =>

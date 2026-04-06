@@ -1,3 +1,4 @@
+using CargoHub.Application.Auth;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Commands;
 using CargoHub.Application.Auth.Dtos;
@@ -39,6 +40,16 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         var company = await _companyRepository.GetByBusinessIdAsync(companyId, cancellationToken);
         if (company == null)
             return new RegisterResult { Success = false, ErrorCode = "CompanyNotFound", Message = "No company found with this Company ID. The company must be created by an administrator first." };
+
+        if (!company.IsActive)
+        {
+            return new RegisterResult
+            {
+                Success = false,
+                ErrorCode = "CompanyInactive",
+                Message = AuthMessages.CompanyInactive
+            };
+        }
 
         var bid = company.BusinessId?.Trim() ?? companyId;
         if (company.MaxUserAccounts is { } cap)

@@ -10,17 +10,20 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
 {
     private readonly ICompanyRepository _companies;
     private readonly ICompanyAdminInviteIssuer _inviteIssuer;
+    private readonly ICompanyAdminInviteRepository _invites;
     private readonly ICompanyUserMetrics _metrics;
     private readonly ICompanySubscriptionAssignmentRepository _subscriptionAssignments;
 
     public CreateAdminCompanyCommandHandler(
         ICompanyRepository companies,
         ICompanyAdminInviteIssuer inviteIssuer,
+        ICompanyAdminInviteRepository invites,
         ICompanyUserMetrics metrics,
         ICompanySubscriptionAssignmentRepository subscriptionAssignments)
     {
         _companies = companies;
         _inviteIssuer = inviteIssuer;
+        _invites = invites;
         _metrics = metrics;
         _subscriptionAssignments = subscriptionAssignments;
     }
@@ -92,6 +95,8 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
         var admins = string.IsNullOrEmpty(bid) ? 0 : await _metrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
 
         var inviteList = CompanyAdminInviteEmailsHelper.GetExplicitTargets(c.InitialAdminInviteEmailsJson, c.InitialAdminInviteEmail);
+        var pendingInvites = await _invites.CountPendingValidInvitesAsync(c.Id, cancellationToken);
+        var lastInviteAt = await _invites.GetLastInviteCreatedAtAsync(c.Id, cancellationToken);
 
         return new AdminCompanyMutationResult
         {
@@ -108,7 +113,11 @@ public sealed class CreateAdminCompanyCommandHandler : IRequestHandler<CreateAdm
                 InitialAdminInviteEmails = inviteList.Count > 0 ? inviteList.ToList() : null,
                 ActiveUserCount = users,
                 AdminCount = admins,
-                SubscriptionPlanId = c.SubscriptionPlanId
+                SubscriptionPlanId = c.SubscriptionPlanId,
+                IsActive = c.IsActive,
+                AdminInviteFirstAcceptedAtUtc = c.AdminInviteFirstAcceptedAtUtc,
+                PendingAdminInviteCount = pendingInvites,
+                LastAdminInviteCreatedAtUtc = lastInviteAt
             }
         };
     }
