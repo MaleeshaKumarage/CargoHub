@@ -31,6 +31,23 @@ function parseOptionalInt(s: string): number | undefined {
   return Number.isFinite(n) ? Math.floor(n) : undefined;
 }
 
+function inviteEmailsKey(emails: string[]): string {
+  return emails
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
+function companyInviteKey(c: AdminCompany): string {
+  const list = c.initialAdminInviteEmails?.length
+    ? c.initialAdminInviteEmails
+    : c.initialAdminInviteEmail
+      ? [c.initialAdminInviteEmail]
+      : [];
+  return inviteEmailsKey(list);
+}
+
 function isCompanyAdmin(u: AdminUser): boolean {
   return Array.isArray(u.roles) && u.roles.includes("Admin");
 }
@@ -67,6 +84,8 @@ export default function ManageCompaniesPage() {
   const [editSubscriptionFromServer, setEditSubscriptionFromServer] = useState<string | null>(null);
   const [savingCompanyId, setSavingCompanyId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editInviteEmails, setEditInviteEmails] = useState<string[]>([""]);
+  const [editResendInvite, setEditResendInvite] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<AdminSubscriptionPlanSummary[]>([]);
   const [createSubscriptionPlanId, setCreateSubscriptionPlanId] = useState("");
 
@@ -88,6 +107,15 @@ export default function ManageCompaniesPage() {
     return Math.min(32, n);
   }, [maxAdmins]);
 
+  const editInviteEmailSlotCount = useMemo(() => {
+    if (!editCompany) return 1;
+    const n = parseOptionalInt(editMaxAdmins);
+    const fallback = editCompany.maxAdminAccounts;
+    const val = n ?? fallback;
+    if (val == null || val < 1) return 1;
+    return Math.min(32, val);
+  }, [editMaxAdmins, editCompany]);
+
   const [adminEmails, setAdminEmails] = useState<string[]>([""]);
 
   useEffect(() => {
@@ -98,6 +126,16 @@ export default function ManageCompaniesPage() {
       return next;
     });
   }, [adminEmailSlotCount]);
+
+  useEffect(() => {
+    if (!editCompany) return;
+    setEditInviteEmails((prev) => {
+      if (prev.length === editInviteEmailSlotCount) return prev;
+      const next = prev.slice(0, editInviteEmailSlotCount);
+      while (next.length < editInviteEmailSlotCount) next.push("");
+      return next;
+    });
+  }, [editCompany, editInviteEmailSlotCount]);
 
   useEffect(() => {
     if (!token) return;
@@ -183,6 +221,14 @@ export default function ManageCompaniesPage() {
     });
   };
 
+  const setEditInviteEmailAt = (index: number, value: string) => {
+    setEditInviteEmails((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -249,6 +295,17 @@ export default function ManageCompaniesPage() {
     const raw = c.subscriptionPlanId?.trim() ?? "";
     setEditSubscriptionFromServer(raw.length > 0 ? raw : null);
     setEditSubscriptionPlanId(raw.length > 0 ? raw : DEFAULT_TRIAL_SUBSCRIPTION_PLAN_ID);
+    setEditResendInvite(false);
+    const slotCount = Math.min(32, Math.max(1, c.maxAdminAccounts ?? 1));
+    const base =
+      c.initialAdminInviteEmails?.length && c.initialAdminInviteEmails.length > 0
+        ? [...c.initialAdminInviteEmails]
+        : c.initialAdminInviteEmail
+          ? [c.initialAdminInviteEmail]
+          : [];
+    const padded = [...base];
+    while (padded.length < slotCount) padded.push("");
+    setEditInviteEmails(padded.slice(0, slotCount));
   };
 
   const handleSaveCompany = async () => {
@@ -269,6 +326,21 @@ export default function ManageCompaniesPage() {
         return;
       }
       body.maxAdminAccounts = p;
+    }
+    const hasNoAdmin = (editCompany.adminCount ?? 0) === 0;
+    if (hasNoAdmin) {
+      const filledInvite = editInviteEmails.map((x) => x.trim()).filter(Boolean);
+      const maxA = parseOptionalInt(editMaxAdmins) ?? editCompany.maxAdminAccounts;
+      if (maxA != null && filledInvite.length > maxA) {
+        setEditError(tMc("inviteTooManyEmails"));
+        return;
+      }
+      if (inviteEmailsKey(filledInvite) !== companyInviteKey(editCompany)) {
+        body.initialAdminEmails = filledInvite;
+      }
+      if (editResendInvite) {
+        body.resendAdminInvite = true;
+      }
     }
     const desiredSub = editSubscriptionPlanId.trim();
     if (!desiredSub) {
@@ -558,7 +630,7 @@ export default function ManageCompaniesPage() {
                             title={
                               hasAdmin
                                 ? "Company already has an administrator; resend is not available."
-                                : "Resend invite to the same address(es) configured for this company."
+                                : "Open Edit to change invite emails or use Resend after saving. Quick resend uses the saved list."
                             }
                             onClick={() => handleResendInvite(c.id)}
                           >
@@ -644,6 +716,35 @@ export default function ManageCompaniesPage() {
                   ))}
                 </select>
               </div>
+              {editCompany && (editCompany.adminCount ?? 0) === 0 && (
+                <div className="space-y-3 rounded-md border p-3">
+                  <p className="text-sm font-medium">{tMc("inviteEmailsEditLabel")}</p>
+                  <p className="text-xs text-muted-foreground">{tMc("inviteEmailsEditHelp")}</p>
+                  <div className="flex flex-col gap-2">
+                    {editInviteEmails.map((em, i) => (
+                      <Input
+                        key={i}
+                        type="email"
+                        value={em}
+                        onChange={(e) => setEditInviteEmailAt(i, e.target.value)}
+                        placeholder={tMc("inviteEmailPlaceholder", { n: i + 1 })}
+                        disabled={!!savingCompanyId}
+                        autoComplete="off"
+                      />
+                    ))}
+                  </div>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border"
+                      checked={editResendInvite}
+                      onChange={(e) => setEditResendInvite(e.target.checked)}
+                      disabled={!!savingCompanyId}
+                    />
+                    <span>{tMc("inviteResendAfterSave")}</span>
+                  </label>
+                </div>
+              )}
               {editError && (
                 <p className="text-sm text-destructive" role="alert">
                   {editError}

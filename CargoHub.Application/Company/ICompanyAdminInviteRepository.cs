@@ -19,4 +19,10 @@ public interface ICompanyAdminInviteRepository
 
     /// <summary>Invalidate pending invite for this company and email only (allows multiple concurrent invites per company).</summary>
     Task RevokePendingForCompanyAndEmailAsync(Guid companyId, string normalizedEmail, CancellationToken cancellationToken = default);
+
+    /// <summary>Invites not consumed and not expired (UTC now).</summary>
+    Task<int> CountPendingValidInvitesAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    /// <summary>Latest <see cref="CompanyAdminInvite.CreatedAt"/> for the company, or null if none.</summary>
+    Task<DateTimeOffset?> GetLastInviteCreatedAtAsync(Guid companyId, CancellationToken cancellationToken = default);
 }

@@ -434,7 +434,12 @@
     "reductionTitle": "Valitse tilit vapauttaaksesi kapasiteettia",
     "reductionDescription": "Käyttäjä- tai ylläpitäjämäärän pienentäminen voi vaatia ylläpitäjien alentamista tavallisiksi käyttäjiksi ja/tai tilien deaktivointia. Alennukset tehdään ensin; valitut tilit deaktivoidaan (eivät voi enää kirjautua).",
     "reductionApply": "Käytä muutokset",
-    "reductionApplying": "Käytetään…"
+    "reductionApplying": "Käytetään…",
+    "inviteEmailsEditLabel": "Initial admin invite emails",
+    "inviteEmailsEditHelp": "Only while this company has no administrator. Updating emails revokes all unused pending invites, then you can check “Send invites” to mail the new list.",
+    "inviteResendAfterSave": "Send invitation emails now (uses the list above; revokes any unused pending invites first)",
+    "inviteTooManyEmails": "Number of emails cannot exceed max admins.",
+    "inviteEmailPlaceholder": "Admin email {n}"
   },
   "manageInvoices": {
     "title": "Laskutus ja laskut",

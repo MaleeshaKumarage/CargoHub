@@ -340,7 +340,12 @@
     "reductionTitle": "Velg kontoer for å frigjøre kapasitet",
     "reductionDescription": "Å redusere antall brukere eller administratorer kan kreve nedgradering av administratorer og/eller deaktivering av brukerkontoer. Nedgraderinger skjer først; valgte kontoer deaktiveres deretter (de kan ikke lenger logge inn).",
     "reductionApply": "Bruk endringene",
-    "reductionApplying": "Bruker…"
+    "reductionApplying": "Bruker…",
+    "inviteEmailsEditLabel": "Initial admin invite emails",
+    "inviteEmailsEditHelp": "Only while this company has no administrator. Updating emails revokes all unused pending invites, then you can check “Send invites” to mail the new list.",
+    "inviteResendAfterSave": "Send invitation emails now (uses the list above; revokes any unused pending invites first)",
+    "inviteTooManyEmails": "Number of emails cannot exceed max admins.",
+    "inviteEmailPlaceholder": "Admin email {n}"
   },
   "manageInvoices": {
     "title": "Fakturering og fakturaer",

@@ -479,7 +479,12 @@
     "reductionTitle": "Choose accounts to free capacity",
     "reductionDescription": "Reducing how many users or admins this company may have requires demoting administrators and/or deactivating users. Demotions run first; selected accounts are then deactivated (they can no longer sign in).",
     "reductionApply": "Apply changes",
-    "reductionApplying": "Applying…"
+    "reductionApplying": "Applying…",
+    "inviteEmailsEditLabel": "Initial admin invite emails",
+    "inviteEmailsEditHelp": "Only while this company has no administrator. Updating emails revokes all unused pending invites, then you can check “Send invites” to mail the new list.",
+    "inviteResendAfterSave": "Send invitation emails now (uses the list above; revokes any unused pending invites first)",
+    "inviteTooManyEmails": "Number of emails cannot exceed max admins.",
+    "inviteEmailPlaceholder": "Admin email {n}"
   },
   "manageInvoices": {
     "title": "Billing & invoices",

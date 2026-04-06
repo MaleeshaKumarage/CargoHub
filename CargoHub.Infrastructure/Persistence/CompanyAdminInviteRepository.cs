@@ -61,4 +61,22 @@ public sealed class CompanyAdminInviteRepository : ICompanyAdminInviteRepository
         if (pending.Count > 0)
             await _db.SaveChangesAsync(cancellationToken);
     }
+
+    public Task<int> CountPendingValidInvitesAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return _db.CompanyAdminInvites
+            .CountAsync(
+                i => i.CompanyId == companyId && i.ConsumedAt == null && i.ExpiresAt > now,
+                cancellationToken);
+    }
+
+    public async Task<DateTimeOffset?> GetLastInviteCreatedAtAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        if (!await _db.CompanyAdminInvites.AnyAsync(i => i.CompanyId == companyId, cancellationToken))
+            return null;
+        return await _db.CompanyAdminInvites
+            .Where(i => i.CompanyId == companyId)
+            .MaxAsync(i => i.CreatedAt, cancellationToken);
+    }
 }

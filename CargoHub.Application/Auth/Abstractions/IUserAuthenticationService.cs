@@ -61,10 +61,17 @@ public sealed class AuthenticationResult
     /// </summary>
     public IList<string> Roles { get; init; } = new List<string>();
 
+    /// <summary>When <see cref="Success"/> is false, optional machine-readable reason (e.g. CompanyInactive).</summary>
+    public string? ErrorCode { get; init; }
+
+    /// <summary>When <see cref="Success"/> is false, optional user-facing message.</summary>
+    public string? Message { get; init; }
+
     /// <summary>
     /// Creates a failed authentication result.
     /// </summary>
-    public static AuthenticationResult Failed() => new() { Success = false };
+    public static AuthenticationResult Failed(string? errorCode = null, string? message = null) =>
+        new() { Success = false, ErrorCode = errorCode, Message = message };
 
     /// <summary>
     /// Creates a successful authentication result.

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DotNetEnv;
+using CargoHub.Api.Middleware;
 using CargoHub.Api.Options;
 using CargoHub.Api.Services;
 using CargoHub.Application.Auth.Abstractions;
@@ -316,6 +317,7 @@ app.UseHttpsRedirection();
 app.UseCors();
 
 app.UseAuthentication();
+app.UseMiddleware<RequireActiveCompanyMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
