@@ -26,188 +26,15 @@ import {
   parseBookingFieldRulesFromApi,
   validateBookingCreateForm,
   type BookingFieldRules,
+  type PayerSource,
 } from "@/lib/booking-field-rules";
+import { buildCreateBookingBody, defaultPackage, defaultParty } from "@/lib/booking-form-payload";
+import { PartyFields } from "@/components/booking/PartyFields";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TrialBookingLimitBanner } from "@/components/TrialBookingLimitBanner";
-
-const defaultParty = (): CreateBookingParty => ({
-  name: "",
-  address1: "",
-  address2: "",
-  postalCode: "",
-  city: "",
-  country: "FI",
-  email: "",
-  phoneNumber: "",
-  phoneNumberMobile: "",
-  contactPersonName: "",
-  vatNo: "",
-  customerNumber: "",
-});
-
-const defaultPackage = (): CreateBookingPackage => ({
-  weight: "",
-  volume: "",
-  packageType: "",
-  description: "",
-  length: "",
-  width: "",
-  height: "",
-});
-
-type PayerSource = "sender" | "receiver" | "other";
-
-function trimOrUndefined(s: string) {
-  const t = s?.trim();
-  return t === "" ? undefined : t;
-}
-
-function PartyFields({
-  title,
-  state,
-  setState,
-  quickBooking,
-  fieldKeyPrefix,
-  fieldErrors,
-}: {
-  title: string;
-  state: CreateBookingParty;
-  setState: (p: CreateBookingParty) => void;
-  quickBooking?: boolean;
-  fieldKeyPrefix: string;
-  fieldErrors?: Record<string, string>;
-}) {
-  const f = useTranslations("bookings.fields");
-  const tBookings = useTranslations("bookings");
-  const optional = tBookings("optional");
-  const update = (key: keyof CreateBookingParty, value: string) => setState({ ...state, [key]: value });
-  const errs = fieldErrors ?? {};
-  const err = (key: string) => errs[`${fieldKeyPrefix}.${key}`];
-  return (
-    <div className="space-y-3">
-      {title ? <h4 className="font-medium text-sm">{title}</h4> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label>{f("name")}</Label>
-          <Input value={state.name ?? ""} onChange={(e) => update("name", e.target.value)} placeholder={f("namePlaceholder")} />
-          {err("name") ? (
-            <p className="text-xs text-destructive" role="alert">
-              {err("name")}
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-1">
-          <Label>{f("address")}</Label>
-          <Input value={state.address1 ?? ""} onChange={(e) => update("address1", e.target.value)} placeholder={f("addressPlaceholder")} />
-          {err("address1") ? (
-            <p className="text-xs text-destructive" role="alert">
-              {err("address1")}
-            </p>
-          ) : null}
-        </div>
-        {!quickBooking && (
-          <div className="space-y-1">
-            <Label>{f("address2")}</Label>
-            <Input value={state.address2 ?? ""} onChange={(e) => update("address2", e.target.value)} placeholder={optional} />
-            {err("address2") ? (
-              <p className="text-xs text-destructive" role="alert">
-                {err("address2")}
-              </p>
-            ) : null}
-          </div>
-        )}
-        <div className="space-y-1">
-          <Label>{f("postalCode")}</Label>
-          <Input value={state.postalCode ?? ""} onChange={(e) => update("postalCode", e.target.value)} placeholder={f("postalCodePlaceholder")} />
-          {err("postalCode") ? (
-            <p className="text-xs text-destructive" role="alert">
-              {err("postalCode")}
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-1">
-          <Label>{f("city")}</Label>
-          <Input value={state.city ?? ""} onChange={(e) => update("city", e.target.value)} placeholder={f("cityPlaceholder")} />
-          {err("city") ? (
-            <p className="text-xs text-destructive" role="alert">
-              {err("city")}
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-1">
-          <Label>{f("country")}</Label>
-          <Input value={state.country ?? ""} onChange={(e) => update("country", e.target.value)} placeholder={f("countryPlaceholder")} />
-          {err("country") ? (
-            <p className="text-xs text-destructive" role="alert">
-              {err("country")}
-            </p>
-          ) : null}
-        </div>
-        {!quickBooking && (
-          <>
-            <div className="space-y-1">
-              <Label>{f("email")}</Label>
-              <Input type="email" value={state.email ?? ""} onChange={(e) => update("email", e.target.value)} placeholder={optional} />
-              {err("email") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("email")}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <Label>{f("phone")}</Label>
-              <Input value={state.phoneNumber ?? ""} onChange={(e) => update("phoneNumber", e.target.value)} placeholder={optional} />
-              {err("phoneNumber") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("phoneNumber")}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <Label>{f("mobile")}</Label>
-              <Input value={state.phoneNumberMobile ?? ""} onChange={(e) => update("phoneNumberMobile", e.target.value)} placeholder={optional} />
-              {err("phoneNumberMobile") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("phoneNumberMobile")}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <Label>{f("contactPerson")}</Label>
-              <Input value={state.contactPersonName ?? ""} onChange={(e) => update("contactPersonName", e.target.value)} placeholder={optional} />
-              {err("contactPersonName") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("contactPersonName")}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <Label>{f("vatNo")}</Label>
-              <Input value={state.vatNo ?? ""} onChange={(e) => update("vatNo", e.target.value)} placeholder={optional} />
-              {err("vatNo") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("vatNo")}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <Label>{f("customerNumber")}</Label>
-              <Input value={state.customerNumber ?? ""} onChange={(e) => update("customerNumber", e.target.value)} placeholder={optional} />
-              {err("customerNumber") ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {err("customerNumber")}
-                </p>
-              ) : null}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export default function CreateBookingPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
@@ -372,84 +199,30 @@ export default function CreateBookingPage() {
   }
 
   function buildBody(): CreateBookingBody {
-    return {
-      referenceNumber: trimOrUndefined(referenceNumber),
-      postalService: trimOrUndefined(postalService),
-      companyId: trimOrUndefined(companyId),
-      receiverName: trimOrUndefined(receiver.name ?? ""),
-      receiverAddress1: trimOrUndefined(receiver.address1 ?? ""),
-      receiverAddress2: trimOrUndefined(receiver.address2 ?? ""),
-      receiverPostalCode: trimOrUndefined(receiver.postalCode ?? ""),
-      receiverCity: trimOrUndefined(receiver.city ?? ""),
-      receiverCountry: trimOrUndefined(receiver.country ?? "") || "FI",
-      receiverEmail: trimOrUndefined(receiver.email ?? ""),
-      receiverPhone: trimOrUndefined(receiver.phoneNumber ?? ""),
-      receiverPhoneMobile: trimOrUndefined(receiver.phoneNumberMobile ?? ""),
-      receiverContactPersonName: trimOrUndefined(receiver.contactPersonName ?? ""),
-      receiverVatNo: trimOrUndefined(receiver.vatNo ?? ""),
-      receiverCustomerNumber: trimOrUndefined(receiver.customerNumber ?? ""),
-      shipper: toPartyPayload(shipper),
-      payer:
-        payerSource === "sender"
-          ? toPartyPayload(shipper)
-          : payerSource === "receiver"
-            ? toPartyPayload(receiver)
-            : toPartyPayload(payer),
-      pickUpAddress: toPartyPayload(pickUpAddress),
-      deliveryPoint: toPartyPayload(deliveryPoint),
-      shipment:
-        service || senderReference || receiverReference || freightPayer || handlingInstructions
-          ? {
-              service: trimOrUndefined(service),
-              senderReference: trimOrUndefined(senderReference),
-              receiverReference: trimOrUndefined(receiverReference),
-              freightPayer: trimOrUndefined(freightPayer),
-              handlingInstructions: trimOrUndefined(handlingInstructions),
-            }
-          : undefined,
-      shippingInfo:
-        grossWeight || grossVolume || packageQuantity || pickupHandlingInstructions || deliveryHandlingInstructions || generalInstructions || packages.some((p) => p.weight || p.volume || p.packageType || p.description)
-          ? {
-              grossWeight: trimOrUndefined(grossWeight),
-              grossVolume: trimOrUndefined(grossVolume),
-              packageQuantity: trimOrUndefined(packageQuantity) || (packages.length > 0 ? String(packages.length) : undefined),
-              pickupHandlingInstructions: trimOrUndefined(pickupHandlingInstructions),
-              deliveryHandlingInstructions: trimOrUndefined(deliveryHandlingInstructions),
-              generalInstructions: trimOrUndefined(generalInstructions),
-              deliveryWithoutSignature,
-              packages: packages
-                .map((p) => ({
-                  weight: trimOrUndefined(p.weight ?? ""),
-                  volume: trimOrUndefined(p.volume ?? ""),
-                  packageType: trimOrUndefined(p.packageType ?? ""),
-                  description: trimOrUndefined(p.description ?? ""),
-                  length: trimOrUndefined(p.length ?? ""),
-                  width: trimOrUndefined(p.width ?? ""),
-                  height: trimOrUndefined(p.height ?? ""),
-                }))
-                .filter((p) => p.weight || p.volume || p.packageType || p.description),
-            }
-          : undefined,
-    };
-  }
-
-  function toPartyPayload(p: CreateBookingParty): CreateBookingParty | undefined {
-    const has = p.name || p.address1 || p.postalCode || p.city || p.country || p.email || p.phoneNumber || p.contactPersonName || p.vatNo || p.customerNumber;
-    if (!has) return undefined;
-    return {
-      name: trimOrUndefined(p.name ?? ""),
-      address1: trimOrUndefined(p.address1 ?? ""),
-      address2: trimOrUndefined(p.address2 ?? ""),
-      postalCode: trimOrUndefined(p.postalCode ?? ""),
-      city: trimOrUndefined(p.city ?? ""),
-      country: trimOrUndefined(p.country ?? "") || "FI",
-      email: trimOrUndefined(p.email ?? ""),
-      phoneNumber: trimOrUndefined(p.phoneNumber ?? ""),
-      phoneNumberMobile: trimOrUndefined(p.phoneNumberMobile ?? ""),
-      contactPersonName: trimOrUndefined(p.contactPersonName ?? ""),
-      vatNo: trimOrUndefined(p.vatNo ?? ""),
-      customerNumber: trimOrUndefined(p.customerNumber ?? ""),
-    };
+    return buildCreateBookingBody({
+      referenceNumber,
+      postalService,
+      companyId,
+      receiver,
+      shipper,
+      payer,
+      pickUpAddress,
+      deliveryPoint,
+      payerSource,
+      service,
+      senderReference,
+      receiverReference,
+      freightPayer,
+      handlingInstructions,
+      grossWeight,
+      grossVolume,
+      packageQuantity,
+      pickupHandlingInstructions,
+      deliveryHandlingInstructions,
+      generalInstructions,
+      deliveryWithoutSignature,
+      packages,
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {

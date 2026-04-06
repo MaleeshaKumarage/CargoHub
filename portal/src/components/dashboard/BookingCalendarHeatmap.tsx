@@ -1,10 +1,27 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   buildBookingMonthGrid,
   type DailyBookingCell,
 } from "@/lib/booking-month-heatmap-layout";
+import { useLocale, useTranslations } from "next-intl";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { useState } from "react";
+
+function formatUtcYmdLong(ymd: string, locale: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(d);
+}
 
 function cellSurfaceClass(
   count: number,
@@ -65,11 +82,20 @@ export function BookingCalendarHeatmapGrid({
   weekLabel: (isoWeek: number, isoWeekYear: number) => string;
   formatCellTooltip: (p: { date: string; bookingCount: number; draftCount: number }) => string;
 }) {
+  const tStats = useTranslations("dashboard.stats");
+  const locale = useLocale();
+  const [dayDetail, setDayDetail] = useState<{
+    date: string;
+    bookingCount: number;
+    draftCount: number;
+  } | null>(null);
+
   const { weeks, maxCount } = buildBookingMonthGrid(daily, targetYear, targetMonth);
   const completedMap = new Map(completedDaily.map((x) => [x.date, x.count]));
   const draftsMap = new Map(draftsDaily.map((x) => [x.date, x.count]));
 
   return (
+    <div className="space-y-2">
     <div
       className="grid gap-1"
       style={{
@@ -97,12 +123,14 @@ export function BookingCalendarHeatmapGrid({
             const title = c.inTargetMonth
               ? formatCellTooltip({ date: c.date, bookingCount, draftCount })
               : c.date;
+            const showCounts = c.inTargetMonth && (bookingCount > 0 || draftCount > 0);
             return (
               <div
                 key={c.date}
                 title={title}
+                aria-label={c.inTargetMonth ? title : c.date}
                 className={cn(
-                  "flex aspect-square max-h-12 min-h-[2.5rem] w-full flex-col items-center justify-center rounded-md px-0.5 transition-colors",
+                  "flex aspect-square max-h-[3.25rem] min-h-[2.75rem] w-full flex-col items-center justify-center gap-0.5 rounded-md px-0.5 py-0.5 transition-colors sm:max-h-14 sm:min-h-[3rem]",
                   cellSurfaceClass(c.count, maxCount, c.inTargetMonth),
                 )}
               >
@@ -114,11 +142,63 @@ export function BookingCalendarHeatmapGrid({
                 >
                   {c.dayOfMonth}
                 </span>
+                {showCounts ? (
+                  <span
+                    className="max-w-full truncate text-center text-[9px] font-semibold tabular-nums leading-none text-foreground/95 sm:text-[10px]"
+                    aria-hidden
+                  >
+                    {tStats("heatmapCellInlineCounts", { bookingCount, draftCount })}
+                  </span>
+                ) : null}
               </div>
             );
           })}
         </div>
       ))}
+    </div>
+    <p className="text-center text-[11px] leading-snug text-muted-foreground sm:text-left">
+      {tStats("heatmapLegendTapDay")}
+    </p>
+
+    <DialogPrimitive.Root
+      open={dayDetail !== null}
+      onOpenChange={(open) => {
+        if (!open) setDayDetail(null);
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Content
+          className={cn(
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "fixed left-[50%] top-[50%] z-50 w-[min(20rem,calc(100vw-2rem))] translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-background p-4 shadow-lg",
+          )}
+        >
+          {dayDetail ? (
+            <>
+              <DialogPrimitive.Title className="text-base font-semibold leading-snug tracking-tight">
+                {formatUtcYmdLong(dayDetail.date, locale)}
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="mt-3 space-y-2.5 text-foreground">
+                <span className="block text-[15px] font-medium leading-6">
+                  {tStats("heatmapDayDialogBookings", { count: dayDetail.bookingCount })}
+                </span>
+                <span className="block text-[15px] font-medium leading-6">
+                  {tStats("heatmapDayDialogDrafts", { count: dayDetail.draftCount })}
+                </span>
+              </DialogPrimitive.Description>
+              <div className="mt-4 flex justify-end">
+                <DialogPrimitive.Close asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    {tStats("heatmapDayDialogClose")}
+                  </Button>
+                </DialogPrimitive.Close>
+              </div>
+            </>
+          ) : null}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
     </div>
   );
 }
