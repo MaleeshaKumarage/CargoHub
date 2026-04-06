@@ -229,6 +229,56 @@ public class AdminController : ControllerBase
         return Ok(list);
     }
 
+    /// <summary>
+    /// Platform earnings time series for charts: daily buckets (yesterday, last 7 days, last calendar month UTC)
+    /// or monthly buckets (last 6 / 12 months). EUR, invoice-eligible lines only.
+    /// </summary>
+    /// <param name="range">yesterday | last7days | lastMonth | last6months | lastYear</param>
+    [HttpGet("dashboard/earnings/series")]
+    public async Task<ActionResult<IReadOnlyList<PlatformEarningsSeriesPointDto>>> GetPlatformEarningsSeries(
+        [FromQuery] string range = "lastMonth",
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryParsePlatformEarningsSeriesRange(range, out var parsed))
+        {
+            return BadRequest(new
+            {
+                message = "Invalid range. Use: yesterday, last7days, lastMonth, last6months, lastYear.",
+            });
+        }
+
+        var list = await _mediator.Send(new GetPlatformEarningsSeriesQuery(parsed), cancellationToken);
+        return Ok(list);
+    }
+
+    private static bool TryParsePlatformEarningsSeriesRange(string? s, out PlatformEarningsSeriesRange range)
+    {
+        range = PlatformEarningsSeriesRange.LastMonth;
+        if (string.IsNullOrWhiteSpace(s))
+            return false;
+
+        switch (s.Trim().ToLowerInvariant())
+        {
+            case "yesterday":
+                range = PlatformEarningsSeriesRange.Yesterday;
+                return true;
+            case "last7days":
+                range = PlatformEarningsSeriesRange.Last7Days;
+                return true;
+            case "lastmonth":
+                range = PlatformEarningsSeriesRange.LastMonth;
+                return true;
+            case "last6months":
+                range = PlatformEarningsSeriesRange.Last6Months;
+                return true;
+            case "lastyear":
+                range = PlatformEarningsSeriesRange.LastYear;
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /// <summary>Per-company EUR for a UTC month (sorted descending).</summary>
     [HttpGet("dashboard/earnings/by-company")]
     public async Task<ActionResult<IReadOnlyList<PlatformEarningsCompanyDto>>> GetPlatformEarningsByCompany(

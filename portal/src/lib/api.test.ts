@@ -25,6 +25,7 @@ import {
   adminGetBillingMonthBreakdown,
   adminGetBillingBreakdownByDateRange,
   adminGetPlatformEarningsMonthly,
+  adminGetPlatformEarningsSeries,
   adminGetPlatformEarningsByCompany,
   adminGetPlatformEarningsBySubscription,
   adminSetBookingInvoiceExcluded,
@@ -2084,6 +2085,28 @@ describe("api", () => {
       const r = await adminGetPlatformEarningsBySubscription("tok", 2023, 5);
       expect(r[0].planId).toBe("p1");
       expect(r[0].percent).toBe(50.5);
+    });
+
+    it("series maps PascalCase and encodes range", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ Period: "2025-03-01", TotalEur: 9.25 }],
+      });
+      const r = await adminGetPlatformEarningsSeries("tok", "lastMonth");
+      expect(r).toEqual([{ period: "2025-03-01", totalEur: 9.25 }]);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/dashboard/earnings/series?range=lastMonth"),
+        expect.objectContaining({ headers: { Authorization: "Bearer tok" } }),
+      );
+    });
+
+    it("series returns empty when response is not an array", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      });
+      const r = await adminGetPlatformEarningsSeries("tok", "yesterday");
+      expect(r).toEqual([]);
     });
   });
 
