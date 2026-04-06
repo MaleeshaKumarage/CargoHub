@@ -8,9 +8,7 @@ const authState = vi.hoisted(() => ({
 }));
 const apiMocks = vi.hoisted(() => ({
   getDashboardStats: vi.fn(),
-  adminGetPlatformEarningsMonthly: vi.fn().mockResolvedValue([]),
-  adminGetPlatformEarningsByCompany: vi.fn().mockResolvedValue([]),
-  adminGetPlatformEarningsBySubscription: vi.fn().mockResolvedValue([]),
+  adminGetPlatformEarningsSeries: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/context/AuthContext", () => ({
@@ -47,9 +45,7 @@ vi.mock("next-intl", () => ({
 
 vi.mock("@/lib/api", () => ({
   getDashboardStats: (...args: unknown[]) => apiMocks.getDashboardStats(...args),
-  adminGetPlatformEarningsMonthly: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsMonthly(...args),
-  adminGetPlatformEarningsByCompany: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsByCompany(...args),
-  adminGetPlatformEarningsBySubscription: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsBySubscription(...args),
+  adminGetPlatformEarningsSeries: (...args: unknown[]) => apiMocks.adminGetPlatformEarningsSeries(...args),
 }));
 
 vi.mock("@/lib/dashboard-wordcloud", () => ({
@@ -64,7 +60,7 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.roles = ["User"];
-    apiMocks.adminGetPlatformEarningsMonthly.mockResolvedValue([]);
+    apiMocks.adminGetPlatformEarningsSeries.mockResolvedValue([]);
     apiMocks.getDashboardStats.mockResolvedValue({
       scope: "all",
       countToday: 5,
@@ -127,19 +123,12 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("loads platform earnings when SuperAdmin", async () => {
+  it("loads platform earnings series when SuperAdmin", async () => {
     authState.roles = ["SuperAdmin"];
-    const now = new Date();
-    const y = now.getUTCFullYear();
-    const m = now.getUTCMonth() + 1;
-    apiMocks.adminGetPlatformEarningsMonthly.mockResolvedValue([{ yearUtc: y, monthUtc: m, totalEur: 0 }]);
+    apiMocks.adminGetPlatformEarningsSeries.mockResolvedValue([{ period: "2025-01-15", totalEur: 12 }]);
     render(<DashboardPage />);
     await vi.waitFor(() => {
-      expect(apiMocks.adminGetPlatformEarningsMonthly).toHaveBeenCalled();
-    });
-    await vi.waitFor(() => {
-      expect(apiMocks.adminGetPlatformEarningsByCompany).toHaveBeenCalled();
-      expect(apiMocks.adminGetPlatformEarningsBySubscription).toHaveBeenCalled();
+      expect(apiMocks.adminGetPlatformEarningsSeries).toHaveBeenCalledWith("token", "lastMonth", expect.any(AbortSignal));
     });
   });
 });

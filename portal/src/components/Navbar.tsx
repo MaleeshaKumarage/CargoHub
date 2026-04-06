@@ -69,8 +69,9 @@ export function Navbar() {
               alt={appName}
               className="h-8 w-auto object-contain"
             />
-          ) : null}
-          {appName}
+          ) : (
+            <span className="truncate">{appName}</span>
+          )}
         </Link>
         <nav className="flex items-center gap-2">
           <Link href="/dashboard">

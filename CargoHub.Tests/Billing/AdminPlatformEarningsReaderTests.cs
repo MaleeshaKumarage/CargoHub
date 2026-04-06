@@ -1,3 +1,4 @@
+using CargoHub.Application.Billing.Admin;
 using CargoHub.Domain.Billing;
 using CargoHub.Domain.Companies;
 using CargoHub.Infrastructure.Billing;
@@ -565,5 +566,71 @@ public class AdminPlatformEarningsReaderTests : IDisposable
         Assert.Single(list);
         Assert.Equal("Unknown plan", list[0].PlanName);
         Assert.Equal(100m, list[0].Percent);
+    }
+
+    [Fact]
+    public async Task GetSeriesAsync_Yesterday_BucketsByCreatedAtUtc()
+    {
+        using var ctx = _fixture.CreateContext();
+        var planId = Guid.NewGuid();
+        var pricingId = Guid.NewGuid();
+        ctx.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = planId,
+            Name = "P1",
+            Kind = SubscriptionPlanKind.PayPerBooking,
+            Currency = "EUR",
+            IsActive = true,
+        });
+        ctx.SubscriptionPlanPricingPeriods.Add(new SubscriptionPlanPricingPeriod
+        {
+            Id = pricingId,
+            SubscriptionPlanId = planId,
+            EffectiveFromUtc = DateTime.UtcNow.AddDays(-30),
+        });
+
+        var companyId = Guid.NewGuid();
+        ctx.Companies.Add(new CompanyEntity
+        {
+            Id = companyId,
+            CompanyId = "c",
+            Name = "Co",
+            BusinessId = "1",
+            CustomerId = "u",
+            SubscriptionPlanId = planId,
+        });
+
+        var periodId = Guid.NewGuid();
+        ctx.CompanyBillingPeriods.Add(new CompanyBillingPeriod
+        {
+            Id = periodId,
+            CompanyId = companyId,
+            YearUtc = DateTime.UtcNow.Year,
+            MonthUtc = DateTime.UtcNow.Month,
+            Currency = "EUR",
+            Status = CompanyBillingPeriodStatus.Open,
+        });
+
+        var yesterdayNoon = DateTime.UtcNow.Date.AddDays(-1).AddHours(12);
+        ctx.BillingLineItems.Add(new BillingLineItem
+        {
+            Id = Guid.NewGuid(),
+            CompanyBillingPeriodId = periodId,
+            LineType = BillingLineType.PerBooking,
+            Amount = 33m,
+            Currency = "EUR",
+            SubscriptionPlanId = planId,
+            SubscriptionPlanPricingPeriodId = pricingId,
+            CreatedAtUtc = yesterdayNoon,
+            ExcludedFromInvoice = false,
+        });
+
+        await ctx.SaveChangesAsync();
+
+        var reader = new AdminPlatformEarningsReader(ctx);
+        var series = await reader.GetSeriesAsync(PlatformEarningsSeriesRange.Yesterday);
+        Assert.Single(series);
+        Assert.Equal(33m, series[0].TotalEur);
+        Assert.Equal(DateTime.UtcNow.Date.AddDays(-1).ToString("yyyy-MM-dd"), series[0].Period);
     }
 }
