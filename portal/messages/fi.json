@@ -636,6 +636,10 @@
     "footer": {
       "rights": "All rights reserved.",
       "backToTour": "Back to top"
-    }
+    },
+    "previewDisclaimer": "Sample data only—not connected to your company.",
+    "previewAdminNote": "SuperAdmin view (sample rows).",
+    "previewActive": "Active",
+    "previewTrial": "Trial"
   }
 }

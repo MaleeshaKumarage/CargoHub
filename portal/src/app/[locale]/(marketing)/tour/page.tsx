@@ -1,11 +1,11 @@
 import { RevealOnScroll } from "@/components/marketing/RevealOnScroll";
 import {
-  IllustrationAdmin,
-  IllustrationBookings,
-  IllustrationCarriers,
-  IllustrationDashboard,
-  IllustrationWorkflow,
-} from "@/components/marketing/TourUiIllustrations";
+  TourAdminPreview,
+  TourBookingPreview,
+  TourCarriersPreview,
+  TourDashboardPreview,
+  TourWorkflowPreview,
+} from "@/components/marketing/TourRealPreviews";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
@@ -139,7 +139,7 @@ export default async function TourPage({ params }: Props) {
             </ul>
           </RevealOnScroll>
           <RevealOnScroll className="lg:justify-self-end">
-            <IllustrationBookings label={tBook("mockLabel")} />
+            <TourBookingPreview />
           </RevealOnScroll>
         </div>
       </section>
@@ -150,7 +150,7 @@ export default async function TourPage({ params }: Props) {
       >
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
           <RevealOnScroll className="order-2 lg:order-1">
-            <IllustrationDashboard label={tDash("mockLabel")} />
+            <TourDashboardPreview />
           </RevealOnScroll>
           <RevealOnScroll className="order-1 lg:order-2">
             <span className="font-mono text-sm text-cyan-400/80">{tDash("index")}</span>
@@ -184,7 +184,7 @@ export default async function TourPage({ params }: Props) {
             </ul>
           </RevealOnScroll>
           <RevealOnScroll>
-            <IllustrationWorkflow label={tFlow("mockLabel")} />
+            <TourWorkflowPreview />
           </RevealOnScroll>
         </div>
       </section>
@@ -203,7 +203,7 @@ export default async function TourPage({ params }: Props) {
               </h2>
               <p className="mt-4 max-w-xl text-zinc-400">{tCar("body")}</p>
             </div>
-            <IllustrationCarriers label={tCar("mockLabel")} />
+            <TourCarriersPreview />
           </RevealOnScroll>
         </div>
       </section>
@@ -219,7 +219,7 @@ export default async function TourPage({ params }: Props) {
               </h2>
               <p className="mt-4 text-zinc-400">{tAdm("body")}</p>
             </div>
-            <IllustrationAdmin label={tAdm("mockLabel")} />
+            <TourAdminPreview />
           </RevealOnScroll>
         </div>
       </section>
