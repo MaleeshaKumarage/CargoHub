@@ -1,3 +1,4 @@
+using System.Globalization;
 using CargoHub.Application.Billing.Admin;
 using CargoHub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,78 @@ public sealed class AdminPlatformEarningsReader : IAdminPlatformEarningsReader
     private readonly ApplicationDbContext _db;
 
     public AdminPlatformEarningsReader(ApplicationDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<PlatformEarningsSeriesPointDto>> GetSeriesAsync(
+        PlatformEarningsSeriesRange range,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var todayUtc = now.Date;
+
+        return range switch
+        {
+            PlatformEarningsSeriesRange.Yesterday => await GetDailySeriesAsync(
+                todayUtc.AddDays(-1),
+                todayUtc,
+                cancellationToken),
+            PlatformEarningsSeriesRange.Last7Days => await GetDailySeriesAsync(
+                todayUtc.AddDays(-6),
+                todayUtc.AddDays(1),
+                cancellationToken),
+            PlatformEarningsSeriesRange.LastMonth =>
+                await GetDailySeriesAsync(
+                    new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-1),
+                    new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc),
+                    cancellationToken),
+            PlatformEarningsSeriesRange.Last6Months => MapMonthsToSeries(await GetMonthlyTotalsAsync(6, cancellationToken)),
+            PlatformEarningsSeriesRange.LastYear => MapMonthsToSeries(await GetMonthlyTotalsAsync(12, cancellationToken)),
+            _ => throw new ArgumentOutOfRangeException(nameof(range), range, null),
+        };
+    }
+
+    private static IReadOnlyList<PlatformEarningsSeriesPointDto> MapMonthsToSeries(
+        IReadOnlyList<PlatformEarningsMonthDto> months) =>
+        months
+            .Select(m => new PlatformEarningsSeriesPointDto
+            {
+                Period = $"{m.YearUtc}-{m.MonthUtc:D2}",
+                TotalEur = m.TotalEur,
+            })
+            .ToList();
+
+    private async Task<IReadOnlyList<PlatformEarningsSeriesPointDto>> GetDailySeriesAsync(
+        DateTime startUtcInclusive,
+        DateTime endUtcExclusive,
+        CancellationToken cancellationToken)
+    {
+        var raw = await (
+            from l in _db.BillingLineItems.AsNoTracking()
+            join p in _db.CompanyBillingPeriods.AsNoTracking() on l.CompanyBillingPeriodId equals p.Id
+            where !l.ExcludedFromInvoice
+                  && l.Currency.ToUpper() == "EUR"
+                  && l.CreatedAtUtc >= startUtcInclusive
+                  && l.CreatedAtUtc < endUtcExclusive
+            group l by new { l.CreatedAtUtc.Year, l.CreatedAtUtc.Month, l.CreatedAtUtc.Day } into g
+            select new { g.Key.Year, g.Key.Month, g.Key.Day, Total = g.Sum(x => x.Amount) }
+        ).ToListAsync(cancellationToken);
+
+        var dict = raw.ToDictionary(
+            x => new DateTime(x.Year, x.Month, x.Day, 0, 0, 0, DateTimeKind.Utc),
+            x => x.Total);
+
+        var result = new List<PlatformEarningsSeriesPointDto>();
+        for (var d = startUtcInclusive.Date; d < endUtcExclusive; d = d.AddDays(1))
+        {
+            dict.TryGetValue(d, out var total);
+            result.Add(new PlatformEarningsSeriesPointDto
+            {
+                Period = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                TotalEur = total,
+            });
+        }
+
+        return result;
+    }
 
     public async Task<IReadOnlyList<PlatformEarningsMonthDto>> GetMonthlyTotalsAsync(
         int months,

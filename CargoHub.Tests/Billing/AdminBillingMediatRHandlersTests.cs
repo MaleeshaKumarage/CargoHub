@@ -210,4 +210,15 @@ public sealed class AdminBillingMediatRHandlersTests
         await h.Handle(new GetPlatformEarningsBySubscriptionQuery(2025, 4), default);
         mock.Verify(x => x.GetBySubscriptionForMonthAsync(2025, 4, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GetPlatformEarningsSeriesQueryHandler_delegates()
+    {
+        var mock = new Mock<IAdminPlatformEarningsReader>();
+        mock.Setup(x => x.GetSeriesAsync(It.IsAny<PlatformEarningsSeriesRange>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<PlatformEarningsSeriesPointDto>());
+        var h = new GetPlatformEarningsSeriesQueryHandler(mock.Object);
+        await h.Handle(new GetPlatformEarningsSeriesQuery(PlatformEarningsSeriesRange.LastMonth), default);
+        mock.Verify(x => x.GetSeriesAsync(PlatformEarningsSeriesRange.LastMonth, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
