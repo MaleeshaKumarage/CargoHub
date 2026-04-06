@@ -25,4 +25,18 @@ public static class PortalPublicBaseUrlResolver
 
         return "http://localhost:3000";
     }
+
+    /// <summary>
+    /// Public tour page URL for emails. Uses <see cref="PortalPublicOptions.TourUrl"/> when set; otherwise
+    /// <c>{Resolve(portal, configuration)}/en/tour</c>.
+    /// </summary>
+    public static string ResolveTourUrl(PortalPublicOptions portal, IConfiguration configuration)
+    {
+        var raw = portal.TourUrl?.Trim();
+        if (!string.IsNullOrEmpty(raw))
+            return raw.TrimEnd('/');
+
+        var baseUrl = Resolve(portal, configuration);
+        return $"{baseUrl}/en/tour";
+    }
 }
