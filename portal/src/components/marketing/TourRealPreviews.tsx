@@ -85,6 +85,7 @@ export function TourBookingPreview() {
   const t = useTranslations("bookings");
   const f = useTranslations("bookings.fields");
   const tM = useTranslations("milestones");
+  const tHome = useTranslations("home");
 
   const demoItem = {
     isDraft: false,
@@ -94,7 +95,7 @@ export function TourBookingPreview() {
       { status: "CompletedBooking", occurredAtUtc: "2025-03-10T09:12:00Z" },
       { status: "Waybill", occurredAtUtc: "2025-03-10T09:30:00Z" },
       { status: "SendBooking", occurredAtUtc: "2025-03-10T10:00:00Z" },
-    ] as const,
+    ],
   };
 
   return (
@@ -269,6 +270,7 @@ export function TourWorkflowPreview() {
 
 export function TourCarriersPreview() {
   const tNav = useTranslations("nav");
+  const tTour = useTranslations("tour");
 
   const rows = [
     { name: "Posti", id: "CNT-8821-A" },
@@ -308,6 +310,7 @@ export function TourCarriersPreview() {
 
 export function TourAdminPreview() {
   const tNav = useTranslations("nav");
+  const tTour = useTranslations("tour");
 
   return (
     <TourUiSurface>
