@@ -5,8 +5,10 @@ export const TOUR_SECTION_IDS = [
   "bookings",
   "dashboard",
   "workflow",
+  "integrations",
   "carriers",
   "admin",
+  "subscriptions",
   "start",
 ] as const;
 

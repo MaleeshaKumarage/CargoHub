@@ -25,7 +25,8 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      image_digest: ${{ steps.push.outputs.digest || steps.build_only.outputs.digest }}
+      # Registry digest when pushed; local image ID (sha256:…) when build-only — build-push-action does not set digest with push:false.
+      image_digest: ${{ steps.push.outputs.digest || steps.local_digest.outputs.digest }}
 
     steps:
       - name: Checkout repository
@@ -88,11 +89,20 @@ jobs:
           context: .
           file: ./Dockerfile.all-in-one
           push: false
+          load: true
           tags: cargohub:ci-${{ github.sha }}
           build-args: |
             BUILD_REF=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Local image ID (no registry digest without push)
+        id: local_digest
+        if: steps.hub.outputs.enabled != '1'
+        run: |
+          img="cargohub:ci-${{ github.sha }}"
+          digest=$(docker inspect --format='{{.Id}}' "$img")
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
   # ─── Notify (only if build failed) ───
   notify-build-failure:

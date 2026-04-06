@@ -60,4 +60,15 @@ describe("getRolesFromToken", () => {
   it("returns empty array on JSON parse error", () => {
     expect(getRolesFromToken("header.invalid!!!.sig")).toEqual([]);
   });
+
+  it("returns empty array when role claim is neither string nor string array", () => {
+    const payload = b64({ role: { nested: true } });
+    expect(getRolesFromToken(`header.${payload}.sig`)).toEqual([]);
+  });
+
+  it("returns single role when ClaimTypes URI maps to a string", () => {
+    const uri = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+    const payload = b64({ [uri]: "SuperAdmin" });
+    expect(getRolesFromToken(`header.${payload}.sig`)).toEqual(["SuperAdmin"]);
+  });
 });
