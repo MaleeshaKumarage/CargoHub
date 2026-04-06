@@ -510,6 +510,44 @@ export type PlatformEarningsMonth = { yearUtc: number; monthUtc: number; totalEu
 export type PlatformEarningsCompany = { companyId: string; companyName: string; amountEur: number };
 export type PlatformEarningsSubscription = { planId: string; planName: string; amountEur: number; percent: number };
 
+export type PlatformEarningsSeriesRangeParam =
+  | "yesterday"
+  | "last7days"
+  | "lastMonth"
+  | "last6months"
+  | "lastYear";
+
+export type PlatformEarningsSeriesPoint = { period: string; totalEur: number };
+
+/** Super Admin: platform earnings time series for charts (UTC; daily or monthly buckets). */
+export async function adminGetPlatformEarningsSeries(
+  token: string,
+  range: PlatformEarningsSeriesRangeParam,
+  signal?: AbortSignal,
+): Promise<PlatformEarningsSeriesPoint[]> {
+  const res = await fetch(
+    `${adminBase()}/dashboard/earnings/series?range=${encodeURIComponent(range)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = (data as { message?: string }).message ?? res.statusText;
+    throw new Error(msg || `Failed to load earnings series (${res.status})`);
+  }
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((x) => {
+    const r = x as Record<string, unknown>;
+    return {
+      period: String(r.period ?? r.Period ?? ""),
+      totalEur: Number(r.totalEur ?? r.TotalEur ?? 0),
+    };
+  });
+}
+
 /** Super Admin: platform payable EUR per UTC month (invoice-eligible lines only). */
 export async function adminGetPlatformEarningsMonthly(
   token: string,
