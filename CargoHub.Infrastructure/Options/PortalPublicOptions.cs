@@ -18,4 +18,10 @@ public sealed class PortalPublicOptions
 
     /// <summary>Domain for fallback admin invite when Super Admin does not set an email.</summary>
     public string CompanyAdminFallbackEmailDomain { get; set; } = "example.com";
+
+    /// <summary>Optional display name appended to admin invite emails as a contact line (with <see cref="AdminInviteContactEmail"/>).</summary>
+    public string AdminInviteContactName { get; set; } = "";
+
+    /// <summary>Optional email for the admin invite contact line (with <see cref="AdminInviteContactName"/>).</summary>
+    public string AdminInviteContactEmail { get; set; } = "";
 }
