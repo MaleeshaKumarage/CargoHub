@@ -107,11 +107,13 @@ public sealed class CompanyAdminInviteIssuer : ICompanyAdminInviteIssuer
         var companyLabel = company?.Name ?? company?.BusinessId ?? companyId.ToString();
 
         var subject = $"Company admin invitation — {companyLabel}";
+        var contactFooter = CompanyAdminInviteEmailHtml.BuildContactFooter(_portal.Value);
         var body =
             $"<p>You have been invited as an administrator for <strong>{System.Net.WebUtility.HtmlEncode(companyLabel)}</strong>.</p>" +
             $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(link)}\">Open the invitation</a> to choose your user name and password.</p>" +
             $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(tourUrl)}\">Product tour</a> — overview of bookings, insight, and workflows (optional).</p>" +
-            "<p>If the link expires, ask a Super Admin to resend the invite.</p>";
+            "<p>If the link expires, ask a Super Admin to resend the invite.</p>" +
+            contactFooter;
 
         try
         {
