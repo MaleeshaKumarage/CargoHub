@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CargoHub.Application.Auth;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Commands;
 using CargoHub.Application.Auth.Dtos;
@@ -69,6 +70,26 @@ public class RegisterUserCommandHandlerTests
 
         Assert.False(result.Success);
         Assert.Equal("CompanyNotFound", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCompanyInactive_ReturnsCompanyInactive()
+    {
+        var company = new CompanyEntity { BusinessId = "1234567-8", Name = "Acme", IsActive = false };
+        var companyRepo = new Mock<ICompanyRepository>();
+        companyRepo.Setup(r => r.GetByBusinessIdAsync("1234567-8", It.IsAny<CancellationToken>())).ReturnsAsync(company);
+
+        var handler = CreateHandler(companyRepo.Object, new Mock<IUserRegistrationService>().Object, new Mock<IJwtTokenFactory>().Object);
+        var result = await handler.Handle(new RegisterUserCommand(new PortalRegisterRequest
+        {
+            BusinessId = "1234567-8",
+            Email = "a@b.com",
+            Password = "P@ss1",
+        }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("CompanyInactive", result.ErrorCode);
+        Assert.Equal(AuthMessages.CompanyInactive, result.Message);
     }
 
     [Fact]

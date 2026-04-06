@@ -26,6 +26,7 @@ public class AdminController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ICompanyRepository _companyRepository;
+    private readonly ICompanyAdminInviteRepository _companyAdminInvites;
     private readonly ICompanyUserMetrics _companyUserMetrics;
     private readonly AdminCompanyUserPolicy _companyUserPolicy;
     private readonly IMediator _mediator;
@@ -34,6 +35,7 @@ public class AdminController : ControllerBase
     public AdminController(
         UserManager<ApplicationUser> userManager,
         ICompanyRepository companyRepository,
+        ICompanyAdminInviteRepository companyAdminInvites,
         ICompanyUserMetrics companyUserMetrics,
         AdminCompanyUserPolicy companyUserPolicy,
         IMediator mediator,
@@ -41,6 +43,7 @@ public class AdminController : ControllerBase
     {
         _userManager = userManager;
         _companyRepository = companyRepository;
+        _companyAdminInvites = companyAdminInvites;
         _companyUserMetrics = companyUserMetrics;
         _companyUserPolicy = companyUserPolicy;
         _mediator = mediator;
@@ -61,6 +64,8 @@ public class AdminController : ControllerBase
             var bid = c.BusinessId ?? "";
             var users = string.IsNullOrEmpty(bid) ? 0 : await _companyUserMetrics.CountActiveUsersForBusinessIdAsync(bid, cancellationToken);
             var admins = string.IsNullOrEmpty(bid) ? 0 : await _companyUserMetrics.CountAdminsForBusinessIdAsync(bid, cancellationToken);
+            var pendingInvites = await _companyAdminInvites.CountPendingValidInvitesAsync(c.Id, cancellationToken);
+            var lastInviteAt = await _companyAdminInvites.GetLastInviteCreatedAtAsync(c.Id, cancellationToken);
             list.Add(new CompanySummaryDto
             {
                 Id = c.Id,
@@ -72,7 +77,11 @@ public class AdminController : ControllerBase
                 InitialAdminInviteEmail = c.InitialAdminInviteEmail,
                 ActiveUserCount = users,
                 AdminCount = admins,
-                SubscriptionPlanId = c.SubscriptionPlanId
+                SubscriptionPlanId = c.SubscriptionPlanId,
+                IsActive = c.IsActive,
+                AdminInviteFirstAcceptedAtUtc = c.AdminInviteFirstAcceptedAtUtc,
+                PendingAdminInviteCount = pendingInvites,
+                LastAdminInviteCreatedAtUtc = lastInviteAt
             });
         }
 
@@ -366,7 +375,7 @@ public class AdminController : ControllerBase
         return Created($"/api/v1/admin/companies/{created.Id}", created);
     }
 
-    /// <summary>Update company limits and optionally resend admin invite when there is still no admin.</summary>
+    /// <summary>Update company limits; optional initial admin invite emails (no admin yet); optionally resend invites (revokes all pending first).</summary>
     [HttpPatch("companies/{id:guid}")]
     public async Task<ActionResult<AdminCompanyDetailDto>> PatchCompany(Guid id, [FromBody] PatchAdminCompanyRequest body, CancellationToken cancellationToken)
     {
@@ -378,7 +387,9 @@ public class AdminController : ControllerBase
                 body.ResendAdminInvite,
                 body.DeactivateUserIds,
                 body.DemoteAdminUserIds,
-                body.SubscriptionPlanId),
+                body.SubscriptionPlanId,
+                body.IsActive,
+                body.InitialAdminEmails),
             cancellationToken);
         if (!result.Success)
         {
@@ -543,6 +554,10 @@ public class AdminController : ControllerBase
         public int ActiveUserCount { get; set; }
         public int AdminCount { get; set; }
         public Guid? SubscriptionPlanId { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTimeOffset? AdminInviteFirstAcceptedAtUtc { get; set; }
+        public int PendingAdminInviteCount { get; set; }
+        public DateTimeOffset? LastAdminInviteCreatedAtUtc { get; set; }
     }
 
     public sealed class CreateAdminCompanyRequest
@@ -580,6 +595,9 @@ public class AdminController : ControllerBase
         public List<string>? DeactivateUserIds { get; set; }
         public List<string>? DemoteAdminUserIds { get; set; }
         public Guid? SubscriptionPlanId { get; set; }
+        public bool? IsActive { get; set; }
+        /// <summary>When set, replaces invite recipient list (only when the company has no administrator yet).</summary>
+        public List<string>? InitialAdminEmails { get; set; }
     }
 
     public sealed class AdminUserDto

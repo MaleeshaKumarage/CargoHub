@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CargoHub.Application.Auth;
 using CargoHub.Application.Auth.Abstractions;
 using CargoHub.Application.Auth.Commands;
 using CargoHub.Application.Auth.Dtos;
@@ -24,6 +25,24 @@ public class LoginUserCommandHandlerTests
 
         Assert.False(result.Success);
         Assert.Equal("InvalidCredentials", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCredentialsInvalidWithCompanyInactive_ReturnsCompanyInactive()
+    {
+        var authService = new Mock<IUserAuthenticationService>();
+        authService.Setup(a => a.ValidateCredentialsAsync("user@test.com", "wrong", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AuthenticationResult.Failed("CompanyInactive", AuthMessages.CompanyInactive));
+
+        var jwtFactory = new Mock<IJwtTokenFactory>();
+
+        var handler = new LoginUserCommandHandler(authService.Object, jwtFactory.Object);
+        var result = await handler.Handle(new LoginUserCommand(new PortalLoginRequest { Account = "user@test.com", Password = "wrong" }), default);
+
+        Assert.False(result.Success);
+        Assert.Equal("CompanyInactive", result.ErrorCode);
+        Assert.Equal(AuthMessages.CompanyInactive, result.Message);
+        jwtFactory.Verify(j => j.CreateToken(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Claim[]>()), Times.Never);
     }
 
     [Fact]
