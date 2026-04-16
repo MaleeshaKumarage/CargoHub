@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,7 @@ export default function ManageCompaniesPage() {
   const [maxAdmins, setMaxAdmins] = useState("");
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
+  const [togglingCompanyId, setTogglingCompanyId] = useState<string | null>(null);
 
   const [editCompany, setEditCompany] = useState<AdminCompany | null>(null);
   const [editMaxUsers, setEditMaxUsers] = useState("");
@@ -284,6 +286,22 @@ export default function ManageCompaniesPage() {
       setInviteActionError(e instanceof Error ? e.message : "Resend failed");
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const handleToggleCompanyActive = async (company: AdminCompany, nextActive: boolean) => {
+    if (!token) return;
+    setInviteActionError(null);
+    setTogglingCompanyId(company.id);
+    try {
+      await adminPatchCompany(token, company.id, { isActive: nextActive });
+      setCompanies((prev) =>
+        prev.map((row) => (row.id === company.id ? { ...row, isActive: nextActive } : row))
+      );
+    } catch (e) {
+      setInviteActionError(e instanceof Error ? e.message : "Status update failed");
+    } finally {
+      setTogglingCompanyId(null);
     }
   };
 
@@ -584,10 +602,10 @@ export default function ManageCompaniesPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium">Name</th>
                     <th className="p-3 text-left font-medium">Business ID</th>
+                    <th className="p-3 text-left font-medium">{tMc("activeColumn")}</th>
                     <th className="p-3 text-left font-medium">Users / max</th>
                     <th className="p-3 text-left font-medium">Admins / max</th>
                     <th className="p-3 text-left font-medium">{tMc("subscriptionColumn")}</th>
-                    <th className="p-3 text-left font-medium">Company ID</th>
                     <th className="p-3 text-left font-medium">{tMc("companyActionsColumn")}</th>
                     <th className="p-3 text-left font-medium">Invite</th>
                   </tr>
@@ -600,6 +618,19 @@ export default function ManageCompaniesPage() {
                         <td className="p-3">{c.name ?? "—"}</td>
                         <td className="p-3">{c.businessId ?? "—"}</td>
                         <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={c.isActive}
+                              disabled={togglingCompanyId === c.id}
+                              onCheckedChange={(checked) => void handleToggleCompanyActive(c, checked)}
+                              aria-label={tMc("activeColumn")}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {c.isActive ? tMc("activeStateOn") : tMc("activeStateOff")}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3">
                           {c.activeUserCount ?? "—"}
                           {c.maxUserAccounts != null ? ` / ${c.maxUserAccounts}` : ""}
                         </td>
@@ -610,7 +641,6 @@ export default function ManageCompaniesPage() {
                         <td className="p-3 max-w-[200px] truncate" title={planDisplayName(c.subscriptionPlanId)}>
                           {planDisplayName(c.subscriptionPlanId)}
                         </td>
-                        <td className="p-3 font-mono text-xs">{c.companyId}</td>
                         <td className="p-3">
                           <Button
                             type="button"

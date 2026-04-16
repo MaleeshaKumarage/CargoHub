@@ -410,6 +410,7 @@ function normalizeAdminCompany(raw: Record<string, unknown>): AdminCompany {
   const ac = raw.activeUserCount ?? raw.ActiveUserCount;
   const ad = raw.adminCount ?? raw.AdminCount;
   const sid = raw.subscriptionPlanId ?? raw.SubscriptionPlanId;
+  const ia = raw.isActive ?? raw.IsActive;
   return {
     id: String(raw.id ?? raw.Id ?? ''),
     name: (raw.name ?? raw.Name ?? null) as string | null,
@@ -422,6 +423,7 @@ function normalizeAdminCompany(raw: Record<string, unknown>): AdminCompany {
     ...(ac !== undefined && ac !== null ? { activeUserCount: Number(ac) } : {}),
     ...(ad !== undefined && ad !== null ? { adminCount: Number(ad) } : {}),
     subscriptionPlanId: sid != null && String(sid).length > 0 ? String(sid) : null,
+    isActive: ia == null ? true : Boolean(ia),
   };
 }
 
@@ -438,6 +440,7 @@ export type AdminCompany = {
   adminCount?: number;
   /** Assigned subscription template id (from admin API). */
   subscriptionPlanId?: string | null;
+  isActive: boolean;
 };
 
 export type AdminCreateCompanyBody = {
@@ -463,6 +466,7 @@ export type AdminPatchCompanyBody = {
   /** Super Admin lowering caps: user IDs to deactivate. */
   deactivateUserIds?: string[];
   subscriptionPlanId?: string | null;
+  isActive?: boolean;
 };
 
 /** Returned with HTTP 409 when lowering limits requires choosing users first. */
