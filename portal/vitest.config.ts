@@ -11,6 +11,9 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       reportsDirectory: "./coverage",
+      // Avoid CI OOM: don't attempt to include every file in the project in the report.
+      // We only gate coverage for code that is actually exercised by tests.
+      all: false,
       // Match .github/workflows/pr-validation.yml (line & branch ≥75%; CI does not gate statements/functions)
       thresholds: {
         lines: 75,
