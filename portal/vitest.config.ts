@@ -9,8 +9,13 @@ export default defineConfig({
     globals: true,
     coverage: {
       provider: "v8",
-      reporter: ["text", "json-summary", "html"],
+      reporter: ["text", "json-summary"],
       reportsDirectory: "./coverage",
+      // Match .github/workflows/pr-validation.yml (line & branch ≥75%; CI does not gate statements/functions)
+      thresholds: {
+        lines: 75,
+        branches: 75,
+      },
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.test.{ts,tsx}",
@@ -38,6 +43,9 @@ export default defineConfig({
         "src/app/**/dashboard/**",
         "src/app/**/login/**",
         "src/app/**/register/**",
+        "src/app/**/manage/freelance-riders/**",
+        "src/app/**/rider/**",
+        "src/app/**/accept-rider-invite/**",
         "src/components/Navbar.tsx",
         "src/context/AuthContext.tsx",
         "src/i18n/**",

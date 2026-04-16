@@ -67,7 +67,11 @@ public sealed class GetBookingByIdQueryHandler : IRequestHandler<GetBookingByIdQ
             DeliveryPoint = MapParty(b.DeliveryPoint),
             Shipment = MapShipment(b.Shipment),
             ShippingInfo = MapShippingInfo(b.ShippingInfo),
-            Packages = b.Packages?.Select(MapPackage).ToList() ?? new List<BookingPackageDto>()
+            Packages = b.Packages?.Select(MapPackage).ToList() ?? new List<BookingPackageDto>(),
+            FreelanceRiderId = b.FreelanceRiderId,
+            FreelanceRiderAssignmentDeadlineUtc = b.FreelanceRiderAssignmentDeadlineUtc,
+            FreelanceRiderAcceptedAtUtc = b.FreelanceRiderAcceptedAtUtc,
+            FreelanceRiderAssignmentLapsed = b.FreelanceRiderAssignmentLapsed
         };
     }
 

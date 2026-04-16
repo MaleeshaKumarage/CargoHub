@@ -3,6 +3,7 @@ using CargoHub.Application.Bookings.Commands;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Domain.Bookings;
 using CargoHub.Tests.TestDoubles;
+using CargoHub.Tests.TestSupport;
 using Moq;
 using Xunit;
 
@@ -37,7 +38,7 @@ public class CreateBookingCommandHandlerMappingTests
 
         var request = MinimalRequest();
         request.Shipper = new CreateBookingPartyDto { Name = "Shipper Co", Address1 = "S1", City = "Helsinki", Country = "FI" };
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);
@@ -57,7 +58,7 @@ public class CreateBookingCommandHandlerMappingTests
 
         var request = MinimalRequest();
         request.Shipment = new CreateBookingShipmentDto { Service = "express", SenderReference = "REF1" };
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);
@@ -81,7 +82,7 @@ public class CreateBookingCommandHandlerMappingTests
             GrossWeight = "5",
             Packages = new List<CreateBookingPackageDto> { new() { Weight = "2", Description = "P1" }, new() { Weight = "3" } }
         };
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);
@@ -102,7 +103,7 @@ public class CreateBookingCommandHandlerMappingTests
 
         var request = MinimalRequest();
         request.Payer = new CreateBookingPartyDto { Name = "Payer Ltd", City = "Turku", Country = "FI" };
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);
@@ -123,7 +124,7 @@ public class CreateBookingCommandHandlerMappingTests
 
         var request = MinimalRequest();
         request.ShippingInfo = null;
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);
@@ -222,7 +223,7 @@ public class CreateBookingCommandHandlerMappingTests
         request.ReceiverPhone = "+358401234567";
         request.ReceiverContactPersonName = "Contact";
         request.ReceiverCountry = null;
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "C", request, null), default);
 
         Assert.NotNull(captured);

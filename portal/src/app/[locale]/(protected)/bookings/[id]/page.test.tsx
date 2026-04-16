@@ -8,9 +8,14 @@ const mockReplace = vi.fn();
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
     token: "token",
+    user: { roles: ["User"] },
     isAuthenticated: true,
     isLoading: false,
   }),
+}));
+
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
 }));
 
 vi.mock("@/i18n/navigation", () => ({
