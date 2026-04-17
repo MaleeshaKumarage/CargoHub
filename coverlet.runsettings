@@ -5,8 +5,8 @@
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <!-- Exclude test project, migrations, and external-facing Infrastructure (couriers, SMTP) -->
-          <Exclude>[*.Tests]*,[*]*.Migrations*,[CargoHub.Infrastructure]*.Couriers*,[CargoHub.Infrastructure]*.Smtp*,[CargoHub.Infrastructure]*.Schema*,[CargoHub.Infrastructure]*.Auth*,[CargoHub.Infrastructure]*.Identity*,[CargoHub.Application]*.Couriers*,[CargoHub.Api]*</Exclude>
+          <!-- Exclude test project, migrations, API host, and Infrastructure (integration-heavy; Application/Domain hold the gate) -->
+          <Exclude>[*.Tests]*,[*]*.Migrations*,[CargoHub.Infrastructure]*,[CargoHub.Application]*.Couriers*,[CargoHub.Api]*</Exclude>
         </Configuration>
       </DataCollector>
     </DataCollectors>

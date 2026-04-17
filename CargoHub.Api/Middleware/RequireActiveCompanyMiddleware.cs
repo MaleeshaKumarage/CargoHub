@@ -28,7 +28,7 @@ public sealed class RequireActiveCompanyMiddleware
             return;
         }
 
-        if (context.User.IsInRole(RoleNames.SuperAdmin))
+        if (context.User.IsInRole(RoleNames.SuperAdmin) || context.User.IsInRole(RoleNames.Rider))
         {
             await _next(context);
             return;

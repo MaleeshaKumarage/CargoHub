@@ -17,6 +17,7 @@ import {
   type BookingImportResult,
   type BookingListItem,
 } from "@/lib/api";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,13 @@ export default function BookingsPage() {
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
 
   useEffect(() => {
+    const roles = user?.roles;
+    if (!isLoading && isAuthenticated && roles && isRiderOnlyPortal(roles)) {
+      router.replace("/rider/deliveries");
+    }
+  }, [isLoading, isAuthenticated, user?.roles, router]);
+
+  useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace("/login");
       return;
@@ -85,6 +93,13 @@ export default function BookingsPage() {
   }, [token, tab, isAuthenticated, isLoading]);
 
   if (!isAuthenticated || isLoading) return null;
+  if (user?.roles && isRiderOnlyPortal(user.roles)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
 
   const isDrafts = tab === "drafts";
   const showImportExport = !isSuperAdmin && !isDrafts;
