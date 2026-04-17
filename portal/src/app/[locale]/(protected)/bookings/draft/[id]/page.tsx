@@ -35,6 +35,8 @@ import {
   type PayerSource,
 } from "@/lib/booking-field-rules";
 import { buildCreateBookingBody, defaultPackage, defaultParty } from "@/lib/booking-form-payload";
+import { FreelanceRiderSection } from "@/components/booking/FreelanceRiderSection";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -87,6 +89,7 @@ export default function DraftDetailPage() {
   const [courierIds, setCourierIds] = useState<string[]>([]);
   const [couriersReady, setCouriersReady] = useState(false);
   const [saveToAddressBook, setSaveToAddressBook] = useState(true);
+  const [freelanceRiderId, setFreelanceRiderId] = useState("");
 
   const clearFieldErrors = useCallback(() => setFieldErrors({}), []);
 
@@ -114,10 +117,11 @@ export default function DraftDetailPage() {
     setGeneralInstructions(ctx.generalInstructions);
     setDeliveryWithoutSignature(d.shippingInfo?.deliveryWithoutSignature ?? false);
     setPackages(ctx.packages.length > 0 ? ctx.packages : [defaultPackage()]);
+    setFreelanceRiderId(d.freelanceRiderId ?? "");
   }
 
   function buildBody(): CreateBookingBody {
-    return buildCreateBookingBody({
+    const base = buildCreateBookingBody({
       referenceNumber,
       postalService,
       companyId,
@@ -141,7 +145,17 @@ export default function DraftDetailPage() {
       deliveryWithoutSignature,
       packages,
     });
+    const body: CreateBookingBody = { ...base };
+    if (freelanceRiderId.trim()) {
+      body.freelanceRiderId = freelanceRiderId.trim();
+    } else if (draft?.freelanceRiderId) {
+      body.clearFreelanceRider = true;
+    }
+    return body;
   }
+
+  const shipperPostalForMatch = (pickUpAddress.postalCode || shipper.postalCode || "").trim();
+  const receiverPostalForMatch = (receiver.postalCode || "").trim();
 
   function runBookingValidation(): Record<string, string> {
     return validateBookingCreateForm(
@@ -171,6 +185,13 @@ export default function DraftDetailPage() {
       t("fieldRequired"),
     );
   }
+
+  useEffect(() => {
+    const roles = user?.roles;
+    if (!isLoading && isAuthenticated && roles && isRiderOnlyPortal(roles)) {
+      router.replace("/rider/deliveries");
+    }
+  }, [isLoading, isAuthenticated, user?.roles, router]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -345,6 +366,13 @@ export default function DraftDetailPage() {
   const ro = isSuperAdmin;
 
   if (!isAuthenticated || isLoading) return null;
+  if (user?.roles && isRiderOnlyPortal(user.roles)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -528,6 +556,19 @@ export default function DraftDetailPage() {
                 />
               </CardContent>
             </Card>
+
+            {token && draft ? (
+              <FreelanceRiderSection
+                token={token}
+                shipperPostal={shipperPostalForMatch}
+                receiverPostal={receiverPostalForMatch}
+                matchCompanyId={isSuperAdmin ? (draft.header?.companyId ?? undefined) : undefined}
+                value={freelanceRiderId}
+                onChange={setFreelanceRiderId}
+                disabled={ro}
+                idPrefix="draft-fr"
+              />
+            ) : null}
 
             <Card>
               <CardHeader>

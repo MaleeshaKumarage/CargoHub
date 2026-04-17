@@ -4,6 +4,7 @@ using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Domain.Bookings;
 using CargoHub.Infrastructure.Billing;
 using CargoHub.Infrastructure.Persistence;
+using CargoHub.Tests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -39,7 +40,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var handler = new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context));
+        var handler = new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance);
         var result = await handler.Handle(new CreateBookingCommand(customerId, "Customer", request, companyId), default);
 
         Assert.NotNull(result);
@@ -91,7 +92,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCountry = "FI"
         };
         await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
-        var completed = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var completed = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(completed);
 
         var list = await repo.ListByCustomerIdAsync(customerId, 0, 10, null, default);
@@ -150,7 +151,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var result = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var result = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(result);
 
         var first = await repo.TryAddStatusEventAsync(result.Id, "CustomStatus", "test", default);
@@ -173,7 +174,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var result = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var result = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(result);
 
         var history = await repo.GetStatusHistoryAsync(result.Id, default);
@@ -195,7 +196,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var stats = await repo.GetDashboardStatsAsync(customerId, default);
         Assert.True(stats.CountToday >= 1);
@@ -217,7 +218,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var stats = await repo.GetDashboardStatsAsync(null, default);
         Assert.True(stats.CountToday >= 1);
@@ -238,7 +239,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCountry = "FI"
         };
         await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var draftStats = await repo.GetDashboardStatsAsync(customerId, "  DrAfTs  ", null, null, default);
         Assert.Equal("drafts", draftStats.Scope);
@@ -264,7 +265,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCountry = "FI"
         };
         await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, Guid.NewGuid()), default);
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var draftStats = await repo.GetDashboardStatsAsync(customerId, "drafts", null, null, default);
         Assert.True(draftStats.CountMonth >= 1);
@@ -289,7 +290,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var stats = await repo.GetDashboardStatsAsync(customerId, null, 2024, 2, default);
         Assert.Equal(29, stats.BookingsPerDayCurrentMonth.Count);
@@ -311,7 +312,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var now = DateTime.UtcNow;
         var stats = await repo.GetDashboardStatsAsync(customerId, null, now.Year, 13, default);
@@ -332,7 +333,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
 
         var now = DateTime.UtcNow;
         var stats = await repo.GetDashboardStatsAsync(customerId, null, now.Year + 1, 6, default);
@@ -353,7 +354,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(created);
         var booking = await context.Bookings.AsNoTracking().FirstAsync(b => b.Id == created.Id);
         context.BookingStatusHistory.Add(new BookingStatusHistory
@@ -384,8 +385,8 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
-        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(a);
         Assert.NotNull(b);
         var ba = await context.Bookings.AsNoTracking().FirstAsync(x => x.Id == a.Id);
@@ -428,7 +429,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(created);
         var b = await context.Bookings.FirstAsync(x => x.Id == created.Id);
         b.CreatedAtUtc = DateTime.UtcNow.AddDays(-10);
@@ -452,7 +453,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var created = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(created);
         var b = await repo.GetByIdWithTrackingAsync(created.Id, customerId, default);
         Assert.NotNull(b);
@@ -481,8 +482,8 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var r1 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "CustomerA", request, Guid.NewGuid()), default);
-        var r2 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "CustomerB", request, Guid.NewGuid()), default);
+        var r1 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "CustomerA", request, Guid.NewGuid()), default);
+        var r2 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "CustomerB", request, Guid.NewGuid()), default);
         Assert.NotNull(r1);
         Assert.NotNull(r2);
 
@@ -519,7 +520,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI"
         };
-        var r1 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
+        var r1 = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(r1);
         var b1 = await repo.GetByIdWithTrackingAsync(r1.Id, customerId, default);
         Assert.NotNull(b1);
@@ -548,10 +549,10 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCountry = "FI"
         };
         await new CreateDraftCommandHandler(repo).Handle(new CreateDraftCommand(customerId, "C", request, companyId), default);
-        var completed = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
+        var completed = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
         Assert.NotNull(completed);
 
-        var testBooking = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context)).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
+        var testBooking = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance).Handle(new CreateBookingCommand(customerId, "C", request, companyId), default);
         Assert.NotNull(testBooking);
         var tb = await repo.GetByIdWithTrackingAsync(testBooking.Id, customerId, default);
         Assert.NotNull(tb);
@@ -630,7 +631,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI",
         };
-        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance)
             .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(done);
         Assert.False(await repo.ConfirmDraftAsync(done.Id, customerId, default));
@@ -650,7 +651,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI",
         };
-        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance)
             .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(done);
         Assert.Null(await repo.GetByIdWithTrackingAsync(done.Id, "other", default));
@@ -670,7 +671,7 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI",
         };
-        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+        var done = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance)
             .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(done);
         var first = await repo.TryAddStatusEventAsync(done.Id, "Custom", "t", default);
@@ -702,9 +703,9 @@ public class BookingRepositoryTestDbTests : IDisposable
             ReceiverCity = "Helsinki",
             ReceiverCountry = "FI",
         };
-        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+        var a = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance)
             .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
-        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context))
+        var b = await new CreateBookingCommandHandler(repo, new SubscriptionBillingOrchestrator(context, StubRiderBookingAssignmentCoordinator.Instance), StubRiderBookingAssignmentCoordinator.Instance)
             .Handle(new CreateBookingCommand(customerId, "C", request, Guid.NewGuid()), default);
         Assert.NotNull(a);
         Assert.NotNull(b);

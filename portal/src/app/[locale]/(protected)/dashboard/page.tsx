@@ -31,6 +31,7 @@ import {
 } from "@/lib/dashboard-echarts";
 import { buildWordCloudOption } from "@/lib/dashboard-wordcloud";
 import { cn } from "@/lib/utils";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 import { BookingCalendarHeatmapGrid } from "@/components/dashboard/BookingCalendarHeatmap";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -81,6 +82,13 @@ export default function DashboardPage() {
   const [avgMode, setAvgMode] = useState<"roll30" | "month" | "year">("roll30");
   const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes("SuperAdmin");
   const chartTheme = useChartTheme();
+
+  useEffect(() => {
+    const roles = user?.roles;
+    if (!isLoading && isAuthenticated && roles && isRiderOnlyPortal(roles)) {
+      router.replace("/rider/deliveries");
+    }
+  }, [isLoading, isAuthenticated, user?.roles, router]);
 
   const [earningsRange, setEarningsRange] = useState<PlatformEarningsSeriesRangeParam>("lastMonth");
   const [earningsSeries, setEarningsSeries] = useState<PlatformEarningsSeriesPoint[]>([]);
@@ -394,6 +402,13 @@ export default function DashboardPage() {
   }, [isSuperAdmin, token, earningsRange]);
 
   if (!isAuthenticated || isLoading) return null;
+  if (user?.roles && isRiderOnlyPortal(user.roles)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

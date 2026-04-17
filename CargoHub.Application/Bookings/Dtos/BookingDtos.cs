@@ -93,6 +93,11 @@ public sealed class BookingDetailDto
     public List<BookingPackageDto> Packages { get; set; } = new();
     /// <summary>When each status (Draft, Waybill, etc.) was reached. Empty if not loaded.</summary>
     public List<BookingStatusEventDto> StatusHistory { get; set; } = new();
+
+    public Guid? FreelanceRiderId { get; set; }
+    public DateTime? FreelanceRiderAssignmentDeadlineUtc { get; set; }
+    public DateTime? FreelanceRiderAcceptedAtUtc { get; set; }
+    public bool FreelanceRiderAssignmentLapsed { get; set; }
 }
 
 public sealed class BookingHeaderDto
@@ -205,6 +210,9 @@ public sealed class CreateBookingRequest
     public CreateBookingPartyDto? DeliveryPoint { get; set; }
     public CreateBookingShipmentDto? Shipment { get; set; }
     public CreateBookingShippingInfoDto? ShippingInfo { get; set; }
+
+    /// <summary>Optional freelance rider (validated on save). Omit to use carrier only.</summary>
+    public Guid? FreelanceRiderId { get; set; }
 }
 
 /// <summary>
@@ -233,4 +241,9 @@ public sealed class UpdateDraftRequest
     public CreateBookingPartyDto? DeliveryPoint { get; set; }
     public CreateBookingShipmentDto? Shipment { get; set; }
     public CreateBookingShippingInfoDto? ShippingInfo { get; set; }
+
+    public Guid? FreelanceRiderId { get; set; }
+
+    /// <summary>When true, clears freelance rider on the draft (omit <see cref="FreelanceRiderId"/>).</summary>
+    public bool ClearFreelanceRider { get; set; }
 }

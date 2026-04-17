@@ -5,6 +5,7 @@ using CargoHub.Application.Auth;
 using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings;
 using CargoHub.Application.Company;
+using CargoHub.Application.FreelanceRiders;
 using CargoHub.Application.Bookings.Commands;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Application.Bookings.Queries;
@@ -195,6 +196,10 @@ public class PortalBookingsController : ControllerBase
         {
             return SubscriptionBillingError(ex);
         }
+        catch (RiderAssignmentException ex)
+        {
+            return BadRequest(new { errorCode = ex.ErrorCode, message = ex.Message });
+        }
     }
 
     // ---- Drafts: save as draft, retrieve, fill rest, confirm to complete ----
@@ -286,6 +291,10 @@ public class PortalBookingsController : ControllerBase
         catch (SubscriptionBillingException ex)
         {
             return SubscriptionBillingError(ex);
+        }
+        catch (RiderAssignmentException ex)
+        {
+            return BadRequest(new { errorCode = ex.ErrorCode, message = ex.Message });
         }
     }
 

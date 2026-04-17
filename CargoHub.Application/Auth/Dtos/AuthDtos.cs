@@ -95,6 +95,14 @@ public sealed class AcceptCompanyAdminInviteRequest
     public string UserName { get; set; } = string.Empty;
 }
 
+/// <summary>POST /api/v1/portal/accept-freelance-rider-invite</summary>
+public sealed class AcceptFreelanceRiderInviteRequest
+{
+    public string Token { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+}
+
 /// <summary>Request for portal verify. Body: { code }.</summary>
 public sealed class VerifyRequest
 {
