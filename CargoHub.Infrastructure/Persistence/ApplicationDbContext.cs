@@ -1,6 +1,7 @@
 using CargoHub.Domain.Billing;
 using CargoHub.Domain.Bookings;
 using CargoHub.Domain.Companies;
+using CargoHub.Domain.FreelanceRiders;
 using CargoHub.Infrastructure.Identity;
 using CompanyEntity = CargoHub.Domain.Companies.Company;
 using Microsoft.AspNetCore.Identity;
@@ -54,6 +55,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<CompanySubscriptionAssignment> CompanySubscriptionAssignments => Set<CompanySubscriptionAssignment>();
 
     public DbSet<BillingPeriodExcludedBooking> BillingPeriodExcludedBookings => Set<BillingPeriodExcludedBooking>();
+
+    public DbSet<FreelanceRider> FreelanceRiders => Set<FreelanceRider>();
+
+    public DbSet<FreelanceRiderServiceArea> FreelanceRiderServiceAreas => Set<FreelanceRiderServiceArea>();
+
+    public DbSet<FreelanceRiderInvite> FreelanceRiderInvites => Set<FreelanceRiderInvite>();
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -121,6 +128,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                   .HasForeignKey(b => b.CompanyId)
                   .IsRequired(false)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(b => b.FreelanceRiderId);
+            entity.Property(b => b.FreelanceRiderAssignmentDeadlineUtc);
+            entity.Property(b => b.FreelanceRiderAcceptedAtUtc);
+            entity.Property(b => b.FreelanceRiderAssignmentLapsed).IsRequired();
+            entity.HasIndex(b => b.FreelanceRiderAssignmentDeadlineUtc)
+                  .HasDatabaseName("IX_Bookings_FreelanceRiderAssignmentDeadlineUtc");
+            entity.HasOne<FreelanceRider>()
+                  .WithMany()
+                  .HasForeignKey(b => b.FreelanceRiderId)
+                  .IsRequired(false)
+                  .OnDelete(DeleteBehavior.SetNull);
 
             entity.OwnsOne(b => b.Header);
             entity.OwnsOne(b => b.Shipment);
@@ -395,6 +414,60 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                   .WithMany(p => p.InvoiceSends)
                   .HasForeignKey(x => x.CompanyBillingPeriodId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FreelanceRider>(entity =>
+        {
+            entity.ToTable("FreelanceRiders", DbSchemas.Couriers);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BusinessId).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.DisplayName).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Phone).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.NormalizedEmail).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.ApplicationUserId).HasMaxLength(128);
+            entity.Property(x => x.Status).HasConversion<int>().IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.NormalizedEmail).HasDatabaseName("IX_FreelanceRiders_NormalizedEmail");
+            entity.HasIndex(x => x.CompanyId).HasDatabaseName("IX_FreelanceRiders_CompanyId");
+            entity.HasIndex(x => x.ApplicationUserId).HasDatabaseName("IX_FreelanceRiders_ApplicationUserId");
+            entity.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<FreelanceRiderServiceArea>(entity =>
+        {
+            entity.ToTable("FreelanceRiderServiceAreas", DbSchemas.Couriers);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PostalCodeNormalized).IsRequired().HasMaxLength(16);
+            entity.HasIndex(x => new { x.FreelanceRiderId, x.PostalCodeNormalized })
+                .IsUnique()
+                .HasDatabaseName("IX_FreelanceRiderServiceAreas_Rider_Postal");
+            entity.HasOne(x => x.FreelanceRider)
+                .WithMany(r => r.ServiceAreas)
+                .HasForeignKey(x => x.FreelanceRiderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FreelanceRiderInvite>(entity =>
+        {
+            entity.ToTable("FreelanceRiderInvites", DbSchemas.Couriers);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.NormalizedEmail).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.ExpiresAt).IsRequired();
+            entity.Property(x => x.CreatedAt).IsRequired();
+            entity.HasIndex(x => x.TokenHash).IsUnique().HasDatabaseName("IX_FreelanceRiderInvites_TokenHash");
+            entity.HasIndex(x => x.FreelanceRiderId).HasDatabaseName("IX_FreelanceRiderInvites_FreelanceRiderId");
+            entity.HasOne(x => x.FreelanceRider)
+                .WithMany()
+                .HasForeignKey(x => x.FreelanceRiderId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

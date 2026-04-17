@@ -35,7 +35,8 @@ public sealed class UserRegistrationService : IUserRegistrationService
         string portalRole,
         CancellationToken cancellationToken = default)
     {
-        if (portalRole != Application.Auth.RoleNames.User && portalRole != Application.Auth.RoleNames.Admin)
+        if (portalRole != Application.Auth.RoleNames.User && portalRole != Application.Auth.RoleNames.Admin &&
+            portalRole != Application.Auth.RoleNames.Rider)
             throw new InvalidOperationException($"Invalid portal role: {portalRole}");
 
         // Store both email and userName so login works with either (account = email or userName)

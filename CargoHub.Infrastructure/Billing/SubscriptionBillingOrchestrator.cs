@@ -1,4 +1,5 @@
 using CargoHub.Application.Billing;
+using CargoHub.Application.FreelanceRiders;
 using CargoHub.Domain.Billing;
 using CargoHub.Domain.Bookings;
 using CargoHub.Infrastructure.Persistence;
@@ -12,10 +13,12 @@ public sealed class SubscriptionBillingOrchestrator : ISubscriptionBillingOrches
     private const string MonthlyBaseComponent = "base";
 
     private readonly ApplicationDbContext _db;
+    private readonly IRiderBookingAssignmentCoordinator _riderAssignment;
 
-    public SubscriptionBillingOrchestrator(ApplicationDbContext db)
+    public SubscriptionBillingOrchestrator(ApplicationDbContext db, IRiderBookingAssignmentCoordinator riderAssignment)
     {
         _db = db;
+        _riderAssignment = riderAssignment;
     }
 
     public async Task<bool> ConfirmDraftWithBillingAsync(Guid bookingId, string customerId, CancellationToken cancellationToken = default)
@@ -32,6 +35,13 @@ public sealed class SubscriptionBillingOrchestrator : ISubscriptionBillingOrches
                 if (!booking.CompanyId.HasValue)
                     throw new SubscriptionBillingException(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, "A company subscription is required to complete bookings.");
                 await AssertTrialNotExceededForCompanyAsync(booking.CompanyId.Value, ct);
+            }
+
+            if (booking.FreelanceRiderId.HasValue)
+            {
+                var assign = await _riderAssignment.ApplyForCompletedBookingAsync(booking, booking.FreelanceRiderId, ct);
+                if (!assign.Success)
+                    throw new RiderAssignmentException(assign.ErrorCode ?? "RiderAssignmentFailed", assign.Message ?? "Rider assignment failed.");
             }
 
             await ApplyBillableTransitionAsync(booking, ct);

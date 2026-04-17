@@ -37,6 +37,11 @@ public sealed class UpdateDraftCommandHandler : IRequestHandler<UpdateDraftComma
             CreateBookingCommandHandler.MapPackages(draft, r.ShippingInfo.Packages);
         }
 
+        if (r.ClearFreelanceRider)
+            draft.FreelanceRiderId = null;
+        else if (r.FreelanceRiderId.HasValue)
+            draft.FreelanceRiderId = r.FreelanceRiderId;
+
         await _repository.UpdateAsync(draft, cancellationToken);
         return GetBookingByIdQueryHandler.MapToDetail(draft);
     }

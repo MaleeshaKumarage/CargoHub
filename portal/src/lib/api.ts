@@ -1434,6 +1434,48 @@ export async function adminReplaceSubscriptionPlanPricingTiers(
 }
 
 /** Anonymous: accept Super Admin–sent company admin invite (returns JWT like register). */
+/** Anonymous: accept Super Admin–sent freelance rider invite (returns JWT with Rider role). */
+export async function acceptFreelanceRiderInvite(body: {
+  token: string;
+  password: string;
+  userName: string;
+}): Promise<LoginResult> {
+  const res = await fetch(`${portalBase()}/accept-freelance-rider-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    return { success: false, message: 'Invalid response' };
+  }
+  if (!res.ok) {
+    return {
+      success: false,
+      errorCode: (data.errorCode as string) ?? 'Error',
+      message: (data.message as string) ?? 'Request failed',
+    };
+  }
+  const userId = (data.userId ?? data.UserId) as string | undefined;
+  const jwtToken = (data.jwtToken ?? data.JwtToken ?? '') as string;
+  if (userId && jwtToken) {
+    const rawRoles = data.roles ?? data.Roles;
+    const normalizedData: LoginResponse = {
+      userId,
+      email: (data.email as string) ?? '',
+      displayName: (data.displayName as string) ?? '',
+      businessId: (data.businessId ?? data.BusinessId ?? null) as string | null,
+      customerMappingId: (data.customerMappingId ?? data.CustomerMappingId ?? null) as string | null,
+      jwtToken,
+      roles: Array.isArray(rawRoles) ? (rawRoles as string[]) : [],
+    };
+    return { success: true, data: normalizedData };
+  }
+  return { success: false, message: 'Invalid response' };
+}
+
 export async function acceptCompanyAdminInvite(body: {
   token: string;
   password: string;
@@ -1608,6 +1650,209 @@ export async function addReceiver(token: string, entry: AddressEntry, companyId?
   return res.json();
 }
 
+// --- Freelance riders ---
+
+export type FreelanceRiderMatch = {
+  id: string;
+  displayName: string;
+  email: string;
+};
+
+/** Match riders by pickup and delivery postals (company scoped; SuperAdmin may pass companyId). */
+export async function getFreelanceRiderMatches(
+  token: string,
+  params: { shipperPostal: string; receiverPostal: string; companyId?: string | null },
+): Promise<FreelanceRiderMatch[]> {
+  const u = new URL(`${portalBase()}/freelance-riders/matches`);
+  u.searchParams.set('shipperPostal', params.shipperPostal.trim());
+  u.searchParams.set('receiverPostal', params.receiverPostal.trim());
+  if (params.companyId) u.searchParams.set('companyId', params.companyId);
+  const res = await fetch(u.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load rider matches');
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((raw) => {
+    const r = raw as Record<string, unknown>;
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      displayName: String(r.displayName ?? r.DisplayName ?? ''),
+      email: String(r.email ?? r.Email ?? ''),
+    };
+  });
+}
+
+export type RiderMeResponse = {
+  id: string;
+  businessId: string;
+  displayName: string;
+  phone: string;
+  email: string;
+  postalCodes: string[];
+};
+
+export async function riderGetMe(token: string): Promise<RiderMeResponse> {
+  const res = await fetch(`${portalBase()}/rider/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load rider profile');
+  const data = (await res.json()) as Record<string, unknown>;
+  const pcs = data.postalCodes ?? data.PostalCodes;
+  return {
+    id: String(data.id ?? data.Id ?? ''),
+    businessId: String(data.businessId ?? data.BusinessId ?? ''),
+    displayName: String(data.displayName ?? data.DisplayName ?? ''),
+    phone: String(data.phone ?? data.Phone ?? ''),
+    email: String(data.email ?? data.Email ?? ''),
+    postalCodes: Array.isArray(pcs) ? (pcs as string[]) : [],
+  };
+}
+
+export async function riderPatchMe(
+  token: string,
+  body: { phone?: string; email?: string; postalCodes?: string[] },
+): Promise<void> {
+  const res = await fetch(`${portalBase()}/rider/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(data.message ?? 'Update failed');
+  }
+}
+
+export async function riderListBookings(token: string): Promise<BookingDetail[]> {
+  const res = await fetch(`${portalBase()}/rider/bookings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load deliveries');
+  return res.json();
+}
+
+export async function riderGetBooking(token: string, id: string): Promise<BookingDetail> {
+  const res = await fetch(`${portalBase()}/rider/bookings/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('Booking not found');
+    throw new Error('Failed to load booking');
+  }
+  return res.json();
+}
+
+export async function riderAcceptBooking(token: string, id: string): Promise<void> {
+  const res = await fetch(`${portalBase()}/rider/bookings/${encodeURIComponent(id)}/accept`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(data.message ?? 'Accept failed');
+  }
+}
+
+export type AdminFreelanceRider = {
+  id: string;
+  businessId: string;
+  displayName: string;
+  phone: string;
+  email: string;
+  status: string;
+  companyId?: string | null;
+  companyLabel?: string | null;
+  applicationUserId?: string | null;
+  postalCodes: string[];
+};
+
+export type AdminCreateFreelanceRiderBody = {
+  businessId: string;
+  displayName?: string;
+  phone?: string;
+  email: string;
+  companyId?: string | null;
+  postalCodes?: string[];
+  sendInvite?: boolean;
+};
+
+export type AdminPatchFreelanceRiderBody = {
+  displayName?: string;
+  phone?: string;
+  email?: string;
+  status?: string;
+  companyId?: string | null;
+  clearCompany?: boolean;
+  postalCodes?: string[];
+};
+
+export async function adminListFreelanceRiders(token: string): Promise<AdminFreelanceRider[]> {
+  const res = await fetch(`${adminBase()}/freelance-riders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load freelance riders');
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map((raw) => {
+    const r = raw as Record<string, unknown>;
+    const pcs = r.postalCodes ?? r.PostalCodes;
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      businessId: String(r.businessId ?? r.BusinessId ?? ''),
+      displayName: String(r.displayName ?? r.DisplayName ?? ''),
+      phone: String(r.phone ?? r.Phone ?? ''),
+      email: String(r.email ?? r.Email ?? ''),
+      status: String(r.status ?? r.Status ?? ''),
+      companyId: (r.companyId ?? r.CompanyId ?? null) as string | null,
+      companyLabel: (r.companyLabel ?? r.CompanyLabel ?? null) as string | null,
+      applicationUserId: (r.applicationUserId ?? r.ApplicationUserId ?? null) as string | null,
+      postalCodes: Array.isArray(pcs) ? (pcs as string[]) : [],
+    };
+  });
+}
+
+export async function adminCreateFreelanceRider(
+  token: string,
+  body: AdminCreateFreelanceRiderBody,
+): Promise<{ id: string }> {
+  const res = await fetch(`${adminBase()}/freelance-riders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { message?: string; id?: string };
+  if (!res.ok) throw new Error(data.message ?? 'Create failed');
+  return { id: String(data.id ?? '') };
+}
+
+export async function adminPatchFreelanceRider(
+  token: string,
+  id: string,
+  body: AdminPatchFreelanceRiderBody,
+): Promise<void> {
+  const res = await fetch(`${adminBase()}/freelance-riders/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(err.message ?? 'Update failed');
+  }
+}
+
+export async function adminSendFreelanceRiderInvite(token: string, id: string): Promise<void> {
+  const res = await fetch(`${adminBase()}/freelance-riders/${encodeURIComponent(id)}/invite`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(err.message ?? 'Invite failed');
+  }
+}
+
 // --- Portal Bookings (JWT required) ---
 
 export type BookingListItem = {
@@ -1691,6 +1936,11 @@ export type BookingDetail = {
   packages?: BookingDetailPackage[];
   /** When each milestone status was reached (from status history table). */
   statusHistory?: BookingStatusEvent[];
+  /** Optional freelance rider assignment (completed bookings). */
+  freelanceRiderId?: string | null;
+  freelanceRiderAssignmentDeadlineUtc?: string | null;
+  freelanceRiderAcceptedAtUtc?: string | null;
+  freelanceRiderAssignmentLapsed?: boolean;
 };
 
 export type BookingStatusEvent = {
@@ -1749,6 +1999,10 @@ export type CreateBookingBody = {
   referenceNumber?: string | null;
   postalService?: string | null;
   companyId?: string | null;
+  /** Optional freelance rider (UUID). Omit for carrier-only delivery. */
+  freelanceRiderId?: string | null;
+  /** PATCH draft only: clear saved freelance rider. */
+  clearFreelanceRider?: boolean;
   receiverName?: string | null;
   receiverAddress1?: string | null;
   receiverAddress2?: string | null;
