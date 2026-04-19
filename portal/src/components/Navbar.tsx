@@ -85,6 +85,24 @@ export function Navbar() {
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title={tDesignTheme("label")}>
+                  <Palette className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {DESIGN_THEMES.map((tKey) => (
+                  <DropdownMenuItem
+                    key={tKey}
+                    onClick={() => setTheme(tKey as DesignTheme)}
+                    className={theme === tKey ? "bg-accent" : undefined}
+                  >
+                    {tDesignTheme(tKey)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm">
                   {locale.toUpperCase()}
                 </Button>
