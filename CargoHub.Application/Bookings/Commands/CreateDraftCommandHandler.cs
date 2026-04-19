@@ -46,6 +46,8 @@ public sealed class CreateDraftCommandHandler : IRequestHandler<CreateDraftComma
             ShippingInfo = CreateBookingCommandHandler.MapShippingInfo(r.ShippingInfo)
         };
         CreateBookingCommandHandler.MapPackages(booking, r.ShippingInfo?.Packages);
+        if (r.FreelanceRiderId.HasValue)
+            booking.FreelanceRiderId = r.FreelanceRiderId;
         await _repository.AddAsync(booking, cancellationToken);
         await _repository.AddStatusEventAsync(booking.Id, BookingStatus.Draft, "draft_created", cancellationToken);
         return GetBookingByIdQueryHandler.MapToDetail(booking);

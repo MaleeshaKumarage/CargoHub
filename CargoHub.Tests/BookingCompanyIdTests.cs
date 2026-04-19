@@ -3,6 +3,7 @@ using CargoHub.Application.Bookings.Commands;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Domain.Bookings;
 using CargoHub.Tests.TestDoubles;
+using CargoHub.Tests.TestSupport;
 using Moq;
 using Xunit;
 
@@ -39,7 +40,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand(
             "customer-1",
             "Customer One",
@@ -62,7 +63,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand(
             "customer-1",
             "Customer One",
@@ -136,7 +137,7 @@ public class BookingCompanyIdTests
         repo.Setup(r => r.AddStatusEventAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateBookingCommandHandler(repo.Object, Billing);
+        var handler = new CreateBookingCommandHandler(repo.Object, Billing, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("cust-min", null, MinimalRequest(), companyId), default);
 
         Assert.NotNull(captured);

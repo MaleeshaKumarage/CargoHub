@@ -337,6 +337,18 @@ namespace CargoHub.Infrastructure.Migrations
                     b.Property<DateTime?>("FirstBillableAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("FreelanceRiderAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FreelanceRiderAssignmentDeadlineUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("FreelanceRiderAssignmentLapsed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("FreelanceRiderId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsDraft")
                         .HasColumnType("boolean");
 
@@ -360,6 +372,11 @@ namespace CargoHub.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FreelanceRiderAssignmentDeadlineUtc")
+                        .HasDatabaseName("IX_Bookings_FreelanceRiderAssignmentDeadlineUtc");
+
+                    b.HasIndex("FreelanceRiderId");
 
                     b.HasIndex("ShipmentNumber")
                         .HasDatabaseName("IX_Bookings_ShipmentNumber");
@@ -584,6 +601,135 @@ namespace CargoHub.Infrastructure.Migrations
                         .HasDatabaseName("IX_CompanyAdminInvites_TokenHash");
 
                     b.ToTable("CompanyAdminInvites", "companies");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplicationUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("BusinessId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationUserId")
+                        .HasDatabaseName("IX_FreelanceRiders_ApplicationUserId");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("IX_FreelanceRiders_CompanyId");
+
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("IX_FreelanceRiders_NormalizedEmail");
+
+                    b.ToTable("FreelanceRiders", "couriers");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRiderInvite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FreelanceRiderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FreelanceRiderId")
+                        .HasDatabaseName("IX_FreelanceRiderInvites_FreelanceRiderId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_FreelanceRiderInvites_TokenHash");
+
+                    b.ToTable("FreelanceRiderInvites", "couriers");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRiderServiceArea", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FreelanceRiderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PostalCodeNormalized")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FreelanceRiderId", "PostalCodeNormalized")
+                        .IsUnique()
+                        .HasDatabaseName("IX_FreelanceRiderServiceAreas_Rider_Postal");
+
+                    b.ToTable("FreelanceRiderServiceAreas", "couriers");
                 });
 
             modelBuilder.Entity("CargoHub.Infrastructure.Identity.ApplicationUser", b =>
@@ -891,6 +1037,11 @@ namespace CargoHub.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("CargoHub.Domain.FreelanceRiders.FreelanceRider", null)
+                        .WithMany()
+                        .HasForeignKey("FreelanceRiderId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.OwnsOne("CargoHub.Domain.Bookings.BookingParty", "DeliveryPoint", b1 =>
                         {
@@ -1743,6 +1894,38 @@ namespace CargoHub.Infrastructure.Migrations
                     b.Navigation("Company");
                 });
 
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRider", b =>
+                {
+                    b.HasOne("CargoHub.Domain.Companies.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRiderInvite", b =>
+                {
+                    b.HasOne("CargoHub.Domain.FreelanceRiders.FreelanceRider", "FreelanceRider")
+                        .WithMany()
+                        .HasForeignKey("FreelanceRiderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FreelanceRider");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRiderServiceArea", b =>
+                {
+                    b.HasOne("CargoHub.Domain.FreelanceRiders.FreelanceRider", "FreelanceRider")
+                        .WithMany("ServiceAreas")
+                        .HasForeignKey("FreelanceRiderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FreelanceRider");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -1811,6 +1994,11 @@ namespace CargoHub.Infrastructure.Migrations
             modelBuilder.Entity("CargoHub.Domain.Billing.SubscriptionPlanPricingPeriod", b =>
                 {
                     b.Navigation("Tiers");
+                });
+
+            modelBuilder.Entity("CargoHub.Domain.FreelanceRiders.FreelanceRider", b =>
+                {
+                    b.Navigation("ServiceAreas");
                 });
 #pragma warning restore 612, 618
         }

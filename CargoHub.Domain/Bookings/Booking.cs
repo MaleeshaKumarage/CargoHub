@@ -148,6 +148,18 @@ public class Booking
     /// </summary>
     public ICollection<BookingUpdate> Updates { get; set; } = new List<BookingUpdate>();
 
+    /// <summary>Optional freelance rider handoff. Cleared if assignment lapses (not accepted in time).</summary>
+    public Guid? FreelanceRiderId { get; set; }
+
+    /// <summary>UTC deadline for the rider to accept. Set when a completed booking is created with a rider, or when a draft is confirmed with a rider.</summary>
+    public DateTime? FreelanceRiderAssignmentDeadlineUtc { get; set; }
+
+    /// <summary>Set when the assigned rider accepts before the deadline.</summary>
+    public DateTime? FreelanceRiderAcceptedAtUtc { get; set; }
+
+    /// <summary>True after deadline passed without acceptance (rider id cleared; carrier proceeds).</summary>
+    public bool FreelanceRiderAssignmentLapsed { get; set; }
+
 }
 
 /// <summary>

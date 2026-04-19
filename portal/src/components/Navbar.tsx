@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 
 export function Navbar() {
   const { theme, setTheme } = useDesignTheme();
@@ -58,6 +59,71 @@ export function Navbar() {
       ? rolesFromUser
       : (rolesFromMe ?? rolesFromToken ?? []);
   const isSuperAdmin = Array.isArray(roles) && roles.includes("SuperAdmin");
+  const isRiderOnly = isRiderOnlyPortal(roles);
+
+  if (isRiderOnly) {
+    return (
+      <header data-slot="navbar" className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/rider/deliveries" className="flex items-center gap-2 font-semibold">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt={appName} className="h-8 w-auto object-contain" />
+            ) : (
+              <span className="truncate">{appName}</span>
+            )}
+          </Link>
+          <nav className="flex items-center gap-2">
+            <Link href="/rider/deliveries">
+              <Button variant={pathname?.startsWith("/rider/deliveries") ? "secondary" : "ghost"} size="sm">
+                {tNav("riderDeliveries")}
+              </Button>
+            </Link>
+            <Link href="/rider/profile">
+              <Button variant={pathname?.startsWith("/rider/profile") ? "secondary" : "ghost"} size="sm">
+                {tNav("riderProfile")}
+              </Button>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {locale.toUpperCase()}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href={pathname ?? "/rider/deliveries"} locale="en">
+                    English
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={pathname ?? "/rider/deliveries"} locale="fi">
+                    Suomi
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={pathname ?? "/rider/deliveries"} locale="sv">
+                    Svenska
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {displayName || t("account")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>{t("signOut")}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </nav>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header data-slot="navbar" className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -115,6 +181,9 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/manage/companies">{tNav("companies")}</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/manage/freelance-riders">{tNav("freelanceRiders")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/manage/invoices">{tNav("invoices")}</Link>

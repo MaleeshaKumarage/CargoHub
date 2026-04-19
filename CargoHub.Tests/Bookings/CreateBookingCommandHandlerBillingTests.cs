@@ -3,6 +3,7 @@ using CargoHub.Application.Bookings;
 using CargoHub.Application.Bookings.Commands;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Domain.Bookings;
+using CargoHub.Tests.TestSupport;
 using Moq;
 using Xunit;
 
@@ -26,7 +27,7 @@ public class CreateBookingCommandHandlerBillingTests
         var billing = new Mock<ISubscriptionBillingOrchestrator>();
         billing.Setup(b => b.AssertBillableBookingAllowedAsync(It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new SubscriptionBillingException("TrialBookingLimitExceeded", "Trial exhausted."));
-        var handler = new CreateBookingCommandHandler(repo.Object, billing.Object);
+        var handler = new CreateBookingCommandHandler(repo.Object, billing.Object, StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             handler.Handle(new CreateBookingCommand("c1", "N", MinimalRequest(), Guid.NewGuid()), default));
         Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
@@ -48,7 +49,7 @@ public class CreateBookingCommandHandlerBillingTests
             .Returns(Task.CompletedTask);
         billing.Setup(b => b.PostBillingForNewCompletedBookingAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        var handler = new CreateBookingCommandHandler(repo.Object, billing.Object);
+        var handler = new CreateBookingCommandHandler(repo.Object, billing.Object, StubRiderBookingAssignmentCoordinator.Instance);
         await handler.Handle(new CreateBookingCommand("c1", "N", MinimalRequest(), Guid.NewGuid()), default);
         billing.Verify(b => b.PostBillingForNewCompletedBookingAsync(capturedId, It.IsAny<CancellationToken>()), Times.Once);
     }

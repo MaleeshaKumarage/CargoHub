@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { acceptCompanyAdminInvite } from "@/lib/api";
+import { acceptCompanyAdminInvite, acceptFreelanceRiderInvite } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -24,13 +24,15 @@ function AcceptInviteForm() {
 
   const t = useTranslations("auth");
 
+  const inviteKind = searchParams.get("type") === "rider" ? "rider" : "admin";
+
   useEffect(() => {
     const q = searchParams.get("token");
     if (q) setToken(q);
   }, [searchParams]);
 
   if (isAuthenticated) {
-    router.replace("/dashboard");
+    router.replace(inviteKind === "rider" ? "/rider/deliveries" : "/dashboard");
     return null;
   }
 
@@ -54,14 +56,21 @@ function AcceptInviteForm() {
     }
     setLoading(true);
     try {
-      const result = await acceptCompanyAdminInvite({
-        token: token.trim(),
-        password,
-        userName: userName.trim(),
-      });
+      const result =
+        inviteKind === "rider"
+          ? await acceptFreelanceRiderInvite({
+              token: token.trim(),
+              password,
+              userName: userName.trim(),
+            })
+          : await acceptCompanyAdminInvite({
+              token: token.trim(),
+              password,
+              userName: userName.trim(),
+            });
       if (result.success && result.data) {
         setAuth(result.data, result.data.jwtToken);
-        router.replace("/dashboard");
+        router.replace(inviteKind === "rider" ? "/rider/deliveries" : "/dashboard");
         return;
       }
       setError(result.message ?? mapInviteError(result.errorCode));

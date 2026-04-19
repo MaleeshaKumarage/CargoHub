@@ -26,11 +26,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: portal/.nvmrc
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
 
       - name: Install portal dependencies
         run: cd portal && npm ci
 
+      # Vitest + v8 coverage can approach the default ~4GB heap on large Next apps; without extra headroom
+      # Node spends many minutes in GC before OOM (looks like a "stuck" job). 8GB avoids thrashing.
       - name: Portal test with coverage
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: cd portal && npm run test:coverage
 
       - name: Upload portal coverage artifact

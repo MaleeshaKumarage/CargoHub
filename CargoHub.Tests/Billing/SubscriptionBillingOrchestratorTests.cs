@@ -50,7 +50,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     public async Task AssertBillableBookingAllowedAsync_Throws_WhenNoCompany()
     {
         using var ctx = _fixture.CreateContext();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.AssertBillableBookingAllowedAsync(null, false, default));
         Assert.Equal(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, ex.ErrorCode);
@@ -60,7 +60,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     public async Task AssertBillableBookingAllowedAsync_Skips_WhenTestBooking()
     {
         using var ctx = _fixture.CreateContext();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.AssertBillableBookingAllowedAsync(Guid.NewGuid(), true, default);
     }
 
@@ -87,7 +87,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
             SubscriptionPlanId = planId
         });
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.AssertBillableBookingAllowedAsync(companyId, false, default);
     }
 
@@ -112,7 +112,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         }
 
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.AssertBillableBookingAllowedAsync(companyId, false, default));
         Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
@@ -136,7 +136,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
             ctx.Bookings.Add(MinimalBooking(Guid.NewGuid(), "cust-nofb", companyId, isDraft: false, firstBillableAtUtc: null));
 
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.AssertBillableBookingAllowedAsync(companyId, false, default));
         Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
@@ -167,7 +167,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
             ctx.Bookings.Add(MinimalBooking(Guid.NewGuid(), "cust-asg", companyId, isDraft: false, firstBillableAtUtc: DateTime.UtcNow.AddMinutes(-i)));
 
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.AssertBillableBookingAllowedAsync(companyId, false, default));
         Assert.Equal("TrialBookingLimitExceeded", ex.ErrorCode);
@@ -181,7 +181,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c-nc", null, isDraft: true));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ex = await Assert.ThrowsAsync<SubscriptionBillingException>(() =>
             orch.ConfirmDraftWithBillingAsync(id, "c-nc", default));
         Assert.Equal(SubscriptionBillingConstants.CompanyRequiredForBookingErrorCode, ex.ErrorCode);
@@ -191,7 +191,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     public async Task ConfirmDraftWithBillingAsync_ReturnsFalse_WhenBookingMissing()
     {
         using var ctx = _fixture.CreateContext();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ok = await orch.ConfirmDraftWithBillingAsync(Guid.NewGuid(), "any-customer", default);
         Assert.False(ok);
     }
@@ -211,7 +211,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "expected-cust", companyId, isDraft: true));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ok = await orch.ConfirmDraftWithBillingAsync(id, "other-cust", default);
         Assert.False(ok);
     }
@@ -231,7 +231,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         });
         ctx.Bookings.Add(MinimalBooking(id, "c1", companyId, isDraft: false));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ok = await orch.ConfirmDraftWithBillingAsync(id, "c1", default);
         Assert.False(ok);
     }
@@ -253,7 +253,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c2", companyId, isDraft: true));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         var ok = await orch.ConfirmDraftWithBillingAsync(id, "c2", default);
         Assert.True(ok);
         var b = await ctx.Bookings.AsNoTracking().FirstAsync(x => x.Id == id);
@@ -265,7 +265,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
     public async Task PostBillingForNewCompletedBookingAsync_NoOp_WhenBookingIdUnknown()
     {
         using var ctx = _fixture.CreateContext();
-        await new SubscriptionBillingOrchestrator(ctx).PostBillingForNewCompletedBookingAsync(Guid.NewGuid(), default);
+        await new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance).PostBillingForNewCompletedBookingAsync(Guid.NewGuid(), default);
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c3", null, isDraft: false));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         var b = await ctx.Bookings.AsNoTracking().FirstAsync(x => x.Id == id);
         Assert.Null(b.FirstBillableAtUtc);
@@ -296,7 +296,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c4", companyId, isDraft: false, isTest: true));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         var b = await ctx.Bookings.AsNoTracking().FirstAsync(x => x.Id == id);
         Assert.Null(b.FirstBillableAtUtc);
@@ -336,7 +336,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c5", companyId, isDraft: false));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         var lines = await ctx.BillingLineItems.Where(l => l.BookingId == id).ToListAsync();
         Assert.Single(lines);
@@ -378,7 +378,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c-idem", companyId, isDraft: false));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         Assert.Equal(1, await ctx.BillingLineItems.CountAsync(l => l.BookingId == id));
@@ -420,7 +420,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         b.CreatedAtUtc = new DateTime(2040, 7, 1, 0, 0, 0, DateTimeKind.Utc);
         ctx.Bookings.Add(b);
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         Assert.True(await ctx.BillingLineItems.AnyAsync(l => l.BookingId == id && l.Amount == 2m));
     }
@@ -459,7 +459,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c-nc", companyId, isDraft: false));
         await ctx.SaveChangesAsync();
-        await new SubscriptionBillingOrchestrator(ctx).PostBillingForNewCompletedBookingAsync(id, default);
+        await new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance).PostBillingForNewCompletedBookingAsync(id, default);
         Assert.Empty(await ctx.BillingLineItems.Where(l => l.BookingId == id).ToListAsync());
     }
 
@@ -497,7 +497,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c-ia", companyId, isDraft: false));
         await ctx.SaveChangesAsync();
-        await new SubscriptionBillingOrchestrator(ctx).PostBillingForNewCompletedBookingAsync(id, default);
+        await new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance).PostBillingForNewCompletedBookingAsync(id, default);
         Assert.Empty(await ctx.BillingLineItems.ToListAsync());
     }
 
@@ -539,7 +539,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         ctx.Bookings.Add(MinimalBooking(first, "c6", companyId, isDraft: false, firstBillableAtUtc: null));
         ctx.Bookings.Add(MinimalBooking(second, "c6", companyId, isDraft: false, firstBillableAtUtc: null));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(first, default);
         await orch.PostBillingForNewCompletedBookingAsync(second, default);
         var baseLines = await ctx.BillingLineItems.Where(l => l.LineType == BillingLineType.MonthlyBase).ToListAsync();
@@ -601,7 +601,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         ctx.Bookings.Add(MinimalBooking(b1, "c7", companyId, isDraft: false, firstBillableAtUtc: null));
         ctx.Bookings.Add(MinimalBooking(b2, "c7", companyId, isDraft: false, firstBillableAtUtc: null));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(b1, default);
         await orch.PostBillingForNewCompletedBookingAsync(b2, default);
         var m1 = await ctx.BillingLineItems.Where(l => l.BookingId == b1 && l.LineType == BillingLineType.TieredMarginal).SumAsync(l => l.Amount);
@@ -661,7 +661,7 @@ public sealed class SubscriptionBillingOrchestratorTests : IDisposable
         var id = Guid.NewGuid();
         ctx.Bookings.Add(MinimalBooking(id, "c8", companyId, isDraft: false, firstBillableAtUtc: null));
         await ctx.SaveChangesAsync();
-        var orch = new SubscriptionBillingOrchestrator(ctx);
+        var orch = new SubscriptionBillingOrchestrator(ctx, CargoHub.Tests.TestSupport.StubRiderBookingAssignmentCoordinator.Instance);
         await orch.PostBillingForNewCompletedBookingAsync(id, default);
         var adj = await ctx.BillingLineItems.AnyAsync(l => l.LineType == BillingLineType.PeriodAdjustment);
         Assert.True(adj);
