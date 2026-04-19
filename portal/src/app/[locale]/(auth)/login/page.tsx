@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { login as apiLogin } from "@/lib/api";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login: setAuth, isAuthenticated } = useAuth();
+  const { login: setAuth, isAuthenticated, user } = useAuth();
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +21,8 @@ export default function LoginPage() {
   const t = useTranslations("auth");
 
   if (isAuthenticated) {
-    router.replace("/dashboard");
+    const roles = user?.roles ?? [];
+    router.replace(isRiderOnlyPortal(roles) ? "/rider/deliveries" : "/dashboard");
     return null;
   }
 
@@ -32,7 +34,8 @@ export default function LoginPage() {
       const result = await apiLogin(account.trim(), password);
       if (result.success && result.data) {
         setAuth(result.data, result.data.jwtToken);
-        router.replace("/dashboard");
+        const roles = result.data.roles ?? [];
+        router.replace(isRiderOnlyPortal(roles) ? "/rider/deliveries" : "/dashboard");
         return;
       }
       setError(result.message ?? t("invalidCredentials"));

@@ -104,6 +104,17 @@ public class PortalController : ControllerBase
         return Ok(result.Data);
     }
 
+    /// <summary>Accept freelance rider invitation.</summary>
+    [HttpPost("accept-freelance-rider-invite")]
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> AcceptFreelanceRiderInvite([FromBody] AcceptFreelanceRiderInviteRequest request)
+    {
+        var result = await _mediator.Send(new AcceptFreelanceRiderInviteCommand(request), HttpContext.RequestAborted);
+        if (!result.Success)
+            return BadRequest(new { errorCode = result.ErrorCode, message = result.Message });
+        return Ok(result.Data);
+    }
+
     /// <summary>
     /// Register a new user. Company ID (government business ID) is required and must match an existing company created by an administrator.
     /// </summary>

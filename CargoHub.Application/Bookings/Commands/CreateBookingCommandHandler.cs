@@ -1,6 +1,7 @@
 using CargoHub.Application.Billing;
 using CargoHub.Application.Bookings.Dtos;
 using CargoHub.Application.Bookings.Queries;
+using CargoHub.Application.FreelanceRiders;
 using CargoHub.Domain.Bookings;
 using MediatR;
 
@@ -10,11 +11,16 @@ public sealed class CreateBookingCommandHandler : IRequestHandler<CreateBookingC
 {
     private readonly IBookingRepository _repository;
     private readonly ISubscriptionBillingOrchestrator _billing;
+    private readonly IRiderBookingAssignmentCoordinator _riderAssignment;
 
-    public CreateBookingCommandHandler(IBookingRepository repository, ISubscriptionBillingOrchestrator billing)
+    public CreateBookingCommandHandler(
+        IBookingRepository repository,
+        ISubscriptionBillingOrchestrator billing,
+        IRiderBookingAssignmentCoordinator riderAssignment)
     {
         _repository = repository;
         _billing = billing;
+        _riderAssignment = riderAssignment;
     }
 
     public async Task<BookingDetailDto?> Handle(CreateBookingCommand request, CancellationToken cancellationToken)
@@ -50,6 +56,10 @@ public sealed class CreateBookingCommandHandler : IRequestHandler<CreateBookingC
         };
         MapPackages(booking, r.ShippingInfo?.Packages);
         await _billing.AssertBillableBookingAllowedAsync(booking.CompanyId, booking.IsTestBooking, cancellationToken);
+        var assign = await _riderAssignment.ApplyForCompletedBookingAsync(booking, r.FreelanceRiderId, cancellationToken);
+        if (!assign.Success)
+            throw new RiderAssignmentException(assign.ErrorCode ?? "RiderAssignmentFailed", assign.Message ?? "Rider assignment failed.");
+
         await _repository.AddAsync(booking, cancellationToken);
         await _repository.AddStatusEventAsync(booking.Id, BookingStatus.CompletedBooking, "booking_created", cancellationToken);
         await _billing.PostBillingForNewCompletedBookingAsync(booking.Id, cancellationToken);

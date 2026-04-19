@@ -20,6 +20,8 @@ using CargoHub.Infrastructure.Company;
 using CargoHub.Infrastructure.Billing;
 using CargoHub.Infrastructure.Couriers;
 using CargoHub.Infrastructure.Identity;
+using CargoHub.Application.FreelanceRiders;
+using CargoHub.Infrastructure.FreelanceRiders;
 using CargoHub.Infrastructure.Options;
 using CargoHub.Infrastructure.Persistence;
 using MediatR;
@@ -126,6 +128,14 @@ builder.Services.AddScoped<ICompanyAdminInviteRepository, CompanyAdminInviteRepo
 builder.Services.AddScoped<ICompanyUserMetrics, CompanyUserMetrics>();
 builder.Services.AddScoped<ICompanyAdminInviteIssuer, CompanyAdminInviteIssuer>();
 builder.Services.AddScoped<IAcceptCompanyAdminInviteRunner, AcceptCompanyAdminInviteRunner>();
+builder.Services.AddScoped<IAcceptFreelanceRiderInviteRunner, AcceptFreelanceRiderInviteRunner>();
+builder.Services.Configure<RiderAssignmentOptions>(builder.Configuration.GetSection(RiderAssignmentOptions.SectionName));
+builder.Services.AddScoped<IFreelanceRiderRepository, FreelanceRiderRepository>();
+builder.Services.AddScoped<IFreelanceRiderInviteRepository, FreelanceRiderInviteRepository>();
+builder.Services.AddScoped<IRiderBookingAssignmentCoordinator, RiderBookingAssignmentCoordinator>();
+builder.Services.AddScoped<IRiderAssignmentNotificationService, RiderAssignmentEmailNotificationService>();
+builder.Services.AddScoped<FreelanceRiderInviteIssuer>();
+builder.Services.AddHostedService<RiderAssignmentLapseHostedService>();
 builder.Services.AddScoped<AdminCompanyUserPolicy>();
 builder.Services.AddScoped<IAdminCompanyLimitUserOperations, AdminCompanyLimitUserOperations>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
@@ -299,7 +309,7 @@ using (var scope = app.Services.CreateScope())
     SubscriptionPlanSeed.AssignDefaultTrialToCompaniesWithoutPlanAsync(db).GetAwaiter().GetResult();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    foreach (var roleName in new[] { CargoHub.Application.Auth.RoleNames.SuperAdmin, CargoHub.Application.Auth.RoleNames.Admin, CargoHub.Application.Auth.RoleNames.User })
+    foreach (var roleName in new[] { CargoHub.Application.Auth.RoleNames.SuperAdmin, CargoHub.Application.Auth.RoleNames.Admin, CargoHub.Application.Auth.RoleNames.User, CargoHub.Application.Auth.RoleNames.Rider })
     {
         if (roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult()) continue;
         roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();

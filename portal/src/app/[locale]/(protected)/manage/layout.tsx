@@ -84,6 +84,14 @@ export default function ManageLayout({
             {tNav("companies")}
           </Button>
         </Link>
+        <Link href="/manage/freelance-riders">
+          <Button
+            variant={pathname?.startsWith("/manage/freelance-riders") ? "secondary" : "ghost"}
+            size="sm"
+          >
+            {tNav("freelanceRiders")}
+          </Button>
+        </Link>
         <Link href="/manage/invoices">
           <Button
             variant={pathname?.startsWith("/manage/invoices") ? "secondary" : "ghost"}

@@ -6,6 +6,8 @@ import { useRouter } from "@/i18n/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { bookingGet, getWaybillPdfBlobUrl, type BookingDetail, type BookingDetailParty } from "@/lib/api";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
+import { useTranslations } from "next-intl";
 import { BookingMilestoneBar } from "@/components/BookingMilestoneBar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,8 +72,9 @@ export default function BookingDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params?.id as string;
-  const { token, isAuthenticated, isLoading } = useAuth();
+  const { token, user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const tFr = useTranslations("bookings.freelanceRider");
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +134,13 @@ export default function BookingDetailPage() {
   }
 
   if (!isAuthenticated || isLoading) return null;
+  if (user?.roles && isRiderOnlyPortal(user.roles)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted-foreground">Redirecting…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -192,6 +202,37 @@ export default function BookingDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {booking.freelanceRiderId ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{tFr("detailHeading")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {booking.freelanceRiderAssignmentLapsed ? (
+                  <p>{tFr("lapsed")}</p>
+                ) : booking.freelanceRiderAcceptedAtUtc ? (
+                  <p>
+                    {tFr("accepted")}
+                    {booking.freelanceRiderAcceptedAtUtc
+                      ? ` (${new Date(booking.freelanceRiderAcceptedAtUtc).toLocaleString()})`
+                      : ""}
+                  </p>
+                ) : booking.freelanceRiderAssignmentDeadlineUtc ? (
+                  <div className="space-y-1">
+                    <p>{tFr("pending")}</p>
+                    <p className="text-muted-foreground">
+                      {tFr("deadline", {
+                        time: new Date(booking.freelanceRiderAssignmentDeadlineUtc).toLocaleString(),
+                      })}
+                    </p>
+                  </div>
+                ) : (
+                  <p>{tFr("pending")}</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Sender | Receiver side by side */}
           <div className="grid gap-4 md:grid-cols-2">

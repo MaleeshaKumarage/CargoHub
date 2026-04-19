@@ -35,6 +35,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TrialBookingLimitBanner } from "@/components/TrialBookingLimitBanner";
+import { FreelanceRiderSection } from "@/components/booking/FreelanceRiderSection";
+import { isRiderOnlyPortal } from "@/lib/rider-role";
 
 export default function CreateBookingPage() {
   const { token, user, isAuthenticated, isLoading } = useAuth();
@@ -77,6 +79,7 @@ export default function CreateBookingPage() {
   const [saveToAddressBook, setSaveToAddressBook] = useState(true);
   const [bookingRules, setBookingRules] = useState<BookingFieldRules>(() => defaultBookingFieldRules());
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [freelanceRiderId, setFreelanceRiderId] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -168,6 +171,10 @@ export default function CreateBookingPage() {
     router.replace("/bookings");
     return null;
   }
+  if (user?.roles && isRiderOnlyPortal(user.roles)) {
+    router.replace("/rider/deliveries");
+    return null;
+  }
 
   function runBookingValidation(): Record<string, string> {
     return validateBookingCreateForm(
@@ -199,7 +206,7 @@ export default function CreateBookingPage() {
   }
 
   function buildBody(): CreateBookingBody {
-    return buildCreateBookingBody({
+    const base = buildCreateBookingBody({
       referenceNumber,
       postalService,
       companyId,
@@ -223,7 +230,14 @@ export default function CreateBookingPage() {
       deliveryWithoutSignature,
       packages,
     });
+    if (freelanceRiderId.trim()) {
+      return { ...base, freelanceRiderId: freelanceRiderId.trim() };
+    }
+    return base;
   }
+
+  const shipperPostalForMatch = (pickUpAddress.postalCode || shipper.postalCode || "").trim();
+  const receiverPostalForMatch = (receiver.postalCode || "").trim();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -468,6 +482,17 @@ export default function CreateBookingPage() {
             />
           </CardContent>
         </Card>
+
+        {token ? (
+          <FreelanceRiderSection
+            token={token}
+            shipperPostal={shipperPostalForMatch}
+            receiverPostal={receiverPostalForMatch}
+            value={freelanceRiderId}
+            onChange={setFreelanceRiderId}
+            idPrefix="create-fr"
+          />
+        ) : null}
 
         <Card>
           <CardHeader>

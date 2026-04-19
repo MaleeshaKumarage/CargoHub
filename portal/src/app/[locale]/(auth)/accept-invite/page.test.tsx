@@ -25,20 +25,26 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-const searchParamsMock = vi.hoisted(() => ({ token: "from-query" as string | null }));
+const searchParamsMock = vi.hoisted(() => ({
+  token: "from-query" as string | null,
+  type: null as string | null,
+}));
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => {
     const p = new URLSearchParams();
     if (searchParamsMock.token) p.set("token", searchParamsMock.token);
+    if (searchParamsMock.type) p.set("type", searchParamsMock.type);
     return p;
   },
 }));
 
 const mockAcceptInvite = vi.hoisted(() => vi.fn());
+const mockAcceptRiderInvite = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", () => ({
   acceptCompanyAdminInvite: mockAcceptInvite,
+  acceptFreelanceRiderInvite: mockAcceptRiderInvite,
 }));
 
 describe("AcceptInvitePage", () => {
@@ -46,6 +52,7 @@ describe("AcceptInvitePage", () => {
     vi.clearAllMocks();
     authMock.isAuthenticated = false;
     searchParamsMock.token = "from-query";
+    searchParamsMock.type = null;
   });
 
   it("shows missing link message when token is absent", async () => {
@@ -108,6 +115,42 @@ describe("AcceptInvitePage", () => {
     });
     expect(mockSetAuth).toHaveBeenCalled();
     expect(mockReplace).toHaveBeenCalledWith("/dashboard");
+    expect(mockAcceptRiderInvite).not.toHaveBeenCalled();
+  });
+
+  it("submits freelance rider invite and redirects to rider deliveries", async () => {
+    searchParamsMock.type = "rider";
+    mockAcceptRiderInvite.mockResolvedValueOnce({
+      success: true,
+      data: {
+        userId: "u2",
+        email: "r@b.com",
+        displayName: "Rider",
+        businessId: "BR1",
+        customerMappingId: null,
+        jwtToken: "jwt-rider",
+        roles: ["Rider"],
+      },
+    });
+
+    render(<AcceptInvitePage />);
+    await screen.findByLabelText(/userName/i);
+    fireEvent.change(screen.getByLabelText(/userName/i), { target: { value: "rider1" } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "secret12" } });
+    fireEvent.change(screen.getByLabelText(/confirmPassword/i), {
+      target: { value: "secret12" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /inviteSubmit/i }));
+
+    await waitFor(() => {
+      expect(mockAcceptRiderInvite).toHaveBeenCalledWith({
+        token: "from-query",
+        password: "secret12",
+        userName: "rider1",
+      });
+    });
+    expect(mockAcceptInvite).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith("/rider/deliveries");
   });
 
   it("shows API error message when invite is invalid", async () => {
