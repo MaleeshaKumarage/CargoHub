@@ -32,7 +32,15 @@ vi.mock("@/context/AuthContext", () => ({
 
 vi.mock("@/lib/api", () => ({
   getMe: vi.fn().mockResolvedValue({ roles: [] }),
-  DESIGN_THEMES: ["skeuomorphism", "neobrutalism", "claymorphism", "minimalism"],
+  DESIGN_THEMES: [
+    "skeuomorphism",
+    "neobrutalism",
+    "claymorphism",
+    "minimalism",
+    "glassmorphism",
+    "nord",
+    "synthwave",
+  ],
 }));
 
 vi.mock("@/context/BrandingContext", () => ({
@@ -116,5 +124,12 @@ describe("Navbar", () => {
     render(<Navbar />);
     const accountButton = screen.getByRole("button", { name: /Test User|account/i });
     expect(accountButton).toBeInTheDocument();
+  });
+
+  it("rider-only nav includes design theme control (palette)", () => {
+    mockRolesFromToken = ["Rider"];
+    render(<Navbar />);
+    expect(screen.getByTitle("label")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /riderDeliveries/i })).toBeInTheDocument();
   });
 });
